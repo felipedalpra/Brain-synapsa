@@ -440,6 +440,79 @@ export function ProspeccaoPainel() {
           </>
         )}
       </section>
+      {a.whatsapp ? (
+        <section className="panel">
+          <h2>Fila de WhatsApp de hoje</h2>
+          <p className="muted">
+            Mensagem pronta para cada clínica qualificada com celular. Você abre o WhatsApp, confere e envia; o
+            Brain não manda nada sozinho. Hoje: {a.whatsapp.enviadosHoje} de {a.whatsapp.capDia} enviadas. Follow-up
+            aparece {4} dias depois, se a clínica não respondeu.
+          </p>
+          {a.whatsapp.fila.length === 0 ? (
+            <p className="empty">
+              {a.whatsapp.restanteHoje === 0
+                ? "Limite do dia atingido. A fila volta amanhã."
+                : "Nenhuma clínica qualificada com celular esperando. Rode a busca ou a prospecção automática."}
+            </p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Clínica</th>
+                    <th>Mensagem</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {a.whatsapp.fila.map((k) => (
+                    <tr key={`${k.prospectId}-${k.etapa}`}>
+                      <td>
+                        <strong>{k.nome}</strong>
+                        <br />
+                        <span className="muted">
+                          {k.cidade ?? ""} · {k.telefone} · {k.etapa === 1 ? "follow-up" : "primeira mensagem"}
+                        </span>
+                      </td>
+                      <td>
+                        <details>
+                          <summary>Ver texto</summary>
+                          <p style={{ whiteSpace: "pre-wrap" }}>{k.texto}</p>
+                        </details>
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <a className="btn" href={k.link} target="_blank" rel="noopener noreferrer">
+                          Abrir no WhatsApp
+                        </a>{" "}
+                        <button
+                          type="button"
+                          className="btn"
+                          disabled={j}
+                          onClick={() =>
+                            p(() => api.prospeccaoWhatsapp(k.prospectId, k.etapa, "enviado"), "Marcada como enviada")
+                          }
+                        >
+                          Enviei
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="link"
+                          disabled={j}
+                          onClick={() =>
+                            p(() => api.prospeccaoWhatsapp(k.prospectId, k.etapa, "pular"), "Clínica pulada")
+                          }
+                        >
+                          Pular
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
       <section className="panel">
         <div className="subtabs" role="tablist">
           {bh.map((k) => (

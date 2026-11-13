@@ -9,6 +9,7 @@ import { dashboardData, refreshDados } from "./data";
 import { crmPainel } from "./crm-painel";
 import { finImportarExtrato, lerExtratoInter } from "./fin-import";
 import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-email";
+import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
 import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finPagarConta, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, type ContaIn, type ExtratoIn } from "./fin";
@@ -142,6 +143,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (rota === "emails/gerar") return out(200, gerarRascunhos(brain));
         if (rota === "emails/enviar") return out(200, await aprovarEEnviar(brain, svc.env, Array.isArray(body.ids) ? body.ids.map(String) : [], f as typeof fetch));
         if (rota === "contato") { marcarContato(brain, Number(body.id), body.acao === "sair" ? "sair" : "respondeu"); return out(200, { ok: true }); }
+        if (rota === "whatsapp") { marcarWhatsapp(brain, Number(body.id), Number(body.etapa), body.acao === "pular" ? "pular" : "enviado"); return out(200, { ok: true }); }
         if (rota === "descartar") { prospDescartar(brain, Number(body.id), body.descartar !== false); return out(200, { ok: true }); }
       }
       if (url.pathname.startsWith("/api/financeiro/")) {

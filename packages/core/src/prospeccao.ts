@@ -1,5 +1,6 @@
 // Prospecção de clínicas: descobre no Google Maps (Apify), lê o site de cada uma, pontua e só então vai ao CRM.
 // O Brain só PESQUISA e ORGANIZA. Nada é enviado a ninguém daqui; ir ao CRM exige o clique do Felipe.
+import { painelWhatsapp } from "./prospeccao-whatsapp";
 import type { ProspectStatus, ProspectView, ProspeccaoPainel, ProspectRunView } from "@brain/shared";
 import { BrainError, type Brain } from "./brain";
 import { crmClient, CrmError, type NewLead } from "./crm";
@@ -385,5 +386,6 @@ export function prospeccaoPainel(brain: Brain, env: Env): ProspeccaoPainel {
     auto: { ...autoConfig(brain), hoje: enviadasHoje(brain) },
     rotina: { ativo: rotinaConfig(brain).ativo, maximo: rotinaConfig(brain).maximo, proxima: proximaCidade(brain), ultimaData: rotinaConfig(brain).ultimaData },
     emails: { pendentes: rascunhosPendentes(brain), ...emailsResumo(brain), remetenteOk: !!env.RESEND_API_KEY && !!env.RESEND_FROM_PROSPECCAO },
+    whatsapp: painelWhatsapp(brain),
   };
 }

@@ -83,6 +83,7 @@ export const api = {
       id: e,
       acao: a,
     }),
+  prospeccaoWhatsapp: (id, etapa, acao) => post("/api/prospeccao/whatsapp", { id, etapa, acao }),
   prospeccaoRotina: (e) => post("/api/prospeccao/rotina", e),
   prospeccaoRotinaRodar: () => post("/api/prospeccao/rotina/rodar", {}),
   prospeccaoAvancar: () => post("/api/prospeccao/avancar", {}),

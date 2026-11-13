@@ -1740,6 +1740,7 @@ create table if not exists prospects (
 );
 create table if not exists prospect_contato (prospect_id integer primary key, respondeu integer not null default 0, sair integer not null default 0, atualizado_em integer not null default 0);
 create table if not exists inbound_emails (email_id text primary key, de text not null, assunto text not null, tipo text not null, prospect_id integer, at integer not null);
+create table if not exists prospect_whatsapp (prospect_id integer not null, etapa integer not null, enviado_em integer not null, pulado integer not null default 0, primary key (prospect_id, etapa));
 create table if not exists prospect_runs (
   id integer primary key autoincrement,
   tipo text not null,
@@ -3949,6 +3950,68 @@ async function aprovarEEnviar(brain2, env, ids, f = fetch) {
   return ids.length > sobra ? { enviados, parou: `Enviei ${enviados}: o limite de hoje \xE9 ${r0.capDia}. Os outros ficam na fila para amanh\xE3.` } : { enviados };
 }
 
+// packages/core/src/prospeccao-whatsapp.ts
+var DAY3 = 864e5;
+var DIAS_FOLLOWUP = 4;
+function numeroWhatsapp(tel) {
+  let d = String(tel ?? "").replace(/\D/g, "");
+  if (d.startsWith("55") && d.length >= 12) d = d.slice(2);
+  d = d.replace(/^0+/, "");
+  if (d.length !== 10 && d.length !== 11) return null;
+  if (/^(\d)\1+$/.test(d)) return null;
+  const ddd = Number(d.slice(0, 2));
+  if (ddd < 11 || ddd > 99) return null;
+  const celular = d.length === 11 ? d[2] === "9" : /[6-9]/.test(d[2]);
+  if (d.length === 11 && d[2] !== "9") return null;
+  return { numero: `55${d}`, celular };
+}
+function mensagemWhatsapp(nome, etapa) {
+  const n2 = nomeCurto(nome);
+  return etapa === 0 ? `Ol\xE1, tudo bem? Aqui \xE9 o Felipe, da Synapsa. Ajudamos cl\xEDnicas de psicologia como a ${n2} a centralizar toda a opera\xE7\xE3o num s\xF3 lugar, tirar processos manuais e automatizar as tarefas administrativas, para a equipe ganhar tempo. Posso te mostrar em uma demonstra\xE7\xE3o de 30 minutos? Mais detalhes em ${SITE_CLINICAS}` : `Oi! S\xF3 retomando minha mensagem sobre a ${n2}. Se fizer sentido ver a demonstra\xE7\xE3o de 30 minutos, \xE9 s\xF3 me avisar o melhor dia e hor\xE1rio. Se n\xE3o for o momento, sem problema algum.`;
+}
+var linkWhatsapp = (numero, texto) => `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+var capDia = (brain2) => Math.max(1, Math.min(30, Number(brain2.policy("prospect_whatsapp_daily", 10)) || 10));
+function enviadosHoje(brain2) {
+  const dia = brtDay(brain2.clock());
+  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY3).filter((r) => brtDay(r.enviado_em) === dia).length;
+}
+function painelWhatsapp(brain2) {
+  const cap2 = capDia(brain2);
+  const feitos = enviadosHoje(brain2);
+  const restante = Math.max(0, cap2 - feitos);
+  const agora = brain2.clock();
+  const ps = rows(
+    brain2.db,
+    `select p.id, p.nome, p.cidade, p.telefone, p.whatsapp_no_site, p.nota from prospects p
+     left join prospect_contato c on c.prospect_id = p.id
+     where p.status in ('qualificado','no_crm') and p.telefone is not null and coalesce(c.respondeu, 0) = 0 and coalesce(c.sair, 0) = 0
+     order by p.nota desc, p.id desc limit 300`
+  );
+  const fila = [];
+  for (const p of ps) {
+    const n2 = numeroWhatsapp(p.telefone);
+    if (!n2 || !(n2.celular || p.whatsapp_no_site === 1)) continue;
+    const feitas = rows(brain2.db, "select etapa, enviado_em, pulado from prospect_whatsapp where prospect_id = ?", p.id);
+    const e0 = feitas.find((x) => x.etapa === 0);
+    const e1 = feitas.find((x) => x.etapa === 1);
+    let etapa = null;
+    if (!e0) etapa = 0;
+    else if (!e1 && e0.pulado === 0 && agora - e0.enviado_em >= DIAS_FOLLOWUP * DAY3) etapa = 1;
+    if (etapa === null) continue;
+    const texto = mensagemWhatsapp(p.nome, etapa);
+    fila.push({ prospectId: p.id, nome: p.nome, cidade: p.cidade, telefone: p.telefone, etapa, texto, link: linkWhatsapp(n2.numero, texto), nota: p.nota });
+  }
+  fila.sort((a, b) => b.etapa - a.etapa || b.nota - a.nota);
+  return { fila: fila.slice(0, restante), enviadosHoje: feitos, capDia: cap2, restanteHoje: restante };
+}
+function marcarWhatsapp(brain2, prospectId, etapa, acao) {
+  if (etapa !== 0 && etapa !== 1) throw new BrainError("invalid", "Etapa inv\xE1lida.");
+  if (!row(brain2.db, "select 1 as x from prospects where id = ?", prospectId)) throw new BrainError("not_found", "Cl\xEDnica n\xE3o encontrada.");
+  run(brain2.db, "insert into prospect_whatsapp (prospect_id, etapa, enviado_em, pulado) values (?, ?, ?, ?) on conflict(prospect_id, etapa) do update set enviado_em = excluded.enviado_em, pulado = excluded.pulado", prospectId, etapa, brain2.clock(), acao === "pular" ? 1 : 0);
+  brain2.audit("voce", acao === "pular" ? "whatsapp_pulou" : "whatsapp_enviou", String(prospectId), { etapa });
+  brain2.emit("change");
+}
+
 // packages/core/src/inbound.ts
 var DOMINIOS_LIVRES = /* @__PURE__ */ new Set(["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "yahoo.com.br", "icloud.com", "uol.com.br", "bol.com.br", "live.com", "terra.com.br"]);
 function enderecoDe(from) {
@@ -4506,7 +4569,8 @@ function prospeccaoPainel(brain2, env) {
     atores: ATORES,
     auto: { ...autoConfig(brain2), hoje: enviadasHoje(brain2) },
     rotina: { ativo: rotinaConfig(brain2).ativo, maximo: rotinaConfig(brain2).maximo, proxima: proximaCidade(brain2), ultimaData: rotinaConfig(brain2).ultimaData },
-    emails: { pendentes: rascunhosPendentes(brain2), ...emailsResumo(brain2), remetenteOk: !!env.RESEND_API_KEY && !!env.RESEND_FROM_PROSPECCAO }
+    emails: { pendentes: rascunhosPendentes(brain2), ...emailsResumo(brain2), remetenteOk: !!env.RESEND_API_KEY && !!env.RESEND_FROM_PROSPECCAO },
+    whatsapp: painelWhatsapp(brain2)
   };
 }
 
@@ -5122,6 +5186,10 @@ function createHandler(svc) {
         if (rota === "emails/enviar") return out(200, await aprovarEEnviar(brain2, svc.env, Array.isArray(body.ids) ? body.ids.map(String) : [], f));
         if (rota === "contato") {
           marcarContato(brain2, Number(body.id), body.acao === "sair" ? "sair" : "respondeu");
+          return out(200, { ok: true });
+        }
+        if (rota === "whatsapp") {
+          marcarWhatsapp(brain2, Number(body.id), Number(body.etapa), body.acao === "pular" ? "pular" : "enviado");
           return out(200, { ok: true });
         }
         if (rota === "descartar") {
