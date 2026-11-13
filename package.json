@@ -14,12 +14,15 @@
     "test": "npm run test -w packages/shared && npm run test -w packages/core && npm run test -w apps/central && npm run test -w apps/server && npm run test -w apps/edge",
     "check": "npm run typecheck && npm run test",
     "deploy": "npm run build -w apps/central && npm run deploy -w apps/edge",
-    "deploy:worker": "node scripts/deploy-worker.mjs"
+    "deploy:worker": "node scripts/deploy-worker.mjs",
+    "deploy:central": "npm run build -w apps/central && node scripts/deploy-worker.mjs --central",
+    "deploy:central:backup": "node scripts/deploy-worker.mjs --central apps/central/producao/index.html"
   },
   "engines": {
     "node": ">=22.13"
   },
   "devDependencies": {
+    "@noble/hashes": "^2.4.0",
     "esbuild": "^0.25.12"
   }
 }

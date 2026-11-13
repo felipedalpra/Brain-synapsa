@@ -1,38 +1,151 @@
-import type { ChatReply, JarvisAction, Snapshot } from "@brain/shared";
+// @ts-nocheck
+// Gerado a partir do build de produção de 12/11/2026 (conversor mecânico). Nomes locais ainda minificados; ajuste ao mexer na tela.
 
-/** Cliente da API local do Brain. Mesma origem: o Vite faz proxy em /api no desenvolvimento. */
-async function call<T>(path: string, init?: RequestInit, timeoutMs = 20_000): Promise<T> {
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), timeoutMs);
+export async function chamar(e, a, t = 2e4) {
+  const r = new AbortController(),
+    o = setTimeout(() => r.abort(), t);
   try {
-    const res = await fetch(path, { ...init, signal: ctl.signal, headers: { "content-type": "application/json" } });
-    const body = (await res.json().catch(() => ({}))) as { error?: string } & T;
-    if (res.status === 401) {
-      location.reload(); // sessão expirada: a página de login assume
-      throw new Error("Faça login.");
-    }
-    if (!res.ok) throw new Error(body.error ?? `Erro ${res.status}`);
-    return body;
+    const s = await fetch(e, {
+        ...a,
+        signal: r.signal,
+        headers: {
+          "content-type": "application/json",
+        },
+      }),
+      i = await s.json().catch(() => ({}));
+    if (s.status === 401) throw (location.reload(), new Error("Fa\xE7a login."));
+    if (!s.ok) throw new Error(i.error ?? `Erro ${s.status}`);
+    return i;
   } finally {
-    clearTimeout(t);
+    clearTimeout(o);
   }
 }
-
-const post = <T,>(path: string, body: unknown = {}) => call<T>(path, { method: "POST", body: JSON.stringify(body) });
-
+export const post = (e, a = {}, t = 2e4) =>
+  chamar(
+    e,
+    {
+      method: "POST",
+      body: JSON.stringify(a),
+    },
+    t,
+  );
 export const api = {
-  /** Há um Brain rodando neste computador? */
-  async probe(): Promise<{ sse: boolean } | null> {
+  async probe() {
     try {
-      const r = await call<{ ok?: boolean; server?: string; sse?: boolean }>("/api/health", undefined, 3000);
-      return r.ok === true && r.server === "brain-server" ? { sse: r.sse === true } : null;
+      const e = await chamar("/api/health", void 0, 3e3);
+      return e.ok === true && e.server === "brain-server"
+        ? {
+            sse: e.sse === true,
+          }
+        : null;
     } catch {
       return null;
     }
   },
-  state: () => call<Snapshot>("/api/state"),
-  decide: (id: string, to: "aprovada" | "rejeitada") => post<Snapshot>(`/api/proposals/${encodeURIComponent(id)}/decide`, { to }),
-  action: (action: JarvisAction) => post<{ message: string; snapshot: Snapshot }>("/api/actions", { action }),
-  chat: (text: string) => post<{ reply: ChatReply; snapshot: Snapshot }>("/api/chat", { text }),
-  checkIntegrations: () => post<Snapshot>("/api/integrations/check"),
+  state: () => chamar("/api/state"),
+  decide: (e, a, t = false) =>
+    post(`/api/proposals/${encodeURIComponent(e)}/decide`, {
+      to: a,
+      enviar: t,
+    }),
+  send: (e) => post(`/api/proposals/${encodeURIComponent(e)}/send`, {}),
+  action: (e) =>
+    post("/api/actions", {
+      action: e,
+    }),
+  chat: (e) =>
+    post("/api/chat", {
+      text: e,
+    }),
+  checkIntegrations: () => post("/api/integrations/check"),
+  dashboard: () => chamar("/api/dashboard"),
+  refreshData: () => post("/api/refresh-data", {}, 6e4),
+  crmPainel: (e = false) => chamar(`/api/crm/painel${e ? "?atualizar=1" : ""}`, void 0, 45e3),
+  prospeccao: () => chamar("/api/prospeccao"),
+  prospeccaoDescoberta: (e, a) =>
+    post("/api/prospeccao/descoberta", {
+      regiao: e,
+      maximo: a,
+    }),
+  prospeccaoEnriquecer: () => post("/api/prospeccao/enriquecer", {}),
+  prospeccaoAuto: (e) => post("/api/prospeccao/auto", e),
+  prospeccaoEmailsGerar: () => post("/api/prospeccao/emails/gerar", {}),
+  prospeccaoEmailsEnviar: (e) =>
+    post(
+      "/api/prospeccao/emails/enviar",
+      {
+        ids: e,
+      },
+      9e4,
+    ),
+  prospeccaoContato: (e, a) =>
+    post("/api/prospeccao/contato", {
+      id: e,
+      acao: a,
+    }),
+  prospeccaoRotina: (e) => post("/api/prospeccao/rotina", e),
+  prospeccaoRotinaRodar: () => post("/api/prospeccao/rotina/rodar", {}),
+  prospeccaoAvancar: () => post("/api/prospeccao/avancar", {}),
+  prospeccaoEnviarCrm: (e) =>
+    post(
+      "/api/prospeccao/enviar-crm",
+      {
+        ids: e,
+      },
+      9e4,
+    ),
+  prospeccaoDescartar: (e, a) =>
+    post("/api/prospeccao/descartar", {
+      id: e,
+      descartar: a,
+    }),
+  financeiro: () => chamar("/api/financeiro"),
+  finConta: (e) =>
+    post("/api/financeiro/conta", {
+      conta: e,
+    }),
+  finPagar: (e, a, t) =>
+    post("/api/financeiro/conta/pagar", {
+      id: e,
+      pagoEm: a,
+      valor: t,
+    }),
+  finDesfazer: (e) =>
+    post("/api/financeiro/conta/desfazer", {
+      id: e,
+    }),
+  finRemover: (e) =>
+    post("/api/financeiro/conta/remover", {
+      id: e,
+    }),
+  finImportarExtrato: (e) =>
+    post("/api/financeiro/importar-extrato", {
+      texto: e,
+    }),
+  finCobranca: (e) =>
+    post("/api/financeiro/cobranca", {
+      cobranca: e,
+    }),
+  finCobrancaAtivar: (e, a) =>
+    post("/api/financeiro/cobranca/ativar", {
+      id: e,
+      ativa: a,
+    }),
+  finCobrancaRemover: (e) =>
+    post("/api/financeiro/cobranca/remover", {
+      id: e,
+    }),
+  finLancamento: (e) =>
+    post("/api/financeiro/lancamento", {
+      lancamento: e,
+    }),
+  finLancamentoRemover: (e) =>
+    post("/api/financeiro/lancamento/remover", {
+      id: e,
+    }),
+  finPremissas: (e) =>
+    post("/api/financeiro/premissas", {
+      premissas: e,
+    }),
+  teamFeed: (e) => chamar(`/api/team-feed?team=${encodeURIComponent(e)}`),
 };

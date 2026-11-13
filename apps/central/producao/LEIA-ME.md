@@ -1,6 +1,5 @@
 # Central em produção (cópia de 12/11/2026)
 
-`index.html` é o build compilado (arquivo único) da Central exatamente como estava publicada no Worker `synapsa-brain` em 12/11/2026, com Financeiro, CRM e Prospecções. O fonte legível se perdeu; este arquivo é o backup fiel.
+`index.html` é o build compilado da Central exatamente como estava publicada em 12/11/2026 (Financeiro, CRM, Prospecções). Serve de backup fiel.
 
-Para reimplantar idêntica: publicar este arquivo como asset `index.html` do Worker (o Worker serve só depois do login).
-Não é editável como `.tsx`. Telas novas devem ser reescritas em `apps/central/src` usando este build como referência.
+Para voltar a ela: `npm run deploy:central:backup` na raiz (testado em 12/11/2026).

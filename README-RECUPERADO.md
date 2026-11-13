@@ -14,4 +14,10 @@ Deploy: PUT /accounts/<id>/workers/scripts/synapsa-brain (multipart: metadata, i
 - Base: árvore de 17/out/2026 (Central antiga, server local, testes, package.json, tsconfig, wrangler).
 - Por cima: fontes do Worker de produção recuperados do source map (packages/core/src, packages/shared/src, apps/edge/src). Esses são os arquivos de runtime ATUAIS (CRM, Financeiro, Prospecção, e-mail, webhook Resend).
 - Arquivos só-de-tipos (shared/types.ts, core/types.ts, etc.) são os de 17/out: podem estar defasados e precisar de ajuste para o typecheck passar.
-- apps/central é a versão de 17/out. A Central em produção (Financeiro, CRM, Prospecções) é mais nova e o fonte dela se perdeu: NÃO republicar a Central a partir daqui sem reescrever essas telas.
+- apps/central/src foi regenerado do build de produção de 12/11/2026 por conversor mecânico (JSX + separação por tela + nomes dos componentes). Compila igual (418,7 KB contra 418,9 KB) e renderiza idêntico à produção nas 11 telas em modo demonstração, sem erros. Os nomes locais (e, a, t…) continuam minificados e os arquivos têm `// @ts-nocheck`: ao mexer numa tela, renomeie e tipe só ela.
+- A versão antiga de 17/out está no histórico do git (commit f41dab0).
+- apps/central/producao/index.html é o backup fiel da Central em produção.
+
+## Deploy
+- Worker: `CLOUDFLARE_API_TOKEN=… npm run deploy:worker` (não mexe nos segredos nem na Central publicada).
+- Central: `npm run deploy:central` (compila e publica) ou, para voltar ao backup de produção, `npm run deploy:central:backup`.
