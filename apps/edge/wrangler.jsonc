@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "synapsa-brain",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // A Central compilada (npm run build na raiz). O Worker serve só depois do login.
+  "assets": { "directory": "../central/dist", "binding": "ASSETS", "run_worker_first": true },
+  "durable_objects": { "bindings": [{ "name": "BRAIN", "class_name": "BrainDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BrainDO"] }],
+  // 10:00 UTC = 7h de Brasília: rotina diária.
+  // 13:00 UTC seg-sex = 10h de Brasília: rotina de prospecção.
+  "triggers": { "crons": ["0 10 * * *", "0 13 * * 1-5"] },
+  "observability": { "enabled": true },
+  "vars": {
+    "META_AD_ACCOUNT_ID": "act_2088116535419801",
+    "META_IG_ID": "17841477271413528"
+  }
+}

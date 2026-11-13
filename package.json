@@ -1,0 +1,21 @@
+{
+  "name": "synapsa-brain",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "npm run build -w apps/central && npm run start -w apps/server",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build -w apps/central",
+    "typecheck": "npm run typecheck -w packages/shared && npm run typecheck -w packages/core && npm run typecheck -w apps/central && npm run typecheck -w apps/server && npm run typecheck -w apps/edge",
+    "test": "npm run test -w packages/shared && npm run test -w packages/core && npm run test -w apps/central && npm run test -w apps/server && npm run test -w apps/edge",
+    "check": "npm run typecheck && npm run test",
+    "deploy": "npm run build -w apps/central && npm run deploy -w apps/edge"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
