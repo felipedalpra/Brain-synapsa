@@ -1739,6 +1739,7 @@ create table if not exists prospects (
   atualizado_em integer not null
 );
 create table if not exists prospect_contato (prospect_id integer primary key, respondeu integer not null default 0, sair integer not null default 0, atualizado_em integer not null default 0);
+create table if not exists inbound_emails (email_id text primary key, de text not null, assunto text not null, tipo text not null, prospect_id integer, at integer not null);
 create table if not exists prospect_runs (
   id integer primary key autoincrement,
   tipo text not null,
@@ -2998,6 +2999,7 @@ async function sendEmail(brain2, env, p, f = fetch) {
   const cap2 = brain2.policy("email_daily_cap", 20);
   const today = row(brain2.db, "select count(*) as n from envios where channel = 'email' and status = 'enviado' and at > ?", now - DAY)?.n ?? 0;
   if (today >= cap2) throw new BrainError("invalid", `Limite de ${cap2} e-mails por dia atingido. Ele sobe aos poucos para proteger o dom\xEDnio.`);
+  const replyTo = p.prospeccao && env.RESEND_INBOUND || env.RESEND_REPLY_TO;
   const res = await f("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json", "idempotency-key": `brain-${p.id}` },
@@ -3006,8 +3008,8 @@ async function sendEmail(brain2, env, p, f = fetch) {
       to: [to],
       subject: p.subject.slice(0, 200),
       text: p.body + footer(env, p.prospeccao === true),
-      ...env.RESEND_REPLY_TO ? { reply_to: env.RESEND_REPLY_TO } : {},
-      headers: { "List-Unsubscribe": `<mailto:${env.RESEND_REPLY_TO ?? "sair@synapsa.chat"}?subject=SAIR>` }
+      ...replyTo ? { reply_to: replyTo } : {},
+      headers: { "List-Unsubscribe": `<mailto:${replyTo ?? "sair@synapsa.chat"}?subject=SAIR>` }
     })
   });
   const body = await res.json().catch(() => ({}));
@@ -3041,7 +3043,7 @@ async function publishInstagram(brain2, env, p, f = fetch) {
 }
 async function sendApproved(brain2, env, proposalId, f = fetch) {
   if (brain2.killed()) throw new BrainError("kill_switch", "Bot\xE3o de emerg\xEAncia ligado.");
-  const p = row(brain2.db, "select id, status, draft, payload from proposals where id = ?", proposalId);
+  const p = row(brain2.db, "select id, status, draft, payload, kind from proposals where id = ?", proposalId);
   if (!p) throw new BrainError("not_found", "Proposta n\xE3o encontrada.");
   if (p.status !== "aprovada") throw new BrainError("invalid", "S\xF3 envio o que voc\xEA aprovou.");
   const e = envioOf(p.payload);
@@ -3049,7 +3051,7 @@ async function sendApproved(brain2, env, proposalId, f = fetch) {
   if (row(brain2.db, "select 1 as x from envios where proposal_id = ? and status = 'enviado'", p.id)) throw new BrainError("already_decided", "J\xE1 foi enviada.");
   if (!p.draft?.trim()) throw new BrainError("invalid", "A proposta n\xE3o tem texto.");
   const prosp = e.tipo === "email" && e.remetente === "prospeccao";
-  if (prosp) {
+  if (prosp && p.kind !== "resposta_lead") {
     const cap2 = Number(brain2.policy("prospect_email_daily_cap", 10));
     const hoje = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and e.at > ? and pr.kind like 'prospeccao%'", brain2.clock() - DAY)?.n ?? 0;
     if (hoje >= cap2) throw new BrainError("invalid", `Limite de ${cap2} e-mails de prospec\xE7\xE3o por dia atingido. Ele sobe aos poucos para proteger o dom\xEDnio novo.`);
@@ -3947,6 +3949,127 @@ async function aprovarEEnviar(brain2, env, ids, f = fetch) {
   return ids.length > sobra ? { enviados, parou: `Enviei ${enviados}: o limite de hoje \xE9 ${r0.capDia}. Os outros ficam na fila para amanh\xE3.` } : { enviados };
 }
 
+// packages/core/src/inbound.ts
+var DOMINIOS_LIVRES = /* @__PURE__ */ new Set(["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "yahoo.com.br", "icloud.com", "uol.com.br", "bol.com.br", "live.com", "terra.com.br"]);
+function enderecoDe(from) {
+  const m = /<([^>]+)>/.exec(from ?? "");
+  return (m?.[1] ?? from ?? "").trim().toLowerCase();
+}
+function textoNovo(texto) {
+  const linhas = [];
+  for (const l of texto.replace(/\r/g, "").split("\n")) {
+    if (/^>/.test(l) || /^(Em .{5,80}escreveu:|On .{5,80}wrote:|-{2,}\s*(Mensagem original|Original Message)|De:\s|From:\s)/i.test(l.trim())) break;
+    linhas.push(l);
+  }
+  return linhas.join("\n").trim();
+}
+var AUTO_ASSUNTO = /resposta autom[aá]tica|autom[aá]tic[ao]|out of office|fora do escrit[oó]rio|auto.?reply|undeliver|delivery status|mail delivery|n[aã]o entregue/i;
+var SAIR_RE = /\b(sair|remover|remova|descadastr\w*|cancelar (o )?(envio|inscri\w+)|pare de (me )?(enviar|mandar)|n[aã]o (quero|tenho interesse|desejo)|sem interesse|n[aã]o me (envie|mande))\b/i;
+function classificar(assunto, texto, headers = {}) {
+  const auto = (headers["auto-submitted"] ?? "no").toLowerCase() !== "no" || /bulk|auto_reply|junk/i.test(headers["precedence"] ?? "") || headers["x-autoreply"] || headers["x-autorespond"];
+  if (auto || AUTO_ASSUNTO.test(assunto)) return "automatica";
+  const novo = `${assunto}
+${textoNovo(texto).slice(0, 400)}`;
+  return SAIR_RE.test(novo) ? "sair" : "resposta";
+}
+function acharProspect(brain2, de) {
+  const exato = row(brain2.db, "select id, nome, email from prospects where lower(email) = ? order by id desc limit 1", de);
+  if (exato) return exato;
+  const dom = de.split("@")[1];
+  if (!dom || DOMINIOS_LIVRES.has(dom)) return null;
+  return rows(brain2.db, "select id, nome, email from prospects where lower(email) like ? order by id desc limit 2", `%@${dom}`).slice(0, 2).length === 1 ? row(brain2.db, "select id, nome, email from prospects where lower(email) like ? order by id desc limit 1", `%@${dom}`) : null;
+}
+function rascunhoResposta(nome) {
+  return `Ol\xE1! Obrigado por responder.
+
+Vamos marcar a demonstra\xE7\xE3o de 30 minutos da Synapsa para a ${nomeCurto(nome)}? Me diga o dia e o hor\xE1rio que ficam melhores para voc\xEAs que eu encaixo na minha agenda. Se preferirem ver antes, o site \xE9 ${SITE_CLINICAS}.
+
+Abra\xE7o,
+Felipe Dalpra`;
+}
+async function buscarCorpo(env, id, f) {
+  try {
+    const r = await f(`https://api.resend.com/emails/receiving/${encodeURIComponent(id)}`, { headers: { authorization: `Bearer ${env.RESEND_API_KEY}` } });
+    if (!r.ok) return { text: "", html: "", headers: {} };
+    const j2 = await r.json();
+    const h = {};
+    if (Array.isArray(j2.headers)) for (const x of j2.headers) h[String(x.name).toLowerCase()] = String(x.value);
+    else for (const [k, v] of Object.entries(j2.headers ?? {})) h[k.toLowerCase()] = String(v);
+    const html = j2.html ?? "";
+    return { text: j2.text ?? html.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<br\s*\/?>|<\/p>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " "), html, headers: h };
+  } catch {
+    return { text: "", html: "", headers: {} };
+  }
+}
+async function encaminhar(env, titulo, de, corpo2, f) {
+  const destino = env.RESEND_REPLY_TO;
+  const from = env.RESEND_FROM_PROSPECCAO;
+  if (!destino || !from || !env.RESEND_API_KEY) return false;
+  try {
+    const r = await f("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ from, to: [destino], reply_to: de, subject: titulo.slice(0, 200), text: corpo2.slice(0, 2e4) })
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+async function tratarRecebido(brain2, env, d, f = fetch) {
+  const id = d.email_id ?? "";
+  const de = enderecoDe(d.from);
+  if (!id || !de) return { tipo: "interno" };
+  if (row(brain2.db, "select 1 as x from inbound_emails where email_id = ?", id)) return { tipo: "repetido" };
+  const meu = [env.RESEND_FROM_PROSPECCAO, env.RESEND_FROM, env.RESEND_REPLY_TO].map(enderecoDe);
+  if (meu.includes(de)) return { tipo: "interno" };
+  const assunto = String(d.subject ?? "").slice(0, 200);
+  const { text, headers } = await buscarCorpo(env, id, f);
+  const tipo = classificar(assunto, text, headers);
+  const p = acharProspect(brain2, de);
+  const agora = brain2.clock();
+  run(brain2.db, "insert into inbound_emails (email_id, de, assunto, tipo, prospect_id, at) values (?, ?, ?, ?, ?, ?)", id, de, assunto, tipo, p?.id ?? null, agora);
+  if (tipo === "automatica") {
+    brain2.audit("sistema", "resposta_automatica_ignorada", de);
+    return { tipo, prospectId: p?.id };
+  }
+  const trecho = textoNovo(text).slice(0, 1500) || "(sem texto; abra no Resend)";
+  if (tipo === "sair") {
+    if (p) marcarContato(brain2, p.id, "sair");
+    suppress(brain2, de, "pediu para sair (respondeu o e-mail)");
+    brain2.audit("sistema", "prospeccao_sair_por_resposta", de, { prospectId: p?.id });
+    await encaminhar(env, `[SAIR] ${p?.nome ?? de}: ${assunto}`, de, `${de} pediu para sair. J\xE1 bloqueei o endere\xE7o e parei a sequ\xEAncia.
+
+${trecho}`, f);
+    brain2.emit("change");
+    return { tipo, prospectId: p?.id };
+  }
+  if (p) marcarContato(brain2, p.id, "respondeu");
+  const nome = p?.nome ?? de;
+  const rascunho = rascunhoResposta(nome);
+  brain2.addProposal({
+    agentId: "prospeccao",
+    kind: "resposta_lead",
+    channel: "email",
+    risk: "medio",
+    impactoBrl: 79,
+    title: `Responder ${nomeCurto(nome)}`,
+    draft: rascunho,
+    why: `${nomeCurto(nome)} respondeu o e-mail de prospec\xE7\xE3o: \u201C${trecho.slice(0, 220).replace(/\s+/g, " ")}\u201D. Rascunho para marcar a demonstra\xE7\xE3o de 30 minutos. Ajuste antes de aprovar.`,
+    contactRef: de,
+    payload: { envio: { tipo: "email", para: de, assunto: assunto.toLowerCase().startsWith("re:") ? assunto : `Re: ${assunto || "Synapsa"}`, remetente: "prospeccao" }, prospeccao: { prospectId: p?.id ?? null, resposta: true }, base: "legitimo_interesse_b2b" },
+    dedupeKey: `resp-${id}`
+  });
+  await encaminhar(env, `[Resposta] ${nome}: ${assunto}`, de, `${de} respondeu:
+
+${trecho}
+
+O rascunho de retorno j\xE1 est\xE1 em Aprova\xE7\xF5es na Central.`, f);
+  brain2.audit("sistema", "prospeccao_respondeu_por_email", de, { prospectId: p?.id });
+  brain2.emit("change");
+  return { tipo, prospectId: p?.id };
+}
+
 // packages/core/src/webhook-resend.ts
 var b64 = (s2) => Uint8Array.from(atob(s2), (c2) => c2.charCodeAt(0));
 var toB64 = (u) => btoa(String.fromCharCode(...u));
@@ -3984,7 +4107,9 @@ async function receberWebhook(brain2, env, req) {
   const raw = await req.text();
   if (raw.length > 1e5 || !await assinaturaValida(secret, req.headers, raw, brain2.clock())) return json2(401, { error: "assinatura inv\xE1lida" });
   try {
-    return json2(200, { ok: true, tratados: tratarEvento(brain2, JSON.parse(raw)) });
+    const ev = JSON.parse(raw);
+    if (ev.type === "email.received") return json2(200, { ok: true, ...await tratarRecebido(brain2, env, ev.data ?? {}) });
+    return json2(200, { ok: true, tratados: tratarEvento(brain2, ev) });
   } catch {
     return json2(400, { error: "corpo inv\xE1lido" });
   }

@@ -26,6 +26,8 @@ export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: str
   const cap = brain.policy("email_daily_cap", 20);
   const today = row<{ n: number }>(brain.db, "select count(*) as n from envios where channel = 'email' and status = 'enviado' and at > ?", now - DAY)?.n ?? 0;
   if (today >= cap) throw new BrainError("invalid", `Limite de ${cap} e-mails por dia atingido. Ele sobe aos poucos para proteger o domínio.`);
+  // Prospecção: as respostas chegam no Resend (RESEND_INBOUND) e o Brain as lê; sem isso, volta para o seu Gmail.
+  const replyTo = (p.prospeccao && env.RESEND_INBOUND) || env.RESEND_REPLY_TO;
   const res = await f("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json", "idempotency-key": `brain-${p.id}` },
@@ -34,8 +36,8 @@ export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: str
       to: [to],
       subject: p.subject.slice(0, 200),
       text: p.body + footer(env, p.prospeccao === true),
-      ...(env.RESEND_REPLY_TO ? { reply_to: env.RESEND_REPLY_TO } : {}),
-      headers: { "List-Unsubscribe": `<mailto:${env.RESEND_REPLY_TO ?? "sair@synapsa.chat"}?subject=SAIR>` },
+      ...(replyTo ? { reply_to: replyTo } : {}),
+      headers: { "List-Unsubscribe": `<mailto:${replyTo ?? "sair@synapsa.chat"}?subject=SAIR>` },
     }),
   });
   const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
@@ -72,7 +74,7 @@ export async function publishInstagram(brain: Brain, env: Env, p: { id: string; 
 /** Envia o que a proposta aprovada pede. Chamado só por você, na Central, nunca por agente. */
 export async function sendApproved(brain: Brain, env: Env, proposalId: string, f: typeof fetch = fetch): Promise<string> {
   if (brain.killed()) throw new BrainError("kill_switch", "Botão de emergência ligado.");
-  const p = row<{ id: string; status: string; draft: string | null; payload: string }>(brain.db, "select id, status, draft, payload from proposals where id = ?", proposalId);
+  const p = row<{ id: string; status: string; draft: string | null; payload: string; kind: string }>(brain.db, "select id, status, draft, payload, kind from proposals where id = ?", proposalId);
   if (!p) throw new BrainError("not_found", "Proposta não encontrada.");
   if (p.status !== "aprovada") throw new BrainError("invalid", "Só envio o que você aprovou.");
   const e = envioOf(p.payload);
@@ -80,7 +82,7 @@ export async function sendApproved(brain: Brain, env: Env, proposalId: string, f
   if (row(brain.db, "select 1 as x from envios where proposal_id = ? and status = 'enviado'", p.id)) throw new BrainError("already_decided", "Já foi enviada.");
   if (!p.draft?.trim()) throw new BrainError("invalid", "A proposta não tem texto.");
   const prosp = e.tipo === "email" && e.remetente === "prospeccao";
-  if (prosp) {
+  if (prosp && p.kind !== "resposta_lead") {
     const cap = Number(brain.policy("prospect_email_daily_cap", 10));
     const hoje = row<{ n: number }>(brain.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and e.at > ? and pr.kind like 'prospeccao%'", brain.clock() - DAY)?.n ?? 0;
     if (hoje >= cap) throw new BrainError("invalid", `Limite de ${cap} e-mails de prospecção por dia atingido. Ele sobe aos poucos para proteger o domínio novo.`);

@@ -33,3 +33,4 @@ export * from "./sql";
 export * from "./thinker";
 export * from "./web";
 export * from "./webhook-resend";
+export * from "./inbound";

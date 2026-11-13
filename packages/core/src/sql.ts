@@ -196,6 +196,7 @@ create table if not exists prospects (
   atualizado_em integer not null
 );
 create table if not exists prospect_contato (prospect_id integer primary key, respondeu integer not null default 0, sair integer not null default 0, atualizado_em integer not null default 0);
+create table if not exists inbound_emails (email_id text primary key, de text not null, assunto text not null, tipo text not null, prospect_id integer, at integer not null);
 create table if not exists prospect_runs (
   id integer primary key autoincrement,
   tipo text not null,

@@ -1,8 +1,9 @@
-// Avisos do Resend (bounce, reclamação de spam). Rota pública: quem manda é o Resend, então a assinatura (Svix) é a única porta.
+// Avisos do Resend (bounce, reclamação de spam, resposta recebida). Rota pública: quem manda é o Resend, então a assinatura (Svix) é a única porta.
 import type { Brain } from "./brain";
 import { suppress } from "./dispatch";
 import { rows } from "./sql";
 import { marcarContato } from "./prospeccao-email";
+import { tratarRecebido, type Recebido } from "./inbound";
 
 const b64 = (s: string): Uint8Array => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const toB64 = (u: Uint8Array): string => btoa(String.fromCharCode(...u));
@@ -46,7 +47,9 @@ export async function receberWebhook(brain: Brain, env: Record<string, string | 
   const raw = await req.text();
   if (raw.length > 100_000 || !(await assinaturaValida(secret, req.headers, raw, brain.clock()))) return json(401, { error: "assinatura inválida" });
   try {
-    return json(200, { ok: true, tratados: tratarEvento(brain, JSON.parse(raw)) });
+    const ev = JSON.parse(raw) as { type?: string; data?: unknown };
+    if (ev.type === "email.received") return json(200, { ok: true, ...(await tratarRecebido(brain, env, (ev.data ?? {}) as Recebido)) });
+    return json(200, { ok: true, tratados: tratarEvento(brain, ev as Parameters<typeof tratarEvento>[1]) });
   } catch {
     return json(400, { error: "corpo inválido" });
   }
