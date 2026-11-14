@@ -35,3 +35,4 @@ export * from "./web";
 export * from "./webhook-resend";
 export * from "./inbound";
 export * from "./prospeccao-whatsapp";
+export * from "./gsc";

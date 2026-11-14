@@ -10,6 +10,7 @@ import {
   Plug,
   Power,
   Radio,
+  Search,
   Users,
   Wallet,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import { Escritorio } from "./components/Escritorio";
 import { Dashboard } from "./components/Dashboard";
 import { Prospeccoes } from "./components/Crm";
 import { Financeiro } from "./components/Financeiro";
+import { Seo } from "./components/Seo";
 import { Equipes } from "./components/Equipes";
 import { Agentes } from "./components/Agentes";
 import { Aprovacoes } from "./components/Aprovacoes";
@@ -52,6 +54,11 @@ export const Du = [
     id: "financeiro",
     label: "Financeiro",
     icon: Wallet,
+  },
+  {
+    id: "seo",
+    label: "SEO",
+    icon: Search,
   },
   {
     id: "equipes",
@@ -179,6 +186,7 @@ export function App() {
         {o === "dashboard" ? <Dashboard /> : null}
         {o === "crm" ? <Prospeccoes /> : null}
         {o === "financeiro" ? <Financeiro /> : null}
+        {o === "seo" ? <Seo /> : null}
         {o === "equipes" ? (
           <Equipes teamId={i} setTeamId={(d) => m("equipes", d)} goApprovals={() => m("aprovacoes")} />
         ) : null}

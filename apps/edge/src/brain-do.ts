@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, rodarRotina, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, rodarRotina, sincronizarGsc, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -57,6 +57,8 @@ export class BrainDO extends DurableObject<Env> {
   async daily(): Promise<{ failed: number; resumed: number; started: boolean }> {
     const rec = this.runner.recover();
     try { gerarRascunhos(this.brain); } catch { /* follow-ups vencidos viram rascunho; erro aqui não pode parar a rotina */ }
+    // Search Console: uma vez por dia (o próprio sincronizarGsc ignora se já rodou hoje); erro aqui não para a rotina.
+    try { await sincronizarGsc(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece como último erro no painel de SEO */ }
     const started = this.runner.tick();
     await this.runner.idle();
     return { ...rec, started };

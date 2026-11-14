@@ -1228,8 +1228,8 @@ function respond(input, v) {
     return { text: `${by("conectado").length} integra\xE7\xF5es ligadas, ${by("pronto").length} com credencial pronta esperando o Worker, ${by("manual").length} manual e ${by("pendente").length} pendentes${pendentes ? ` (${pendentes})` : ""}. As que travam mais agentes s\xE3o Plataforma e Supabase.` };
   }
   if (/(custo|gasto|token|\bia\b)/.test(q)) {
-    const dia = Object.values(v.runtime).reduce((n2, r) => n2 + r.costBrl, 0);
-    return { text: `Hoje os agentes custaram ${brl(dia)}. No m\xEAs: ${brl(M.llmSpentMonthBrl)} de ${brl(M.llmCapMonthlyBrl)} de teto, ${Math.round(M.llmSpentMonthBrl / M.llmCapMonthlyBrl * 100)}% usado.` };
+    const dia2 = Object.values(v.runtime).reduce((n2, r) => n2 + r.costBrl, 0);
+    return { text: `Hoje os agentes custaram ${brl(dia2)}. No m\xEAs: ${brl(M.llmSpentMonthBrl)} de ${brl(M.llmCapMonthlyBrl)} de teto, ${Math.round(M.llmSpentMonthBrl / M.llmCapMonthlyBrl * 100)}% usado.` };
   }
   if (/(fila|aprova|pendente|propost|decis)/.test(q)) {
     if (pending.length === 0) return { text: "Fila vazia. Nada espera por voc\xEA." };
@@ -1741,6 +1741,8 @@ create table if not exists prospects (
 create table if not exists prospect_contato (prospect_id integer primary key, respondeu integer not null default 0, sair integer not null default 0, atualizado_em integer not null default 0);
 create table if not exists inbound_emails (email_id text primary key, de text not null, assunto text not null, tipo text not null, prospect_id integer, at integer not null);
 create table if not exists prospect_whatsapp (prospect_id integer not null, etapa integer not null, enviado_em integer not null, pulado integer not null default 0, primary key (prospect_id, etapa));
+create table if not exists gsc_dia (site text not null, dia text not null, clicks integer not null, impressions integer not null, ctr real not null, position real not null, primary key (site, dia));
+create table if not exists gsc_top (site text not null, tipo text not null, chave text not null, clicks integer not null, impressions integer not null, ctr real not null, position real not null, atualizado_em integer not null, primary key (site, tipo, chave));
 create table if not exists prospect_runs (
   id integer primary key autoincrement,
   tipo text not null,
@@ -3583,7 +3585,7 @@ function montar(e) {
     if (d !== null) partes.push(d === 0 ? "contato hoje" : `${d} dia${d > 1 ? "s" : ""} sem contato`);
     return partes.join(" \xB7 ");
   };
-  const oportunidades = abertos.filter((l) => (ETAPA_PESO[l.status] ?? 0) >= 2).sort((a, b) => prioridade(b) - prioridade(a)).slice(0, 10).map((l) => resumo2(l, frase(l)));
+  const oportunidades2 = abertos.filter((l) => (ETAPA_PESO[l.status] ?? 0) >= 2).sort((a, b) => prioridade(b) - prioridade(a)).slice(0, 10).map((l) => resumo2(l, frase(l)));
   const parados = abertos.filter((l) => (diasSem(l) ?? 0) >= STALE_DIAS).sort((a, b) => (ETAPA_PESO[b.status] ?? 0) - (ETAPA_PESO[a.status] ?? 0) || (diasSem(b) ?? 0) - (diasSem(a) ?? 0)).slice(0, 10).map((l) => resumo2(l, frase(l)));
   const totalParados = abertos.filter((l) => (diasSem(l) ?? 0) >= STALE_DIAS).length;
   const followupsTodos = abertos.filter((l) => typeof l.follow_up_date === "string" && l.follow_up_date <= hoje).sort((a, b) => String(a.follow_up_date).localeCompare(String(b.follow_up_date)));
@@ -3691,7 +3693,7 @@ function montar(e) {
     leadsPorSemana,
     reunioesPorSemana,
     reunioesPorStatus: [...statusMap].map(([status, total]) => ({ status: ROTULO_STATUS_REUNIAO[status] ?? status, total })).sort((a, b) => b.total - a.total),
-    oportunidades,
+    oportunidades: oportunidades2,
     parados,
     followups,
     reunioesHoje,
@@ -3717,7 +3719,7 @@ function limpa(tipo, resto) {
 }
 function lerExtratoInterTexto(texto) {
   const itens2 = [];
-  let dia = null;
+  let dia2 = null;
   const saldo = /Saldo total\s*\n?\s*(?:.*\n)?\s*R\$\s*([\d.]+,\d{2})/.exec(texto);
   const per = /Per[ií]odo:\s*(\d{2})\/(\d{2})\/(\d{4})\s*a\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(texto);
   for (const bruta of texto.split(/\r?\n/)) {
@@ -3727,15 +3729,15 @@ function lerExtratoInterTexto(texto) {
     if (d) {
       const m = MESES.indexOf(d[2].toLowerCase());
       if (m < 0) throw new BrainError("invalid", `M\xEAs n\xE3o reconhecido no extrato: "${d[2]}".`);
-      dia = `${d[3]}-${String(m + 1).padStart(2, "0")}-${d[1].padStart(2, "0")}`;
+      dia2 = `${d[3]}-${String(m + 1).padStart(2, "0")}-${d[1].padStart(2, "0")}`;
       continue;
     }
     const t = /^(.*?)\s+(-?)R\$\s*([\d.]+,\d{2})\s+(-?)R\$\s*([\d.]+,\d{2})\s*$/.exec(l);
-    if (!t || !dia) continue;
+    if (!t || !dia2) continue;
     const valor = r22((t[2] ? -1 : 1) * brNum(t[3]));
     const corpo2 = t[1].trim();
     const q = /^([^":]+?):?\s*"(.*)"$/.exec(corpo2);
-    itens2.push({ data: dia, descricao: q ? limpa(q[1].trim(), q[2]) : limpa(corpo2, ""), valor });
+    itens2.push({ data: dia2, descricao: q ? limpa(q[1].trim(), q[2]) : limpa(corpo2, ""), valor });
   }
   return {
     itens: itens2,
@@ -3972,8 +3974,8 @@ function mensagemWhatsapp(nome, etapa) {
 var linkWhatsapp = (numero, texto) => `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
 var capDia = (brain2) => Math.max(1, Math.min(30, Number(brain2.policy("prospect_whatsapp_daily", 10)) || 10));
 function enviadosHoje(brain2) {
-  const dia = brtDay(brain2.clock());
-  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY3).filter((r) => brtDay(r.enviado_em) === dia).length;
+  const dia2 = brtDay(brain2.clock());
+  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY3).filter((r) => brtDay(r.enviado_em) === dia2).length;
 }
 function painelWhatsapp(brain2) {
   const cap2 = capDia(brain2);
@@ -4010,6 +4012,130 @@ function marcarWhatsapp(brain2, prospectId, etapa, acao) {
   run(brain2.db, "insert into prospect_whatsapp (prospect_id, etapa, enviado_em, pulado) values (?, ?, ?, ?) on conflict(prospect_id, etapa) do update set enviado_em = excluded.enviado_em, pulado = excluded.pulado", prospectId, etapa, brain2.clock(), acao === "pular" ? 1 : 0);
   brain2.audit("voce", acao === "pular" ? "whatsapp_pulou" : "whatsapp_enviou", String(prospectId), { etapa });
   brain2.emit("change");
+}
+
+// packages/core/src/gsc.ts
+var DAY4 = 864e5;
+var ESCOPO = "https://www.googleapis.com/auth/webmasters.readonly";
+var SITES_PADRAO = [
+  { id: "site", rotulo: "synapsa.com.br", siteUrl: "sc-domain:synapsa.com.br" },
+  { id: "diretorio", rotulo: "Diret\xF3rio de psic\xF3logos", siteUrl: "sc-domain:synapsa.chat", pagina: "https://synapsa.chat/psicologos" }
+];
+var sitesGsc = (brain2) => {
+  const p = brain2.policy("gsc_sites", null);
+  return Array.isArray(p) && p.length ? p : SITES_PADRAO;
+};
+function lerChave(env) {
+  const raw = env.GSC_SERVICE_ACCOUNT?.trim();
+  if (!raw) return null;
+  try {
+    const j2 = JSON.parse(raw);
+    return j2.client_email && j2.private_key ? j2 : null;
+  } catch {
+    return null;
+  }
+}
+var b64url = (b) => {
+  const u = typeof b === "string" ? new TextEncoder().encode(b) : b instanceof Uint8Array ? b : new Uint8Array(b);
+  let s2 = "";
+  for (const x of u) s2 += String.fromCharCode(x);
+  return btoa(s2).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+var cache2 = null;
+async function tokenGoogle(chave2, agora, f = fetch) {
+  if (cache2 && cache2.ate > agora + 6e4) return cache2.token;
+  const iat = Math.floor(agora / 1e3);
+  const aud = chave2.token_uri ?? "https://oauth2.googleapis.com/token";
+  const corpo2 = `${b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64url(JSON.stringify({ iss: chave2.client_email, scope: ESCOPO, aud, iat, exp: iat + 3600 }))}`;
+  const pem = chave2.private_key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, "");
+  const der = Uint8Array.from(atob(pem), (c2) => c2.charCodeAt(0));
+  const k = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", k, new TextEncoder().encode(corpo2));
+  const r = await f(aud, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${corpo2}.${b64url(sig)}` }) });
+  const j2 = await r.json().catch(() => ({}));
+  if (!r.ok || !j2.access_token) throw new BrainError("integration", `Google recusou a chave da conta de servi\xE7o: ${j2.error_description ?? r.status}`);
+  cache2 = { token: j2.access_token, ate: agora + (j2.expires_in ?? 3600) * 1e3 };
+  return j2.access_token;
+}
+async function consultar(token, site, body, f) {
+  const filtro = site.pagina ? { dimensionFilterGroups: [{ filters: [{ dimension: "page", operator: "contains", expression: site.pagina }] }] } : {};
+  const r = await f(`https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site.siteUrl)}/searchAnalytics/query`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ ...body, ...filtro, dataState: "final" })
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new BrainError("integration", r.status === 403 ? `Sem acesso a ${site.siteUrl}: adicione o e-mail da conta de servi\xE7o como usu\xE1rio dessa propriedade no Search Console.` : `Search Console (${site.siteUrl}): ${e.error?.message ?? r.status}`);
+  }
+  return (await r.json()).rows ?? [];
+}
+var dia = (ms2) => brtDay(ms2);
+async function sincronizarGsc(brain2, env, f = fetch, opt = {}) {
+  const chave2 = lerChave(env);
+  if (!chave2) return "Search Console n\xE3o configurado (falta o segredo GSC_SERVICE_ACCOUNT).";
+  const agora = brain2.clock();
+  const hoje = dia(agora);
+  if (!opt.forcar && brain2.policy("gsc_ultima_sync", "") === hoje) return "Search Console j\xE1 sincronizado hoje.";
+  const token = await tokenGoogle(chave2, agora, f);
+  const fim = dia(agora - 2 * DAY4);
+  const falhas = [];
+  let linhas = 0;
+  for (const s2 of sitesGsc(brain2)) {
+    try {
+      const ult = row(brain2.db, "select max(dia) as d from gsc_dia where site = ?", s2.id)?.d;
+      const ini = ult ? dia(Date.parse(`${ult}T12:00:00Z`) - 4 * DAY4) : dia(agora - 90 * DAY4);
+      for (const r of await consultar(token, s2, { startDate: ini, endDate: fim, dimensions: ["date"], rowLimit: 500 }, f)) {
+        run(brain2.db, "insert into gsc_dia (site, dia, clicks, impressions, ctr, position) values (?, ?, ?, ?, ?, ?) on conflict(site, dia) do update set clicks = excluded.clicks, impressions = excluded.impressions, ctr = excluded.ctr, position = excluded.position", s2.id, r.keys[0], r.clicks, r.impressions, r.ctr, r.position);
+        linhas++;
+      }
+      const ini28 = dia(Date.parse(`${fim}T12:00:00Z`) - 27 * DAY4);
+      run(brain2.db, "delete from gsc_top where site = ?", s2.id);
+      for (const [tipo, dim] of [["query", "query"], ["page", "page"]])
+        for (const r of await consultar(token, s2, { startDate: ini28, endDate: fim, dimensions: [dim], rowLimit: 100 }, f))
+          run(brain2.db, "insert or replace into gsc_top (site, tipo, chave, clicks, impressions, ctr, position, atualizado_em) values (?, ?, ?, ?, ?, ?, ?, ?)", s2.id, tipo, r.keys[0], r.clicks, r.impressions, r.ctr, r.position, agora);
+    } catch (e) {
+      falhas.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  if (falhas.length === 0) brain2.setPolicy("gsc_ultima_sync", hoje);
+  else brain2.setPolicy("gsc_ultimo_erro", falhas.join(" | ").slice(0, 400));
+  brain2.audit("sistema", "gsc_sincronizou", `${linhas} dias`, { falhas: falhas.length });
+  brain2.emit("change");
+  return falhas.length ? `Search Console com problema: ${falhas.join(" | ")}` : `Search Console sincronizado (${linhas} dias atualizados).`;
+}
+function oportunidades(queries) {
+  return queries.filter((q) => q.impressions >= 30 && q.ctr < 0.03 && q.position >= 4 && q.position <= 20).sort((a, b) => b.impressions - a.impressions).slice(0, 10);
+}
+function gscPainel(brain2, env) {
+  const sites = sitesGsc(brain2).map((s2) => {
+    const dias = rows(brain2.db, "select dia, clicks, impressions, ctr, position from gsc_dia where site = ? order by dia desc limit 56", s2.id).reverse();
+    const ult = dias.slice(-28), ant = dias.slice(-56, -28);
+    const soma = (a, k) => a.reduce((t, x) => t + x[k], 0);
+    const imp = soma(ult, "impressions");
+    const topo = (tipo) => rows(brain2.db, "select chave, clicks, impressions, ctr, position from gsc_top where site = ? and tipo = ? order by clicks desc, impressions desc limit 15", s2.id, tipo);
+    const todasQ = rows(brain2.db, "select chave, clicks, impressions, ctr, position from gsc_top where site = ? and tipo = 'query'", s2.id);
+    return {
+      id: s2.id,
+      rotulo: s2.rotulo,
+      siteUrl: s2.siteUrl,
+      ultimoDia: dias.at(-1)?.dia ?? null,
+      serie: dias.map((x) => ({ dia: x.dia, clicks: x.clicks, impressions: x.impressions })),
+      atual: { clicks: soma(ult, "clicks"), impressions: imp, ctr: imp ? soma(ult, "clicks") / imp : 0, position: imp ? ult.reduce((t, x) => t + x.position * x.impressions, 0) / imp : 0 },
+      anterior: { clicks: soma(ant, "clicks"), impressions: soma(ant, "impressions") },
+      queries: topo("query"),
+      paginas: topo("page"),
+      oportunidades: oportunidades(todasQ)
+    };
+  });
+  const cl = row(brain2.db, "select sum(clicks) as c, sum(impressions) as i from gsc_top where site = 'site' and tipo = 'page' and chave like '%/clinicas%'");
+  return {
+    configurado: !!lerChave(env),
+    ultimoErro: brain2.policy("gsc_ultimo_erro", null),
+    ultimaSync: brain2.policy("gsc_ultima_sync", null),
+    sites,
+    clinicas: cl && cl.i != null ? { clicks: cl.c ?? 0, impressions: cl.i } : null
+  };
 }
 
 // packages/core/src/inbound.ts
@@ -4662,10 +4788,10 @@ function categoria(c2, entrada) {
 var diaMs = (d) => Date.parse(`${d}T12:00:00-03:00`);
 var mesDe = (d) => d.slice(0, 7);
 function somaMeses(d, n2) {
-  const [y, m, dia] = d.split("-").map(Number);
+  const [y, m, dia2] = d.split("-").map(Number);
   const alvo = new Date(Date.UTC(y, m - 1 + n2, 1));
   const ult = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
-  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(dia, ult)).padStart(2, "0")}`;
+  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(dia2, ult)).padStart(2, "0")}`;
 }
 var nomeMes = (ref) => {
   const [y, m] = ref.split("-");
@@ -4955,8 +5081,8 @@ function finPainel(db, agora) {
   const guiaPaga = contas.some((c2) => c2.tipo === "pagar" && c2.categoria === "Impostos e Taxas" && c2.pago_em && mesDe(c2.pago_em) === mesRef);
   const recAnt = soma(entradas, mesAnt);
   if (!guiaPaga && recAnt > 0) {
-    const dia = Number(hoje.slice(8));
-    alertas.push({ id: "guia-simples", tom: dia > 20 ? "critico" : "atencao", titulo: dia > 20 ? "Guia do Simples sem pagamento lan\xE7ado" : `Guia do Simples vence dia 20 (${20 - dia >= 0 ? `faltam ${20 - dia} dias` : "hoje"})`, detalhe: `Referente a ${nomeMes(mesAnt)}. Estimativa ${brl3(r25(recAnt * cfg.aliquotaImpostos))} (${Math.round(cfg.aliquotaImpostos * 100)}% de ${brl3(recAnt)}); o valor real sai do PGDAS.` });
+    const dia2 = Number(hoje.slice(8));
+    alertas.push({ id: "guia-simples", tom: dia2 > 20 ? "critico" : "atencao", titulo: dia2 > 20 ? "Guia do Simples sem pagamento lan\xE7ado" : `Guia do Simples vence dia 20 (${20 - dia2 >= 0 ? `faltam ${20 - dia2} dias` : "hoje"})`, detalhe: `Referente a ${nomeMes(mesAnt)}. Estimativa ${brl3(r25(recAnt * cfg.aliquotaImpostos))} (${Math.round(cfg.aliquotaImpostos * 100)}% de ${brl3(recAnt)}); o valor real sai do PGDAS.` });
   }
   if (mesesDeCaixa !== null && mesesDeCaixa < 3) alertas.push({ id: "caixa-baixo", tom: mesesDeCaixa < 1.5 ? "critico" : "atencao", titulo: `Caixa cobre ${mesesDeCaixa.toLocaleString("pt-BR")} ${mesesDeCaixa === 1 ? "m\xEAs" : "meses"} de despesa`, detalhe: `Saldo do Inter ${brl3(saldoInter)} contra despesa m\xE9dia de ${brl3(despesaMedia)} por m\xEAs.` });
   if (foraMes > 0) alertas.push({ id: "fora-inter", tom: "info", titulo: `${brl3(r25(foraMes))} pagos fora do Inter neste m\xEAs`, detalhe: "Despesa paga no cart\xE3o ou do bolso. Entra no resultado, mas n\xE3o mexe no saldo do Inter: acompanhe o que voc\xEA precisa repor." });
@@ -5122,6 +5248,7 @@ function createHandler(svc) {
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain2));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain2.db, brain2.clock()));
+      if (req.method === "GET" && url.pathname === "/api/seo") return out(200, gscPainel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
         try {
@@ -5171,6 +5298,7 @@ function createHandler(svc) {
         const message = await sendApproved(brain2, svc.env, send[1], svc.fetch);
         return out(200, { message, snapshot: snapshot() });
       }
+      if (url.pathname === "/api/seo/sincronizar") return out(200, { message: await sincronizarGsc(brain2, svc.env, svc.fetch ?? fetch, { forcar: true }) });
       if (url.pathname.startsWith("/api/prospeccao/")) {
         const rota = url.pathname.slice("/api/prospeccao/".length);
         const f = (u, i) => (svc.fetch ?? fetch)(u, i);
@@ -6403,6 +6531,10 @@ var BrainDO = class extends DurableObject {
     const rec = this.runner.recover();
     try {
       gerarRascunhos(this.brain);
+    } catch {
+    }
+    try {
+      await sincronizarGsc(this.brain, strings(this.env));
     } catch {
     }
     const started = this.runner.tick();

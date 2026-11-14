@@ -10,6 +10,7 @@ import { crmPainel } from "./crm-painel";
 import { finImportarExtrato, lerExtratoInter } from "./fin-import";
 import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-email";
 import { marcarWhatsapp } from "./prospeccao-whatsapp";
+import { gscPainel, sincronizarGsc } from "./gsc";
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
 import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finPagarConta, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, type ContaIn, type ExtratoIn } from "./fin";
@@ -77,6 +78,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain.db, brain.clock()));
+      if (req.method === "GET" && url.pathname === "/api/seo") return out(200, gscPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
         try {
@@ -129,6 +131,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         const message = await sendApproved(brain, svc.env, send[1]!, svc.fetch);
         return out(200, { message, snapshot: snapshot() });
       }
+      if (url.pathname === "/api/seo/sincronizar") return out(200, { message: await sincronizarGsc(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) });
       if (url.pathname.startsWith("/api/prospeccao/")) {
         const rota = url.pathname.slice("/api/prospeccao/".length);
         const f = (u: string | URL | Request, i?: RequestInit) => (svc.fetch ?? fetch)(u as string, i);

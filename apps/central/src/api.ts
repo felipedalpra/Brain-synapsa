@@ -83,6 +83,8 @@ export const api = {
       id: e,
       acao: a,
     }),
+  seo: () => chamar("/api/seo"),
+  seoSincronizar: () => post("/api/seo/sincronizar", {}),
   prospeccaoWhatsapp: (id, etapa, acao) => post("/api/prospeccao/whatsapp", { id, etapa, acao }),
   prospeccaoRotina: (e) => post("/api/prospeccao/rotina", e),
   prospeccaoRotinaRodar: () => post("/api/prospeccao/rotina/rodar", {}),
