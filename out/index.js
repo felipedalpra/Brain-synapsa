@@ -1745,6 +1745,9 @@ create table if not exists gsc_dia (site text not null, dia text not null, click
 create table if not exists gsc_top (site text not null, tipo text not null, chave text not null, clicks integer not null, impressions integer not null, ctr real not null, position real not null, atualizado_em integer not null, primary key (site, tipo, chave));
 create table if not exists gsc_agg (site text not null, tipo text not null, periodo text not null, chave text not null, chave2 text not null default '', clicks integer not null, impressions integer not null, ctr real not null, position real not null, primary key (site, tipo, periodo, chave, chave2));
 create table if not exists gsc_pagina_dia (site text not null, pagina text not null, dia text not null, clicks integer not null, impressions integer not null, position real not null, primary key (site, pagina, dia));
+create table if not exists ig_posts (id text primary key, chave text unique, status text not null, tema text not null, pilar text not null default '', maturidade text not null default 'educativo', legenda text not null, textos text not null default '', creditos text not null default '', agendado_para integer not null, criado_em integer not null, decidido_em integer, publicado_em integer, media_id text, permalink text, erro text);
+create table if not exists ig_midia (id text primary key, post_id text not null, ordem integer not null, b64 text not null);
+create index if not exists ig_midia_post on ig_midia (post_id, ordem);
 create table if not exists prospect_runs (
   id integer primary key autoincrement,
   tipo text not null,
@@ -4404,6 +4407,228 @@ async function gscPainelCompleto(brain2, env, f = fetch) {
   return p;
 }
 
+// packages/core/src/compliance.ts
+var EXTERNAL2 = /* @__PURE__ */ new Set(["whatsapp", "email", "linkedin", "instagram"]);
+var NEEDS_CONSENT = /* @__PURE__ */ new Set(["whatsapp", "email"]);
+var TEXT_RULES = [
+  { id: "promessa", test: /\b(cura|curar|cure|garantid[oa]s?|garantimos|garantia de resultado|resultado garantido|sem risco|100 ?%)\b/i, why: "promete resultado a pacientes ou garantia, o que o CFP e a LGPD n\xE3o admitem", scope: "all" },
+  { id: "desconto", test: /\b(desconto|promo[cç][aã]o|cupom|black ?friday|de gra[cç]a por|[0-9]+ ?% off)\b/i, why: "oferece desconto ou promo\xE7\xE3o: nenhum agente faz isso, s\xF3 voc\xEA decide", scope: "draft" },
+  { id: "clinico", test: /\b(cpf|prontu[aá]rio|diagn[oó]stico d[eao]|cid[- ]?\d|laudo)\b/i, why: "cita dado cl\xEDnico de paciente, que nunca entra no Brain", scope: "all" },
+  { id: "pressao", test: /\b(últim[ao]s? (vaga|chance|hora)|só hoje|corra|n[aã]o perca)\b/i, why: "usa press\xE3o de urg\xEAncia artificial", scope: "draft" }
+];
+var complianceReviewer = (p, { db, now }) => {
+  for (const r of TEXT_RULES) {
+    const text = r.scope === "draft" ? p.draft ?? "" : `${p.title}
+${p.draft ?? ""}`;
+    if (r.test.test(text)) return { ok: false, note: r.why };
+  }
+  const publico = p.payload?.envio?.tipo === "instagram";
+  if (EXTERNAL2.has(p.channel) && p.draft && !publico) {
+    if (!p.contactRef) return { ok: false, note: "mensagem externa sem identificar o contato: n\xE3o d\xE1 para checar consentimento nem o intervalo entre contatos" };
+    const pl = p.payload;
+    const legitimo = p.channel === "email" && pl?.base === "legitimo_interesse_b2b" && !!pl.prospeccao;
+    if (legitimo && row(db, "select 1 as x from email_suppression where email = ?", p.contactRef.trim().toLowerCase())) return { ok: false, note: "esse contato pediu para sair ou deu erro de entrega" };
+    if (NEEDS_CONSENT.has(p.channel) && !legitimo) {
+      const c2 = row(db, "select revoked_at from consents where contact_ref = ? and channel = ?", p.contactRef, p.channel);
+      if (!c2 || c2.revoked_at) return { ok: false, note: `sem consentimento v\xE1lido para ${p.channel} desse contato` };
+    }
+    const policy = row(db, "select value from policies where key = 'contact_policy'");
+    const minDays = policy ? JSON.parse(policy.value).min_days_between : 3;
+    const last = row(db, "select max(at) as at from contact_log where contact_ref = ?", p.contactRef);
+    if (last?.at && now - last.at < minDays * 864e5) {
+      const d = Math.ceil((minDays * 864e5 - (now - last.at)) / 864e5);
+      return { ok: false, note: `esse contato recebeu mensagem h\xE1 menos de ${minDays} dias; liberar em ${d} dia(s)` };
+    }
+  }
+  return { ok: true };
+};
+
+// packages/core/src/instagram.ts
+var MAX_SLIDES = 10;
+var MAX_B64 = 13e5;
+var igual = (a, b) => {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+};
+function tokenValido(env, req) {
+  const t = env.IG_INGEST_TOKEN?.trim();
+  const h = req.headers.get("authorization") ?? "";
+  return !!t && t.length >= 24 && igual(h, `Bearer ${t}`);
+}
+function revisarTexto(texto) {
+  if (/\b(cpf|diagn[oó]stico d[eao] (meu|minha|um|uma) paciente|cid[- ]?\d|laudo d[eao])\b/i.test(texto)) return "cita dado cl\xEDnico de paciente, que nunca entra no Brain";
+  for (const r of TEXT_RULES) if (r.id !== "clinico" && r.test.test(texto)) return r.why;
+  return null;
+}
+var MATURIDADES = /* @__PURE__ */ new Set(["existe", "piloto", "plano", "educativo"]);
+function receberPost(brain2, body, origem) {
+  const s2 = (k, max) => String(body[k] ?? "").trim().slice(0, max);
+  const legenda = s2("legenda", 2200), tema = s2("tema", 160), pilar = s2("pilar", 60), textos = s2("textos", 6e3), creditos = s2("creditos", 600), chave2 = s2("chave", 120);
+  const maturidade = s2("maturidade", 20) || "educativo";
+  const slides = Array.isArray(body.slides) ? body.slides.map(String) : [];
+  if (!legenda || !tema) throw new BrainError("invalid", "Faltou tema ou legenda.");
+  if (!MATURIDADES.has(maturidade)) throw new BrainError("invalid", "maturidade deve ser existe, piloto, plano ou educativo.");
+  if (slides.length < 1 || slides.length > MAX_SLIDES) throw new BrainError("invalid", `Mande de 1 a ${MAX_SLIDES} imagens.`);
+  for (const b of slides) {
+    if (b.length > MAX_B64) throw new BrainError("invalid", "Imagem grande demais: exporte em JPEG com at\xE9 ~900 KB.");
+    if (!b.startsWith("/9j/")) throw new BrainError("invalid", "As imagens devem ser JPEG em base64 (o Instagram s\xF3 aceita JPEG).");
+  }
+  const motivo = revisarTexto(`${legenda}
+${textos}`);
+  if (motivo) throw new BrainError("invalid", `A conformidade barrou esse post: ${motivo}. Reescreva e mande de novo.`);
+  if (chave2) {
+    const ja = row(brain2.db, "select id, status, agendado_para from ig_posts where chave = ?", chave2);
+    if (ja) return { id: ja.id, status: ja.status, agendadoPara: ja.agendado_para };
+  }
+  const agora = brain2.clock();
+  const ag = Date.parse(String(body.agendar_para ?? ""));
+  const agendado = Number.isFinite(ag) && ag > agora ? ag : agora;
+  const id = crypto.randomUUID();
+  brain2.db.transaction(() => {
+    run(brain2.db, "insert into ig_posts (id, chave, status, tema, pilar, maturidade, legenda, textos, creditos, agendado_para, criado_em) values (?, ?, 'pendente', ?, ?, ?, ?, ?, ?, ?, ?)", id, chave2 || null, tema, pilar, maturidade, legenda, textos, creditos, agendado, agora);
+    slides.forEach((b, i) => run(brain2.db, "insert into ig_midia (id, post_id, ordem, b64) values (?, ?, ?, ?)", crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8), id, i, b));
+  });
+  brain2.setPolicy("ig_origem", origem);
+  brain2.audit("sistema", "ig_recebeu", tema, { slides: slides.length, maturidade });
+  brain2.emit("change");
+  return { id, status: "pendente", agendadoPara: agendado };
+}
+function servirMidia(brain2, nome) {
+  const m = nome.match(/^([a-f0-9]{40})\.jpg$/);
+  const r = m ? row(brain2.db, "select b64 from ig_midia where id = ?", m[1]) : void 0;
+  if (!r) return new Response("n\xE3o encontrado", { status: 404 });
+  const bin = Uint8Array.from(atob(r.b64), (c2) => c2.charCodeAt(0));
+  return new Response(bin, { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400" } });
+}
+var ver = (brain2, l) => ({
+  id: l.id,
+  status: l.status,
+  tema: l.tema,
+  pilar: l.pilar,
+  maturidade: l.maturidade,
+  legenda: l.legenda,
+  textos: l.textos,
+  creditos: l.creditos,
+  agendadoPara: l.agendado_para,
+  criadoEm: l.criado_em,
+  publicadoEm: l.publicado_em,
+  permalink: l.permalink,
+  erro: l.erro,
+  midias: rows(brain2.db, "select id from ig_midia where post_id = ? order by ordem", l.id).map((m) => `/api/midia/${m.id}.jpg`)
+});
+function igPainel(brain2, env) {
+  const ls = rows(brain2.db, "select * from ig_posts order by case status when 'pendente' then 0 when 'falhou' then 1 when 'aprovado' then 2 else 3 end, agendado_para desc limit 60");
+  return { configurado: !!(env.META_SYSTEM_USER_TOKEN && env.META_IG_ID), tokenEntrega: !!env.IG_INGEST_TOKEN, auto: brain2.policy("ig_auto_publicar", false) === true, posts: ls.map((l) => ver(brain2, l)) };
+}
+function igContexto(brain2) {
+  const ls = rows(brain2.db, "select * from ig_posts order by criado_em desc limit 60");
+  const fila = ls.filter((l) => l.status === "pendente" || l.status === "aprovado");
+  return {
+    recentes: ls.map((l) => ({ tema: l.tema, pilar: l.pilar, maturidade: l.maturidade, status: l.status, dia: new Date(l.agendado_para).toISOString().slice(0, 10), ...l.status === "rejeitado" && l.erro ? { motivoRejeicao: l.erro } : {} })),
+    pendentes: fila.length,
+    proximoLivre: Math.max(brain2.clock(), ...fila.map((l) => l.agendado_para))
+  };
+}
+function decidirPost(brain2, id, acao, motivo = "") {
+  const p = row(brain2.db, "select * from ig_posts where id = ?", id);
+  if (!p) throw new BrainError("not_found", "Post n\xE3o encontrado.");
+  if (p.status === "publicado") throw new BrainError("already_decided", "Esse post j\xE1 foi publicado.");
+  if (acao === "aprovar" && brain2.killed()) throw new BrainError("kill_switch", "Bot\xE3o de emerg\xEAncia ligado: aprova\xE7\xF5es bloqueadas.");
+  run(brain2.db, "update ig_posts set status = ?, erro = ?, decidido_em = ? where id = ?", acao === "aprovar" ? "aprovado" : "rejeitado", acao === "rejeitar" ? motivo.slice(0, 300) || null : null, brain2.clock(), id);
+  if (acao === "rejeitar") run(brain2.db, "delete from ig_midia where post_id = ?", id);
+  brain2.audit("voce", acao === "aprovar" ? "ig_aprovou" : "ig_rejeitou", p.tema);
+  brain2.emit("change");
+}
+function editarLegenda(brain2, id, legenda) {
+  const p = row(brain2.db, "select * from ig_posts where id = ?", id);
+  if (!p) throw new BrainError("not_found", "Post n\xE3o encontrado.");
+  if (p.status === "publicado") throw new BrainError("already_decided", "Esse post j\xE1 foi publicado.");
+  const t = legenda.trim().slice(0, 2200);
+  if (!t) throw new BrainError("invalid", "A legenda n\xE3o pode ficar vazia.");
+  const motivo = revisarTexto(t);
+  if (motivo) throw new BrainError("invalid", `A conformidade barrou essa legenda: ${motivo}.`);
+  run(brain2.db, "update ig_posts set legenda = ? where id = ?", t, id);
+  brain2.emit("change");
+}
+async function graph(env, f, metodo, caminho, params) {
+  const v = env.META_GRAPH_VERSION ?? "v23.0";
+  const qs = new URLSearchParams(params);
+  const res = await f(`https://graph.facebook.com/${v}/${caminho}${metodo === "GET" ? `?${qs}` : ""}`, { method: metodo, headers: { authorization: `Bearer ${env.META_SYSTEM_USER_TOKEN}`, ...metodo === "POST" ? { "content-type": "application/x-www-form-urlencoded" } : {} }, ...metodo === "POST" ? { body: qs } : {} });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new BrainError("invalid", `Instagram recusou (${res.status}): ${body.error?.message ?? "erro"}`);
+  return body;
+}
+async function publicarPost(brain2, env, id, f = fetch, espera = (ms2) => new Promise((r) => setTimeout(r, ms2))) {
+  if (brain2.killed()) throw new BrainError("kill_switch", "Bot\xE3o de emerg\xEAncia ligado.");
+  const p = row(brain2.db, "select * from ig_posts where id = ?", id);
+  if (!p) throw new BrainError("not_found", "Post n\xE3o encontrado.");
+  if (p.status === "publicado") throw new BrainError("already_decided", "J\xE1 foi publicado.");
+  if (p.status !== "aprovado" && p.status !== "falhou") throw new BrainError("invalid", "S\xF3 publico o que foi aprovado.");
+  const ig = env.META_IG_ID;
+  if (!env.META_SYSTEM_USER_TOKEN || !ig) throw new BrainError("invalid", "Falta META_SYSTEM_USER_TOKEN ou META_IG_ID nos secrets do Brain.");
+  const origem = env.BRAIN_PUBLIC_URL ?? brain2.policy("ig_origem", "");
+  if (!/^https:\/\//.test(origem)) throw new BrainError("invalid", "N\xE3o sei o endere\xE7o p\xFAblico do Brain para o Instagram buscar as imagens.");
+  const midias = rows(brain2.db, "select id from ig_midia where post_id = ? order by ordem", id).map((m) => `${origem}/api/midia/${m.id}.jpg`);
+  if (!midias.length) throw new BrainError("invalid", "Esse post n\xE3o tem imagem.");
+  run(brain2.db, "update ig_posts set status = 'falhou', erro = 'publica\xE7\xE3o interrompida: confira o perfil antes de tentar de novo' where id = ?", id);
+  try {
+    const pronto = async (container) => {
+      for (let i = 0; i < 10; i++) {
+        const st = await graph(env, f, "GET", container, { fields: "status_code" });
+        if (st.status_code === "FINISHED" || st.status_code === void 0) return;
+        if (st.status_code === "ERROR" || st.status_code === "EXPIRED") throw new BrainError("invalid", `O Instagram n\xE3o processou a imagem (${st.status_code}).`);
+        await espera(2e3);
+      }
+    };
+    let criacao;
+    if (midias.length === 1) {
+      criacao = (await graph(env, f, "POST", `${ig}/media`, { image_url: midias[0], caption: p.legenda })).id;
+    } else {
+      const filhos = [];
+      for (const u of midias) {
+        const c2 = (await graph(env, f, "POST", `${ig}/media`, { image_url: u, is_carousel_item: "true" })).id;
+        await pronto(c2);
+        filhos.push(c2);
+      }
+      criacao = (await graph(env, f, "POST", `${ig}/media`, { media_type: "CAROUSEL", children: filhos.join(","), caption: p.legenda })).id;
+    }
+    await pronto(criacao);
+    const mediaId = (await graph(env, f, "POST", `${ig}/media_publish`, { creation_id: criacao })).id;
+    const link = await graph(env, f, "GET", mediaId, { fields: "permalink" }).then((r) => r.permalink ?? null).catch(() => null);
+    run(brain2.db, "update ig_posts set status = 'publicado', publicado_em = ?, media_id = ?, permalink = ?, erro = null where id = ?", brain2.clock(), mediaId, link, id);
+    brain2.audit("sistema", "ig_publicou", p.tema, { mediaId });
+    brain2.emit("change");
+    return "Publicado no Instagram.";
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    run(brain2.db, "update ig_posts set status = 'falhou', erro = ? where id = ?", msg.slice(0, 300), id);
+    brain2.emit("change");
+    throw e;
+  }
+}
+async function publicarDevidos(brain2, env, f = fetch) {
+  if (brain2.killed()) return null;
+  const agora = brain2.clock();
+  if (brain2.policy("ig_auto_publicar", false) === true) {
+    const esperaMs = Number(brain2.policy("ig_auto_espera_h", 12)) * 36e5;
+    for (const p of rows(brain2.db, "select id, tema from ig_posts where status = 'pendente' and agendado_para <= ? and criado_em <= ?", agora, agora - esperaMs)) {
+      run(brain2.db, "update ig_posts set status = 'aprovado', decidido_em = ? where id = ?", agora, p.id);
+      brain2.audit("sistema", "ig_aprovou_automatico", p.tema);
+    }
+  }
+  const hoje = row(brain2.db, "select count(*) as n from ig_posts where status = 'publicado' and publicado_em > ?", agora - 20 * 36e5)?.n ?? 0;
+  if (hoje >= Number(brain2.policy("ig_max_por_dia", 1))) return null;
+  const prox = row(brain2.db, "select id from ig_posts where status = 'aprovado' and agendado_para <= ? order by agendado_para asc limit 1", agora);
+  if (!prox) return null;
+  try {
+    return await publicarPost(brain2, env, prox.id, f);
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
 // packages/core/src/inbound.ts
 var DOMINIOS_LIVRES = /* @__PURE__ */ new Set(["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "yahoo.com.br", "icloud.com", "uol.com.br", "bol.com.br", "live.com", "terra.com.br"]);
 function enderecoDe(from) {
@@ -5507,6 +5732,13 @@ function createHandler(svc) {
       if (origin && !allowed.has(origin)) return json(403, { error: "origem n\xE3o permitida" });
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
       if (req.method === "POST" && url.pathname === "/api/webhooks/resend") return receberWebhook(brain2, svc.env, req);
+      if (req.method === "GET" && url.pathname.startsWith("/api/midia/")) return servirMidia(brain2, url.pathname.slice("/api/midia/".length));
+      if (url.pathname === "/api/instagram/entrega" || url.pathname === "/api/instagram/contexto") {
+        if (!tokenValido(svc.env, req)) return json(401, { error: "token inv\xE1lido" });
+        if (req.method === "GET" && url.pathname.endsWith("/contexto")) return json(200, igContexto(brain2));
+        if (req.method === "POST" && url.pathname.endsWith("/entrega")) return json(200, receberPost(brain2, await readJson(req, 14e6), url.origin));
+        return json(405, { error: "m\xE9todo n\xE3o permitido" });
+      }
       const denied = await svc.authorize?.(req, url);
       if (denied) return denied;
       const out = (status, body2) => json(status, body2, cors);
@@ -5515,6 +5747,7 @@ function createHandler(svc) {
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain2));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain2.db, brain2.clock()));
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, await gscPainelCompleto(brain2, svc.env, svc.fetch ?? fetch));
+      if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
         try {
@@ -5563,6 +5796,20 @@ function createHandler(svc) {
       if (send) {
         const message = await sendApproved(brain2, svc.env, send[1], svc.fetch);
         return out(200, { message, snapshot: snapshot() });
+      }
+      if (url.pathname === "/api/instagram/auto") {
+        brain2.setPolicy("ig_auto_publicar", body.ligado === true);
+        brain2.audit("voce", body.ligado === true ? "ig_auto_ligou" : "ig_auto_desligou", "publica\xE7\xE3o autom\xE1tica do Instagram");
+        return out(200, igPainel(brain2, svc.env));
+      }
+      const igAcao = url.pathname.match(/^\/api\/instagram\/([\w-]+)\/(aprovar|rejeitar|publicar|legenda)$/);
+      if (igAcao) {
+        const [, pid, acao] = igAcao;
+        let message = "";
+        if (acao === "aprovar" || acao === "rejeitar") decidirPost(brain2, pid, acao, String(body.motivo ?? ""));
+        if (acao === "legenda") editarLegenda(brain2, pid, String(body.legenda ?? ""));
+        if (acao === "publicar" || acao === "aprovar" && body.publicarAgora === true) message = await publicarPost(brain2, svc.env, pid, svc.fetch ?? fetch);
+        return out(200, { ...igPainel(brain2, svc.env), message });
       }
       if (url.pathname === "/api/seo/sincronizar") return out(200, { message: await sincronizarGsc(brain2, svc.env, svc.fetch ?? fetch, { forcar: true }) });
       if (url.pathname.startsWith("/api/prospeccao/")) {
@@ -5923,42 +6170,6 @@ async function runChecks(db, env, now, f = fetch) {
   );
   return out;
 }
-
-// packages/core/src/compliance.ts
-var EXTERNAL2 = /* @__PURE__ */ new Set(["whatsapp", "email", "linkedin", "instagram"]);
-var NEEDS_CONSENT = /* @__PURE__ */ new Set(["whatsapp", "email"]);
-var TEXT_RULES = [
-  { id: "promessa", test: /\b(cura|curar|cure|garantid[oa]s?|garantimos|garantia de resultado|resultado garantido|sem risco|100 ?%)\b/i, why: "promete resultado a pacientes ou garantia, o que o CFP e a LGPD n\xE3o admitem", scope: "all" },
-  { id: "desconto", test: /\b(desconto|promo[cç][aã]o|cupom|black ?friday|de gra[cç]a por|[0-9]+ ?% off)\b/i, why: "oferece desconto ou promo\xE7\xE3o: nenhum agente faz isso, s\xF3 voc\xEA decide", scope: "draft" },
-  { id: "clinico", test: /\b(cpf|prontu[aá]rio|diagn[oó]stico d[eao]|cid[- ]?\d|laudo)\b/i, why: "cita dado cl\xEDnico de paciente, que nunca entra no Brain", scope: "all" },
-  { id: "pressao", test: /\b(últim[ao]s? (vaga|chance|hora)|só hoje|corra|n[aã]o perca)\b/i, why: "usa press\xE3o de urg\xEAncia artificial", scope: "draft" }
-];
-var complianceReviewer = (p, { db, now }) => {
-  for (const r of TEXT_RULES) {
-    const text = r.scope === "draft" ? p.draft ?? "" : `${p.title}
-${p.draft ?? ""}`;
-    if (r.test.test(text)) return { ok: false, note: r.why };
-  }
-  const publico = p.payload?.envio?.tipo === "instagram";
-  if (EXTERNAL2.has(p.channel) && p.draft && !publico) {
-    if (!p.contactRef) return { ok: false, note: "mensagem externa sem identificar o contato: n\xE3o d\xE1 para checar consentimento nem o intervalo entre contatos" };
-    const pl = p.payload;
-    const legitimo = p.channel === "email" && pl?.base === "legitimo_interesse_b2b" && !!pl.prospeccao;
-    if (legitimo && row(db, "select 1 as x from email_suppression where email = ?", p.contactRef.trim().toLowerCase())) return { ok: false, note: "esse contato pediu para sair ou deu erro de entrega" };
-    if (NEEDS_CONSENT.has(p.channel) && !legitimo) {
-      const c2 = row(db, "select revoked_at from consents where contact_ref = ? and channel = ?", p.contactRef, p.channel);
-      if (!c2 || c2.revoked_at) return { ok: false, note: `sem consentimento v\xE1lido para ${p.channel} desse contato` };
-    }
-    const policy = row(db, "select value from policies where key = 'contact_policy'");
-    const minDays = policy ? JSON.parse(policy.value).min_days_between : 3;
-    const last = row(db, "select max(at) as at from contact_log where contact_ref = ?", p.contactRef);
-    if (last?.at && now - last.at < minDays * 864e5) {
-      const d = Math.ceil((minDays * 864e5 - (now - last.at)) / 864e5);
-      return { ok: false, note: `esse contato recebeu mensagem h\xE1 menos de ${minDays} dias; liberar em ${d} dia(s)` };
-    }
-  }
-  return { ok: true };
-};
 
 // packages/core/src/guardiao.ts
 var AGENT_ID = "guardiao-de-dados";
@@ -6801,6 +7012,10 @@ var BrainDO = class extends DurableObject {
     }
     try {
       await sincronizarGsc(this.brain, strings(this.env));
+    } catch {
+    }
+    try {
+      await publicarDevidos(this.brain, strings(this.env));
     } catch {
     }
     const started = this.runner.tick();

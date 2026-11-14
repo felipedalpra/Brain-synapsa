@@ -13,3 +13,7 @@ apps/server/data/
 *.db-shm
 .dev.vars
 .wrangler
+
+# material interno do Instagram (o repositório é público)
+instagram/assets/prints/
+instagram/PLAYBOOK.md

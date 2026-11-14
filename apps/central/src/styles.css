@@ -3065,3 +3065,29 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
   .seo-funil li { grid-template-columns: 1fr auto; }
   .seo-funil li i { grid-column: 1 / -1; }
 }
+
+/* ---------- aba Instagram ---------- */
+.ig-post { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.ig-visor { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.ig-visor > img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 10px; background: var(--bg-2); display: block; }
+.ig-nav { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 13px; }
+.ig-nav button { background: var(--panel-2); border: 1px solid var(--line); color: var(--text); border-radius: 8px; width: 34px; height: 30px; font-size: 18px; cursor: pointer; }
+.ig-nav button:disabled { opacity: 0.35; cursor: default; }
+.ig-tira { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+.ig-tira button { flex: none; width: 40px; padding: 0; border: 2px solid transparent; border-radius: 6px; background: none; cursor: pointer; overflow: hidden; }
+.ig-tira button.on { border-color: var(--blue); }
+.ig-tira img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
+.ig-info { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.ig-info h3 { margin: 0; font-size: 18px; }
+.ig-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.ig-status { border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; background: rgba(138, 156, 214, 0.16); }
+.ig-s-pendente { background: rgba(240, 184, 110, 0.18); color: var(--warn); }
+.ig-s-aprovado, .ig-s-publicado { background: rgba(95, 211, 176, 0.16); color: var(--ok); }
+.ig-s-falhou, .ig-s-rejeitado { background: rgba(242, 128, 142, 0.16); color: var(--crit); }
+.ig-legenda { white-space: pre-wrap; line-height: 1.55; margin: 0; max-height: 300px; overflow-y: auto; font-size: 14px; }
+.ig-legenda-edit { width: 100%; background: var(--bg-2); border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); padding: 10px; font: inherit; font-size: 14px; line-height: 1.5; resize: vertical; }
+.ig-creditos { font-size: 12px; margin: 0; }
+.ig-erro { color: var(--crit); margin: 0; font-size: 13.5px; }
+.ig-acoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ig-nav button:focus-visible, .ig-tira button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+@media (max-width: 760px) { .ig-post { grid-template-columns: minmax(0, 1fr); } }

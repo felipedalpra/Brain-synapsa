@@ -13,6 +13,7 @@ import {
   Search,
   Users,
   Wallet,
+  Images,
 } from "lucide-react";
 import { Q, Ze } from "./shared-inline";
 import { useBrain } from "./store";
@@ -28,6 +29,7 @@ import { Agentes } from "./components/Agentes";
 import { Aprovacoes } from "./components/Aprovacoes";
 import { Integracoes } from "./components/Integracoes";
 import { Avisos } from "./components/Avisos";
+import { Instagram } from "./components/Instagram";
 
 export const Du = [
   {
@@ -59,6 +61,11 @@ export const Du = [
     id: "seo",
     label: "SEO",
     icon: Search,
+  },
+  {
+    id: "instagram",
+    label: "Instagram",
+    icon: Images,
   },
   {
     id: "equipes",
@@ -187,6 +194,7 @@ export function App() {
         {o === "crm" ? <Prospeccoes /> : null}
         {o === "financeiro" ? <Financeiro /> : null}
         {o === "seo" ? <Seo /> : null}
+        {o === "instagram" ? <Instagram /> : null}
         {o === "equipes" ? (
           <Equipes teamId={i} setTeamId={(d) => m("equipes", d)} goApprovals={() => m("aprovacoes")} />
         ) : null}

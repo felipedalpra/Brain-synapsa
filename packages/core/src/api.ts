@@ -11,6 +11,7 @@ import { finImportarExtrato, lerExtratoInter } from "./fin-import";
 import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-email";
 import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
+import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
 import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finPagarConta, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, type ContaIn, type ExtratoIn } from "./fin";
@@ -70,6 +71,15 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       // Webhook do Resend: público, protegido pela assinatura Svix (não pelo login).
       if (req.method === "POST" && url.pathname === "/api/webhooks/resend") return receberWebhook(brain, svc.env, req);
 
+      // Instagram: imagem pública (o Instagram precisa buscar) e entrega de posts prontos por token próprio, que só enfileira.
+      if (req.method === "GET" && url.pathname.startsWith("/api/midia/")) return servirMidia(brain, url.pathname.slice("/api/midia/".length));
+      if (url.pathname === "/api/instagram/entrega" || url.pathname === "/api/instagram/contexto") {
+        if (!tokenValido(svc.env, req)) return json(401, { error: "token inválido" });
+        if (req.method === "GET" && url.pathname.endsWith("/contexto")) return json(200, igContexto(brain));
+        if (req.method === "POST" && url.pathname.endsWith("/entrega")) return json(200, receberPost(brain, await readJson(req, 14_000_000), url.origin));
+        return json(405, { error: "método não permitido" });
+      }
+
       const denied = await svc.authorize?.(req, url);
       if (denied) return denied;
       const out = (status: number, body: unknown) => json(status, body, cors);
@@ -79,6 +89,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain.db, brain.clock()));
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch));
+      if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
         try {
@@ -130,6 +141,20 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (send) {
         const message = await sendApproved(brain, svc.env, send[1]!, svc.fetch);
         return out(200, { message, snapshot: snapshot() });
+      }
+      if (url.pathname === "/api/instagram/auto") {
+        brain.setPolicy("ig_auto_publicar", body.ligado === true);
+        brain.audit("voce", body.ligado === true ? "ig_auto_ligou" : "ig_auto_desligou", "publicação automática do Instagram");
+        return out(200, igPainel(brain, svc.env));
+      }
+      const igAcao = url.pathname.match(/^\/api\/instagram\/([\w-]+)\/(aprovar|rejeitar|publicar|legenda)$/);
+      if (igAcao) {
+        const [, pid, acao] = igAcao as unknown as [string, string, string];
+        let message = "";
+        if (acao === "aprovar" || acao === "rejeitar") decidirPost(brain, pid, acao, String(body.motivo ?? ""));
+        if (acao === "legenda") editarLegenda(brain, pid, String(body.legenda ?? ""));
+        if (acao === "publicar" || (acao === "aprovar" && body.publicarAgora === true)) message = await publicarPost(brain, svc.env, pid, (svc.fetch ?? fetch) as typeof fetch);
+        return out(200, { ...igPainel(brain, svc.env), message });
       }
       if (url.pathname === "/api/seo/sincronizar") return out(200, { message: await sincronizarGsc(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) });
       if (url.pathname.startsWith("/api/prospeccao/")) {
