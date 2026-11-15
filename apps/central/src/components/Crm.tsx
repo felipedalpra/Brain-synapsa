@@ -1,5 +1,6 @@
 // @ts-nocheck
 // Gerado a partir do build de produção de 12/11/2026 (conversor mecânico). Nomes locais ainda minificados; ajuste ao mexer na tela.
+import { Planejamento } from "./Planejamento";
 import * as React from "react";
 import { CalendarClock, CircleCheck, Clock, RefreshCw, TriangleAlert, Video } from "lucide-react";
 import { useBrain } from "../store";
@@ -633,9 +634,20 @@ export function Prospeccoes() {
         >
           Prospecções
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={e === "planejamento"}
+          className={e === "planejamento" ? "on" : ""}
+          onClick={() => a("planejamento")}
+        >
+          Planejamento da semana
+        </button>
       </div>
       {e === "painel" ? (
         <CrmPainel />
+      ) : e === "planejamento" ? (
+        <Planejamento />
       ) : (
         <div className="page">
           <header className="page-head">

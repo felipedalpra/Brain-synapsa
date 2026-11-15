@@ -11,6 +11,7 @@ import { finImportarExtrato, lerExtratoInter } from "./fin-import";
 import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-email";
 import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
+import { planAcao, planPainel } from "./planejamento";
 import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
@@ -89,6 +90,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain.db, brain.clock()));
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch));
+      if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain, url.searchParams.get("semana") ?? undefined));
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
@@ -142,6 +144,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         const message = await sendApproved(brain, svc.env, send[1]!, svc.fetch);
         return out(200, { message, snapshot: snapshot() });
       }
+      if (url.pathname === "/api/planejamento") return out(200, planAcao(brain, body));
       if (url.pathname === "/api/instagram/auto") {
         brain.setPolicy("ig_auto_publicar", body.ligado === true);
         brain.audit("voce", body.ligado === true ? "ig_auto_ligou" : "ig_auto_desligou", "publicação automática do Instagram");

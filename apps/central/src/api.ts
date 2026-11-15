@@ -84,6 +84,8 @@ export const api = {
       acao: a,
     }),
   seo: () => chamar("/api/seo"),
+  planejamento: (semana) => chamar(`/api/planejamento${semana ? `?semana=${semana}` : ""}`),
+  planejamentoAcao: (corpo) => post("/api/planejamento", corpo),
   instagram: () => chamar("/api/instagram"),
   instagramAcao: (id, acao, corpo) => post(`/api/instagram/${encodeURIComponent(id)}/${acao}`, corpo ?? {}, 9e4),
   instagramAuto: (ligado) => post("/api/instagram/auto", { ligado }),
