@@ -42,12 +42,13 @@ const b64url = (b: ArrayBuffer | Uint8Array | string) => {
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 };
 
-let cache: { token: string; ate: number } | null = null;
-export async function tokenGoogle(chave: Chave, agora: number, f: typeof fetch = fetch): Promise<string> {
-  if (cache && cache.ate > agora + 60_000) return cache.token;
+const cache = new Map<string, { token: string; ate: number }>();
+export async function tokenGoogle(chave: Chave, agora: number, f: typeof fetch = fetch, escopo: string = ESCOPO): Promise<string> {
+  const guardado = cache.get(escopo);
+  if (guardado && guardado.ate > agora + 60_000) return guardado.token;
   const iat = Math.floor(agora / 1000);
   const aud = chave.token_uri ?? "https://oauth2.googleapis.com/token";
-  const corpo = `${b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64url(JSON.stringify({ iss: chave.client_email, scope: ESCOPO, aud, iat, exp: iat + 3600 }))}`;
+  const corpo = `${b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64url(JSON.stringify({ iss: chave.client_email, scope: escopo, aud, iat, exp: iat + 3600 }))}`;
   const pem = chave.private_key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, "");
   const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
   const k = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
@@ -55,7 +56,7 @@ export async function tokenGoogle(chave: Chave, agora: number, f: typeof fetch =
   const r = await f(aud, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${corpo}.${b64url(sig)}` }) });
   const j = (await r.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error_description?: string };
   if (!r.ok || !j.access_token) throw new BrainError("integration", `Google recusou a chave da conta de serviço: ${j.error_description ?? r.status}`);
-  cache = { token: j.access_token, ate: agora + (j.expires_in ?? 3600) * 1000 };
+  cache.set(escopo, { token: j.access_token, ate: agora + (j.expires_in ?? 3600) * 1000 });
   return j.access_token;
 }
 

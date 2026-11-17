@@ -3138,3 +3138,7 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .pl-hist-det { margin: 10px 0 12px; font-size: 13.5px; min-height: 20px; }
 .pl-marca:focus-visible, .pl-titulo:focus-visible, .pl-mini:focus-visible, .pl-col:focus-visible, .pl-sel:focus-visible, .pl-input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 @media (max-width: 760px) { .pl-dia { grid-template-columns: minmax(0, 1fr); gap: 0; } .pl-subs { margin-left: 14px; } .pl-sel { max-width: none; flex: 1 1 130px; } }
+.seo-passos { margin: 8px 0 12px; padding-left: 20px; display: grid; gap: 6px; line-height: 1.5; }
+.seo-manual { display: grid; gap: 10px; margin-top: 12px; }
+.seo-manual label { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
+@media (max-width: 640px) { .seo-manual label { grid-template-columns: 1fr; } }

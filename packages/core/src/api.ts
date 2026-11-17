@@ -11,6 +11,7 @@ import { finImportarExtrato, lerExtratoInter } from "./fin-import";
 import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-email";
 import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
+import { descobrirPropriedades, gaPainel, propriedadesGa, sincronizarGa } from "./ga";
 import { planAcao, planPainel } from "./planejamento";
 import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
 import { receberWebhook } from "./webhook-resend";
@@ -89,7 +90,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain.db, brain.clock()));
-      if (req.method === "GET" && url.pathname === "/api/seo") return out(200, await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch));
+      if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain, url.searchParams.get("semana") ?? undefined));
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain, svc.env));
@@ -159,7 +160,31 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (acao === "publicar" || (acao === "aprovar" && body.publicarAgora === true)) message = await publicarPost(brain, svc.env, pid, (svc.fetch ?? fetch) as typeof fetch);
         return out(200, { ...igPainel(brain, svc.env), message });
       }
-      if (url.pathname === "/api/seo/sincronizar") return out(200, { message: await sincronizarGsc(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) });
+      if (url.pathname === "/api/seo/sincronizar") {
+        const f = (svc.fetch ?? fetch) as typeof fetch;
+        const gsc = await sincronizarGsc(brain, svc.env, f, { forcar: true });
+        const ga = await sincronizarGa(brain, svc.env, f, { forcar: true }).catch((e) => `GA4 com problema: ${e instanceof Error ? e.message : String(e)}`);
+        return out(200, { message: `${gsc} ${ga}` });
+      }
+      if (url.pathname === "/api/seo/ga") {
+        const f = (svc.fetch ?? fetch) as typeof fetch;
+        const b = body as { site?: string; propriedade?: string; descobrir?: boolean };
+        if (b.descobrir) {
+          try {
+            const d = await descobrirPropriedades(brain, svc.env, f);
+            if (Object.keys(d.achadas).length) brain.setPolicy("ga_propriedades", { ...propriedadesGa(brain), ...d.achadas });
+            return out(200, { achadas: d.achadas, vistas: d.vistas, message: Object.keys(d.achadas).length ? "Propriedades encontradas e salvas." : d.vistas.length ? "A conta enxerga propriedades, mas nenhuma mede os sites da Synapsa." : "A conta de serviço ainda não enxerga nenhuma propriedade." });
+          } catch (e) {
+            return out(200, { achadas: {}, vistas: [], message: e instanceof Error ? e.message : String(e) });
+          }
+        }
+        if (b.site && /^\d{6,14}$/.test(String(b.propriedade ?? "").trim())) {
+          brain.setPolicy("ga_propriedades", { ...propriedadesGa(brain), [b.site]: String(b.propriedade).trim() });
+          brain.emit("change");
+          return out(200, { message: "Propriedade salva." });
+        }
+        return out(400, { message: "Informe o site e o número da propriedade (só dígitos), ou peça para descobrir." });
+      }
       if (url.pathname.startsWith("/api/prospeccao/")) {
         const rota = url.pathname.slice("/api/prospeccao/".length);
         const f = (u: string | URL | Request, i?: RequestInit) => (svc.fetch ?? fetch)(u as string, i);

@@ -36,5 +36,6 @@ export * from "./webhook-resend";
 export * from "./inbound";
 export * from "./prospeccao-whatsapp";
 export * from "./gsc";
+export * from "./ga";
 export * from "./instagram";
 export * from "./planejamento";

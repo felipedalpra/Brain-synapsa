@@ -5,55 +5,10 @@ import { api } from "../api";
 import { useBrain } from "../store";
 import { avisos } from "./Avisos";
 import { Barras, Funil, LinhaInterativa, Mini, dd, fmt, fmt1, pct } from "./seo-charts";
+import { Chips, Delta, Kpi, normaliza, useOrdem } from "./seo-ui";
+import { Analytics } from "./Analytics";
 
 const curto = (u) => u.replace(/^https?:\/\/(www\.)?/, "");
-const normaliza = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-
-function Delta({ atual, antes, inverso = false, sufixo = "" }) {
-  if (!antes) return <span className="seo-delta">{atual ? "novo" : "—"}</span>;
-  const d = ((atual - antes) / antes) * 100;
-  const bom = inverso ? d < 0 : d > 0;
-  return <span className={`seo-delta ${Math.abs(d) < 1 ? "" : bom ? "up" : "down"}`}>{d > 0 ? "+" : ""}{Math.round(d)}%{sufixo}</span>;
-}
-
-function Kpi({ rotulo, valor, filho, nota }) {
-  return (
-    <div className="kpi">
-      <span>{rotulo}</span>
-      <b>{valor}</b>
-      <small>{filho}{nota ? <> · {nota}</> : null}</small>
-    </div>
-  );
-}
-
-function useOrdem(linhas, inicial, desc = true) {
-  const [ord, setOrd] = React.useState({ k: inicial, desc });
-  const ordenadas = React.useMemo(() => {
-    const val = (l) => { const v = typeof ord.k === "function" ? ord.k(l) : l[ord.k]; return typeof v === "string" ? normaliza(v) : v ?? 0; };
-    return [...linhas].sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * (ord.desc ? -1 : 1); });
-  }, [linhas, ord]);
-  const Th = ({ k, children, num = true }) => (
-    <th className={num ? "num" : ""} aria-sort={ord.k === k ? (ord.desc ? "descending" : "ascending") : "none"}>
-      <button type="button" className="seo-th" onClick={() => setOrd((o) => ({ k, desc: o.k === k ? !o.desc : k !== "position" }))}>
-        {children}{ord.k === k ? (ord.desc ? " ↓" : " ↑") : ""}
-      </button>
-    </th>
-  );
-  return { ordenadas, Th };
-}
-
-function Chips({ opcoes, valor, onChange }) {
-  return (
-    <div className="seo-chips" role="group">
-      {opcoes.map((o) => (
-        <button key={o.id} type="button" className={valor === o.id ? "on" : ""} aria-pressed={valor === o.id} onClick={() => onChange(o.id)}>
-          {o.rotulo}{o.n != null ? <em>{o.n}</em> : null}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 /** Páginas (perfis do diretório, páginas do site). Clique na linha para ver as buscas que levaram até ela. */
 function TabelaPaginas({ paginas, rotuloPrimeira, semImpressao = [] }) {
   const [filtro, setFiltro] = React.useState("todos");
@@ -242,7 +197,7 @@ function Dispositivos({ s }) {
 }
 const ISO3 = { bra: "BR", mex: "MX", arg: "AR", usa: "US", prt: "PT", esp: "ES", deu: "DE", can: "CA", are: "AE", ago: "AO", ecu: "EC", col: "CO", chl: "CL", per: "PE", ury: "UY", pry: "PY", gbr: "GB", fra: "FR", ita: "IT", moz: "MZ", jpn: "JP", ind: "IN", chn: "CN" };
 
-function VisaoSite({ s, funil }) {
+function VisaoSite({ s, funil, gaSite }) {
   const [janela, setJanela] = React.useState(90);
   const sub = s.tipo === "diretorio"
     ? [{ id: "perfis", rotulo: "Perfis dos psicólogos" }, { id: "paginas", rotulo: "Home e listas" }, { id: "buscas", rotulo: "Buscas" }, { id: "chaves", rotulo: "Palavras-chave" }, { id: "aparelho", rotulo: "Aparelho e país" }]
@@ -276,10 +231,15 @@ function VisaoSite({ s, funil }) {
           <Funil etapas={[
             { rotulo: "Apareceram no Google", valor: s.atual.impressions, cor: "var(--muted)", nota: "impressões" },
             { rotulo: "Clicaram para o site", valor: funil.cliquesGoogle, cor: "var(--core-2)" },
+            ...(gaSite?.serie?.length ? [
+              { rotulo: "Visitas no site (GA4, todos os canais)", valor: gaSite.atual.sessoes, cor: "var(--core-2)", nota: "inclui direto, redes e links" },
+              { rotulo: "Visitas engajadas (GA4)", valor: gaSite.atual.engajadas, cor: "var(--blue)", nota: "mais de 10 s, 2 páginas ou evento-chave" },
+              { rotulo: "Eventos-chave (GA4)", valor: gaSite.atual.eventos, cor: "var(--ok)", nota: "cadastro, demo etc., se marcados no GA4" },
+            ] : []),
             { rotulo: "Leads no CRM (todas as origens)", valor: funil.leads, cor: "var(--blue)", nota: "mistura outbound, Instagram etc." },
             { rotulo: "Leads com origem Google ou site", valor: funil.leadsGoogle, cor: "var(--ok)", nota: "origem 'google' ou 'landing page'" },
           ]} />
-          <p className="muted">Para medir cadastro e demo por página (entrou, saiu, clicou em "agendar"), falta ligar o Google Analytics 4 ao Brain; é o mesmo processo da conta de serviço.</p>
+          {gaSite?.serie?.length ? <p className="muted">O GA4 mede o que acontece no site; abra a aba Google Analytics para ver por página e por canal.</p> : <p className="muted">Para medir cadastro e demo por página, ligue o GA4 na aba Google Analytics.</p>}
         </section>
       ) : null}
 
@@ -325,6 +285,7 @@ export function Seo() {
   const [erro, setErro] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
   const [site, setSite] = React.useState("diretorio");
+  const [vista, setVista] = React.useState("gsc");
   const carregar = React.useCallback(() => {
     if (!live) return;
     api.seo().then((d) => { setDados(d); setErro(null); }).catch((e) => setErro(e instanceof Error ? e.message : "Erro ao carregar."));
@@ -362,7 +323,8 @@ export function Seo() {
     <div className="stack">
       <section className="panel">
         <div className="seo-head">
-          <h2>Search Console</h2>
+          <h2>{vista === "ga" ? "Google Analytics" : "Search Console"}</h2>
+          <Chips valor={vista} onChange={setVista} opcoes={[{ id: "gsc", rotulo: "Search Console" }, { id: "ga", rotulo: "Google Analytics" }]} />
           <button type="button" className="btn" disabled={busy} onClick={sincronizar}>{busy ? "Sincronizando…" : "Sincronizar agora"}</button>
         </div>
         <p className="muted">
@@ -373,7 +335,9 @@ export function Seo() {
           {sites.map((s) => <button key={s.id} type="button" role="tab" aria-selected={atual.id === s.id} className={atual.id === s.id ? "on" : ""} onClick={() => setSite(s.id)}>{s.rotulo}</button>)}
         </div>
       </section>
-      <VisaoSite key={atual.id} s={atual} funil={dados.funil} />
+      {vista === "ga"
+        ? <Analytics ga={dados.ga} sites={sites} site={atual.id} onRecarregar={carregar} />
+        : <VisaoSite key={atual.id} s={atual} funil={dados.funil} gaSite={dados.ga?.sites?.find((x) => x.id === atual.id)} />}
     </div>
   );
 }

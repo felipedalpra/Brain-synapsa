@@ -90,6 +90,7 @@ export const api = {
   instagramAcao: (id, acao, corpo) => post(`/api/instagram/${encodeURIComponent(id)}/${acao}`, corpo ?? {}, 9e4),
   instagramAuto: (ligado) => post("/api/instagram/auto", { ligado }),
   seoSincronizar: () => post("/api/seo/sincronizar", {}),
+  seoGa: (corpo) => post("/api/seo/ga", corpo),
   prospeccaoWhatsapp: (id, etapa, acao) => post("/api/prospeccao/whatsapp", { id, etapa, acao }),
   prospeccaoRotina: (e) => post("/api/prospeccao/rotina", e),
   prospeccaoRotinaRodar: () => post("/api/prospeccao/rotina/rodar", {}),
