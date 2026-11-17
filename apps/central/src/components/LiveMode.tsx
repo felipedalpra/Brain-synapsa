@@ -1,6 +1,7 @@
 // @ts-nocheck
 // Live Mode: conversa por voz com o Jarvis, contínua, como uma ligação. Ele ouve, pensa com os dados do Brain e responde em voz alta.
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Check, Headphones, Mic, MicOff, Square, X } from "lucide-react";
 import { useBrain } from "../store";
 import { criarOuvinte, falador, temMicrofone } from "../voz";
@@ -135,7 +136,7 @@ export function LiveMode({ onFechar }) {
   const confirmacao = pendente && !pendente.confirm.done ? pendente : null;
   const mostrado = parcial || voce;
 
-  return (
+  return createPortal(
     <div className="live" role="dialog" aria-modal="true" aria-label="Conversa por voz com o Jarvis">
       <button type="button" className="live-x" onClick={onFechar} aria-label="Encerrar conversa por voz"><X size={20} aria-hidden /></button>
       <div className={`live-orb live-${fase}`} aria-hidden>
@@ -169,6 +170,7 @@ export function LiveMode({ onFechar }) {
         <button type="button" className="btn btn-primary" onClick={onFechar}>Encerrar</button>
       </div>
       <p className="live-nota">{falador.neural === false ? "Falando com a voz do navegador." : "Voz neural do Brain."} Esc encerra.</p>
-    </div>
+    </div>,
+    document.body,
   );
 }
