@@ -4,7 +4,9 @@ import { BrainError, type Brain } from "./brain";
 import { run } from "./sql";
 import { HANDLERS } from "./handlers";
 
-export type Chat = (text: string) => Promise<ChatReply>;
+/** `voz`: a resposta será falada em voz alta (modo conversa), então vem curta e sem formatação. */
+export interface ChatOpts { voz?: boolean }
+export type Chat = (text: string, opts?: ChatOpts) => Promise<ChatReply>;
 
 const remember = (brain: Brain, role: "voce" | "jarvis", text: string) => run(brain.db, "insert into chat (role, text, at) values (?, ?, ?)", role, text, brain.clock());
 

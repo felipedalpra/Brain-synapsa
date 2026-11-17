@@ -1,5 +1,5 @@
 import type { JarvisAction } from "@brain/shared";
-import { BrainError, type Brain } from "./brain";
+import { BrainError, brtDay, type Brain } from "./brain";
 import { applyAction, isAction } from "./actions";
 import { executarCrm } from "./crm-acao";
 import { sendApproved, suppress } from "./dispatch";
@@ -22,7 +22,7 @@ import { TEAMS, AGENTS } from "@brain/shared";
 export interface Services {
   brain: Brain;
   env: Record<string, string | undefined>;
-  chat?: (text: string) => Promise<{ text: string; confirm?: { label: string; action: JarvisAction } }>;
+  chat?: (text: string, opts?: { voz?: boolean }) => Promise<{ text: string; confirm?: { label: string; action: JarvisAction } }>;
   checkIntegrations?: () => Promise<void>;
   /** fetch usado nos envios (testes trocam por um falso). */
   fetch?: typeof fetch;
@@ -90,6 +90,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain.db, brain.clock()));
+      if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain, url.searchParams.get("semana") ?? undefined));
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain, svc.env));
@@ -358,8 +359,28 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         const text = String(body.text ?? "").trim().slice(0, 2000);
         if (!text) throw new BrainError("invalid", "Mensagem vazia.");
         if (!svc.chat) return out(501, { error: "Jarvis indisponível" });
-        const reply = await svc.chat(text);
+        const reply = await svc.chat(text, { voz: body.voz === true });
         return out(200, { reply, snapshot: snapshot() });
+      }
+      if (url.pathname === "/api/voz/falar") {
+        // Voz neural do Jarvis (OpenAI). Limite diário para um loop de áudio não gastar sem você ver.
+        const chave = svc.env.OPENAI_API_KEY;
+        if (!chave) return out(501, { error: "Sem OPENAI_API_KEY: uso a voz do navegador." });
+        const texto = String(body.texto ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
+        if (!texto) throw new BrainError("invalid", "Nada para falar.");
+        const hoje = brtDay(brain.clock());
+        const uso = brain.policy<{ dia: string; n: number }>("voz_uso", { dia: hoje, n: 0 });
+        const n = uso.dia === hoje ? uso.n : 0;
+        const teto = Number(svc.env.VOZ_TETO_DIA ?? 600);
+        if (n >= teto) return out(429, { error: `Limite diário de voz neural (${teto} falas) atingido: uso a voz do navegador.` });
+        const r = await ((svc.fetch ?? fetch) as typeof fetch)("https://api.openai.com/v1/audio/speech", {
+          method: "POST",
+          headers: { authorization: `Bearer ${chave}`, "content-type": "application/json" },
+          body: JSON.stringify({ model: svc.env.VOZ_MODELO ?? "gpt-4o-mini-tts", voice: svc.env.VOZ_JARVIS ?? "onyx", input: texto, response_format: "mp3", instructions: "Fale em português do Brasil, com sotaque natural brasileiro. Tom de sócio experiente: calmo, direto e caloroso, ritmo de conversa, sem teatralidade." }),
+        });
+        if (!r.ok) return out(502, { error: `A voz neural falhou (${r.status}): uso a voz do navegador.` });
+        brain.setPolicy("voz_uso", { dia: hoje, n: n + 1 });
+        return new Response(r.body, { status: 200, headers: { "content-type": "audio/mpeg", "cache-control": "no-store", ...cors } });
       }
       if (url.pathname === "/api/integrations/check") {
         await svc.checkIntegrations?.();

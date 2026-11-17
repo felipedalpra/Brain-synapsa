@@ -553,6 +553,24 @@ export function BrainProvider({ children: e, now: a = Date.now(), forceDemo: t =
         state: r,
         live: v,
         ask: j,
+        askVoz: async (h) => {
+          const f = String(h ?? "").trim();
+          if (!f) return { text: "" };
+          o({ t: "msg", m: { id: ta("m"), from: "voce", text: f } });
+          o({ t: "thinking", on: true });
+          try {
+            const d = await api.chat(f, true);
+            o({ t: "snapshot", s: d.snapshot });
+            o({ t: "msg", m: { id: ta("m"), from: "jarvis", text: d.reply.text, confirm: d.reply.confirm } });
+            return d.reply;
+          } catch (d) {
+            const text = `Não consegui falar com o Brain: ${d instanceof Error ? d.message : "erro"}.`;
+            o({ t: "msg", m: { id: ta("m"), from: "jarvis", text } });
+            return { text };
+          } finally {
+            o({ t: "thinking", on: false });
+          }
+        },
         confirm: m,
         act: x,
         decide: async (h, f, d = false) => {

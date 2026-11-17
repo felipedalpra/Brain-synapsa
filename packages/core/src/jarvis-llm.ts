@@ -10,6 +10,7 @@ import { PLAYBOOKS } from "@brain/shared";
 import { finPainel } from "./fin";
 import { CRM_OPS, validarProposta } from "./crm-acao";
 import { crmPainel } from "./crm-painel";
+import { planejar, verInstagram, verPlanejamento, verProspeccao, verSeo } from "./jarvis-dados";
 
 const cap = (x: unknown, n = 12_000) => {
   const t = JSON.stringify(x);
@@ -32,7 +33,13 @@ Regras que você nunca quebra:
 - Dados clínicos de paciente não existem no Brain.
 - Caixa, contas, DRE, projeção e meta de MRR: use ver_financeiro. CRM (funil, reuniões do dia, leads parados, oportunidades): use ver_crm. ver_financeiro e ver_crm são leitura. Você não lança pagamento nem cadastra conta financeira. No CRM você PROPÕE escritas com propor_crm (criar lead, mover etapa, registrar atividade, agendar reunião): isso não executa nada, só mostra um botão de confirmar ao Felipe, e só o clique dele grava. Nunca exclua nada no CRM. Se faltar campo obrigatório (por exemplo telefone), pergunte ao Felipe antes de propor; nunca invente telefone, nome ou data. Depois de propor, diga em uma frase o que vai acontecer ao confirmar.
 - Os números do financeiro são do Inter (caixa real) e das contas lançadas; MRR vem das assinaturas. CAC só existe quando a ferramenta devolver número.
+- Você enxerga TUDO o que está no Brain, cada coisa pela sua ferramenta: ver_seo (Search Console e Google Analytics: buscas, páginas, perfis do diretório, visitas, canais), ver_instagram (fila de posts, o que foi publicado, o que espera aprovação), ver_planejamento (posts e tarefas da semana, responsáveis, taxa de conclusão), ver_prospeccao (prospects e quais abordar), ver_financeiro, ver_crm, consultar_dados (Stripe, Meta Ads, Instagram, execuções, entregas). Nunca diga que não tem acesso sem chamar a ferramenta certa. Se uma ferramenta devolver aviso de que algo não está ligado, repita o aviso e diga o que falta.
+- planejar põe um post ou tarefa na semana do planejamento: é interno e reversível, então execute direto quando o Felipe pedir.
 Se a pergunta for sobre o estado do Brain, chame visao_geral antes de responder.`;
+
+const SYSTEM_VOZ = `
+
+MODO CONVERSA POR VOZ (o Felipe está ouvindo você, não lendo): fale como um sócio que conhece o negócio por dentro, trocando ideia. Responda em até 3 frases curtas, no máximo uns 60 palavras, a menos que ele peça mais. Sem markdown, sem listas, sem emoji, sem URLs lidas letra por letra e sem tabelas. Diga números do jeito que se fala ("mil e duzentos reais", "quarenta por cento"). Dê sua opinião e, quando fizer sentido, termine com uma pergunta curta que avance a conversa. Se ele pedir um briefing, resuma em no máximo 45 segundos de fala: o que mais mexe no MRR primeiro. Se ele só estiver pensando em voz alta, discuta a ideia com ele: concorde só quando fizer sentido e aponte o problema com clareza quando houver. Ações que mudam algo só depois de ele confirmar com clareza; para o que exige botão (confirmação), diga "deixei o botão na tela".`;
 
 const TOOLS: ToolDef[] = [
   DADOS_TOOL as unknown as ToolDef,
@@ -40,6 +47,11 @@ const TOOLS: ToolDef[] = [
   { name: "ver_financeiro", description: "Financeiro da Synapsa (só leitura): saldo do Inter, resultado do mês, MRR, contas a pagar e a receber, alertas, DRE, indicadores e projeção de 36 meses em 3 cenários com o mês em que cada um bate a meta de MRR.", input_schema: { type: "object", properties: {} } },
   { name: "ver_crm", description: "CRM da Synapsa (só leitura): KPIs do funil, etapas, oportunidades a explorar, reuniões de hoje e próximas, leads parados e follow-ups. Sem telefone nem e-mail.", input_schema: { type: "object", properties: { atualizar: { type: "boolean", description: "Ignora o cache de 60 s." } } } },
   { name: "propor_crm", description: "Propõe uma escrita no CRM e pede confirmação ao Felipe. NÃO executa. Operações: criar_lead (dados: name, lead_type = psicologo_individual|clinica|parceiro, phone, origin = instagram|whatsapp|landing_page|indicacao|evento|linkedin|facebook_meta|google|parceria|outbound|outro, classification opcional frio|morno|quente|super_quente); mover_etapa (dados: lead_id, status = novo_lead|contato_feito|reuniao_agendada|reuniao_realizada|em_teste|negociacao|cliente_ativo|perdido|pausado; se perdido, loss_reason {reasons[], details}); registrar_atividade (dados: lead_id, type = enviar_mensagem|ligar|agendar_reuniao|followup, scheduled_date AAAA-MM-DD, scheduled_time HH:MM, observations opcional); agendar_reuniao (dados: lead_id, title, scheduled_at ISO com fuso, channel/notes_before/duration_minutes opcionais). lead_id vem de ver_crm.", input_schema: { type: "object", properties: { op: { type: "string", enum: [...CRM_OPS] }, dados: { type: "object" }, resumo: { type: "string", description: "Rótulo curto do botão, ex.: 'Cadastrar lead TESTE'." } }, required: ["op", "dados", "resumo"] } },
+  { name: "ver_seo", description: "SEO da Synapsa (só leitura): Search Console (cliques, impressões, posição, buscas, páginas e perfis de psicólogos do diretório synapsa.chat, oportunidades) e Google Analytics 4 (visitas, pessoas, engajamento, canais, páginas de entrada, eventos-chave), últimos 28 dias contra os 28 anteriores.", input_schema: { type: "object", properties: {} } },
+  { name: "ver_instagram", description: "Fila e histórico de posts do Instagram da Synapsa: o que espera sua aprovação, o que foi aprovado, publicado ou rejeitado, tema, pilar e legenda.", input_schema: { type: "object", properties: {} } },
+  { name: "ver_planejamento", description: "Planejamento semanal: posts por dia, tarefas e subtarefas, responsável (Felipe Dalpra, Cassio, Felipe Augusto), status e taxa de conclusão, com histórico das semanas.", input_schema: { type: "object", properties: { semana: { type: "string", description: "Segunda-feira da semana (AAAA-MM-DD). Omita para a semana atual." } } } },
+  { name: "ver_prospeccao", description: "Prospecção de psicólogos e clínicas: totais por etapa e os melhores prospects para abordar. Sem telefone nem e-mail.", input_schema: { type: "object", properties: {} } },
+  { name: "planejar", description: "Põe um post ou uma tarefa na semana atual do planejamento. Interno e reversível; executa direto. dia: 0 segunda a 6 domingo (só para post).", input_schema: { type: "object", properties: { titulo: { type: "string" }, tipo: { type: "string", enum: ["post", "tarefa"] }, dia: { type: "integer" }, formato: { type: "string", description: "reel, carrossel, estático, stories…" }, responsavel: { type: "string", enum: ["Felipe Dalpra", "Cassio", "Felipe Augusto"] } }, required: ["titulo"] } },
   { name: "listar_planos", description: "Planos prontos por equipe (id, equipe, título, objetivo, passos).", input_schema: { type: "object", properties: {} } },
   { name: "lancar_plano", description: "Lança um plano pronto: os agentes dele começam na hora. Executa direto.", input_schema: { type: "object", properties: { plano_id: { type: "string" } }, required: ["plano_id"] } },
   { name: "visao_geral", description: "Estado atual: MRR e meta, funil (pode ser nulo), fila de propostas, agentes trabalhando/pausados, integrações, atividade recente, botão de emergência.", input_schema: { type: "object", properties: {} } },
@@ -77,7 +89,8 @@ export function overview(brain: Brain, integrations: Integration[]) {
 }
 
 export function llmChat(brain: Brain, integrations: () => Integration[], cfg: LlmConfig, fallback: Chat, fetchFn: typeof fetch = fetch, env: Record<string, string | undefined> = {}): Chat {
-  return async (text) => {
+  return async (text, opts = {}) => {
+    const voz = opts.voz === true;
     const history = rows<{ role: string; text: string }>(brain.db, "select role, text from chat order by id desc limit 12").reverse();
     const messages: Msg[] = [...history.map((h) => ({ role: (h.role === "voce" ? "user" : "assistant") as Msg["role"], content: h.text })), { role: "user", content: text }];
     // A API exige alternância; funde mensagens seguidas do mesmo papel.
@@ -105,7 +118,7 @@ export function llmChat(brain: Brain, integrations: () => Integration[], cfg: Ll
     try {
       const { text: out, cost } = await toolLoop(
         cfg,
-        { system: `${SYSTEM}\n\nAgentes (id = nome): ${agentList()}.`, messages: merged, tools: TOOLS, maxTokens: 1100, maxRounds: 8 },
+        { system: `${SYSTEM}${voz ? SYSTEM_VOZ : ""}\n\nAgora é ${new Date(brain.clock()).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "full", timeStyle: "short" })}. Agentes (id = nome): ${agentList()}.`, messages: merged, tools: TOOLS, maxTokens: voz ? 500 : 1100, maxRounds: voz ? 6 : 8 },
         async (name, input) => {
           switch (name) {
             case "consultar_dados":
@@ -139,6 +152,16 @@ export function llmChat(brain: Brain, integrations: () => Integration[], cfg: Ll
               confirm = { label: String(input.resumo ?? "Confirmar no CRM").slice(0, 60), action: { type: "crm", op, dados, chave: crypto.randomUUID() } };
               return "Confirmação pedida ao Felipe. Nada foi gravado. Diga em uma frase o que vai acontecer e espere o clique.";
             }
+            case "ver_seo":
+              return cap(verSeo(brain, env), 14_000);
+            case "ver_instagram":
+              return cap(verInstagram(brain, env));
+            case "ver_planejamento":
+              return cap(verPlanejamento(brain, typeof input.semana === "string" ? input.semana : undefined));
+            case "ver_prospeccao":
+              return cap(verProspeccao(brain));
+            case "planejar":
+              return planejar(brain, { titulo: String(input.titulo ?? ""), tipo: String(input.tipo ?? "tarefa"), dia: Number.isInteger(input.dia) ? Number(input.dia) : undefined, formato: String(input.formato ?? ""), responsavel: String(input.responsavel ?? "") });
             case "listar_planos":
               return JSON.stringify(PLAYBOOKS.map((p) => ({ id: p.id, equipe: p.team, titulo: p.titulo, objetivo: p.objetivo, passos: p.passos.map((s) => `${s.agentId}: ${s.titulo}`) })));
             case "lancar_plano":

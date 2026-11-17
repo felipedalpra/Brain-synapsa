@@ -1228,8 +1228,8 @@ function respond(input, v) {
     return { text: `${by("conectado").length} integra\xE7\xF5es ligadas, ${by("pronto").length} com credencial pronta esperando o Worker, ${by("manual").length} manual e ${by("pendente").length} pendentes${pendentes ? ` (${pendentes})` : ""}. As que travam mais agentes s\xE3o Plataforma e Supabase.` };
   }
   if (/(custo|gasto|token|\bia\b)/.test(q)) {
-    const dia3 = Object.values(v.runtime).reduce((n3, r) => n3 + r.costBrl, 0);
-    return { text: `Hoje os agentes custaram ${brl(dia3)}. No m\xEAs: ${brl(M.llmSpentMonthBrl)} de ${brl(M.llmCapMonthlyBrl)} de teto, ${Math.round(M.llmSpentMonthBrl / M.llmCapMonthlyBrl * 100)}% usado.` };
+    const dia4 = Object.values(v.runtime).reduce((n3, r) => n3 + r.costBrl, 0);
+    return { text: `Hoje os agentes custaram ${brl(dia4)}. No m\xEAs: ${brl(M.llmSpentMonthBrl)} de ${brl(M.llmCapMonthlyBrl)} de teto, ${Math.round(M.llmSpentMonthBrl / M.llmCapMonthlyBrl * 100)}% usado.` };
   }
   if (/(fila|aprova|pendente|propost|decis)/.test(q)) {
     if (pending.length === 0) return { text: "Fila vazia. Nada espera por voc\xEA." };
@@ -3728,7 +3728,7 @@ function limpa(tipo, resto) {
 }
 function lerExtratoInterTexto(texto2) {
   const itens2 = [];
-  let dia3 = null;
+  let dia4 = null;
   const saldo = /Saldo total\s*\n?\s*(?:.*\n)?\s*R\$\s*([\d.]+,\d{2})/.exec(texto2);
   const per = /Per[ií]odo:\s*(\d{2})\/(\d{2})\/(\d{4})\s*a\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(texto2);
   for (const bruta of texto2.split(/\r?\n/)) {
@@ -3738,15 +3738,15 @@ function lerExtratoInterTexto(texto2) {
     if (d) {
       const m = MESES.indexOf(d[2].toLowerCase());
       if (m < 0) throw new BrainError("invalid", `M\xEAs n\xE3o reconhecido no extrato: "${d[2]}".`);
-      dia3 = `${d[3]}-${String(m + 1).padStart(2, "0")}-${d[1].padStart(2, "0")}`;
+      dia4 = `${d[3]}-${String(m + 1).padStart(2, "0")}-${d[1].padStart(2, "0")}`;
       continue;
     }
     const t = /^(.*?)\s+(-?)R\$\s*([\d.]+,\d{2})\s+(-?)R\$\s*([\d.]+,\d{2})\s*$/.exec(l);
-    if (!t || !dia3) continue;
+    if (!t || !dia4) continue;
     const valor = r22((t[2] ? -1 : 1) * brNum(t[3]));
     const corpo2 = t[1].trim();
     const q = /^([^":]+?):?\s*"(.*)"$/.exec(corpo2);
-    itens2.push({ data: dia3, descricao: q ? limpa(q[1].trim(), q[2]) : limpa(corpo2, ""), valor });
+    itens2.push({ data: dia4, descricao: q ? limpa(q[1].trim(), q[2]) : limpa(corpo2, ""), valor });
   }
   return {
     itens: itens2,
@@ -3983,8 +3983,8 @@ function mensagemWhatsapp(nome, etapa) {
 var linkWhatsapp = (numero, texto2) => `https://wa.me/${numero}?text=${encodeURIComponent(texto2)}`;
 var capDia = (brain2) => Math.max(1, Math.min(30, Number(brain2.policy("prospect_whatsapp_daily", 10)) || 10));
 function enviadosHoje(brain2) {
-  const dia3 = brtDay(brain2.clock());
-  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY3).filter((r) => brtDay(r.enviado_em) === dia3).length;
+  const dia4 = brtDay(brain2.clock());
+  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY3).filter((r) => brtDay(r.enviado_em) === dia4).length;
 }
 function painelWhatsapp(brain2) {
   const cap2 = capDia(brain2);
@@ -4574,14 +4574,14 @@ function gaPainel(brain2, env) {
 var RESPONSAVEIS_PADRAO = ["Felipe Dalpra", "Cassio", "Felipe Augusto"];
 var STATUS = /* @__PURE__ */ new Set(["pendente", "andamento", "concluida"]);
 var DAY6 = 864e5;
-function segundaDe(dia3) {
-  const d = /* @__PURE__ */ new Date(`${dia3}T12:00:00Z`);
+function segundaDe(dia4) {
+  const d = /* @__PURE__ */ new Date(`${dia4}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) throw new BrainError("invalid", "Semana inv\xE1lida.");
   const dow = (d.getUTCDay() + 6) % 7;
   return new Date(d.getTime() - dow * DAY6).toISOString().slice(0, 10);
 }
 var semanaAtual = (brain2) => segundaDe(brtDay(brain2.clock()));
-var somaDias = (dia3, n3) => new Date(Date.parse(`${dia3}T12:00:00Z`) + n3 * DAY6).toISOString().slice(0, 10);
+var somaDias = (dia4, n3) => new Date(Date.parse(`${dia4}T12:00:00Z`) + n3 * DAY6).toISOString().slice(0, 10);
 var responsaveis = (brain2) => brain2.policy("plan_responsaveis", RESPONSAVEIS_PADRAO);
 var ver = (l) => ({ id: l.id, semana: l.semana, tipo: l.tipo, titulo: l.titulo, dia: l.dia, formato: l.formato, responsavel: l.responsavel, status: l.status, pai: l.pai, ordem: l.ordem, notas: l.notas, criadoEm: l.criado_em, concluidoEm: l.concluido_em, veioDe: l.veio_de, subtarefas: [] });
 function itensDa(brain2, semana) {
@@ -4657,18 +4657,18 @@ function planAcao(brain2, body) {
     if (pai?.pai) throw new BrainError("invalid", "Subtarefa n\xE3o pode ter subtarefa.");
     const tipo = pai ? pai.tipo : body.tipo === "post" ? "post" : "tarefa";
     if (pai) semana = pai.semana;
-    const dia3 = tipo === "post" && body.dia != null && body.dia !== "" ? Math.min(6, Math.max(0, Number(body.dia) | 0)) : null;
+    const dia4 = tipo === "post" && body.dia != null && body.dia !== "" ? Math.min(6, Math.max(0, Number(body.dia) | 0)) : null;
     const resp = texto(body.responsavel, 60) || pai?.responsavel || "";
     const ordem = (row(brain2.db, "select max(ordem) as m from plan_itens where semana = ?", semana)?.m ?? 0) + 1;
-    run(brain2.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em) values (?, ?, ?, ?, ?, ?, ?, 'pendente', ?, ?, '', ?)", crypto.randomUUID(), semana, tipo, titulo2, dia3, texto(body.formato, 30), resp, pai?.id ?? null, ordem, agora);
+    run(brain2.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em) values (?, ?, ?, ?, ?, ?, ?, 'pendente', ?, ?, '', ?)", crypto.randomUUID(), semana, tipo, titulo2, dia4, texto(body.formato, 30), resp, pai?.id ?? null, ordem, agora);
     sincronizarPai(brain2, pai?.id ?? null);
   } else if (acao === "editar") {
     const l = pegar(brain2, body.id);
     semana = l.semana;
     const titulo2 = body.titulo !== void 0 ? texto(body.titulo, 300) : l.titulo;
     if (!titulo2) throw new BrainError("invalid", "O t\xEDtulo n\xE3o pode ficar vazio.");
-    const dia3 = body.dia !== void 0 ? body.dia === null || body.dia === "" ? null : Math.min(6, Math.max(0, Number(body.dia) | 0)) : l.dia;
-    run(brain2.db, "update plan_itens set titulo = ?, dia = ?, formato = ?, responsavel = ?, notas = ? where id = ?", titulo2, dia3, body.formato !== void 0 ? texto(body.formato, 30) : l.formato, body.responsavel !== void 0 ? texto(body.responsavel, 60) : l.responsavel, body.notas !== void 0 ? texto(body.notas, 2e3) : l.notas, l.id);
+    const dia4 = body.dia !== void 0 ? body.dia === null || body.dia === "" ? null : Math.min(6, Math.max(0, Number(body.dia) | 0)) : l.dia;
+    run(brain2.db, "update plan_itens set titulo = ?, dia = ?, formato = ?, responsavel = ?, notas = ? where id = ?", titulo2, dia4, body.formato !== void 0 ? texto(body.formato, 30) : l.formato, body.responsavel !== void 0 ? texto(body.responsavel, 60) : l.responsavel, body.notas !== void 0 ? texto(body.notas, 2e3) : l.notas, l.id);
   } else if (acao === "status") {
     const l = pegar(brain2, body.id);
     semana = l.semana;
@@ -5568,10 +5568,10 @@ function categoria(c2, entrada) {
 var diaMs = (d) => Date.parse(`${d}T12:00:00-03:00`);
 var mesDe = (d) => d.slice(0, 7);
 function somaMeses(d, n3) {
-  const [y, m, dia3] = d.split("-").map(Number);
+  const [y, m, dia4] = d.split("-").map(Number);
   const alvo = new Date(Date.UTC(y, m - 1 + n3, 1));
   const ult = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
-  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(dia3, ult)).padStart(2, "0")}`;
+  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(dia4, ult)).padStart(2, "0")}`;
 }
 var nomeMes = (ref) => {
   const [y, m] = ref.split("-");
@@ -5861,8 +5861,8 @@ function finPainel(db, agora) {
   const guiaPaga = contas.some((c2) => c2.tipo === "pagar" && c2.categoria === "Impostos e Taxas" && c2.pago_em && mesDe(c2.pago_em) === mesRef);
   const recAnt = soma2(entradas, mesAnt);
   if (!guiaPaga && recAnt > 0) {
-    const dia3 = Number(hoje.slice(8));
-    alertas.push({ id: "guia-simples", tom: dia3 > 20 ? "critico" : "atencao", titulo: dia3 > 20 ? "Guia do Simples sem pagamento lan\xE7ado" : `Guia do Simples vence dia 20 (${20 - dia3 >= 0 ? `faltam ${20 - dia3} dias` : "hoje"})`, detalhe: `Referente a ${nomeMes(mesAnt)}. Estimativa ${brl3(r25(recAnt * cfg.aliquotaImpostos))} (${Math.round(cfg.aliquotaImpostos * 100)}% de ${brl3(recAnt)}); o valor real sai do PGDAS.` });
+    const dia4 = Number(hoje.slice(8));
+    alertas.push({ id: "guia-simples", tom: dia4 > 20 ? "critico" : "atencao", titulo: dia4 > 20 ? "Guia do Simples sem pagamento lan\xE7ado" : `Guia do Simples vence dia 20 (${20 - dia4 >= 0 ? `faltam ${20 - dia4} dias` : "hoje"})`, detalhe: `Referente a ${nomeMes(mesAnt)}. Estimativa ${brl3(r25(recAnt * cfg.aliquotaImpostos))} (${Math.round(cfg.aliquotaImpostos * 100)}% de ${brl3(recAnt)}); o valor real sai do PGDAS.` });
   }
   if (mesesDeCaixa !== null && mesesDeCaixa < 3) alertas.push({ id: "caixa-baixo", tom: mesesDeCaixa < 1.5 ? "critico" : "atencao", titulo: `Caixa cobre ${mesesDeCaixa.toLocaleString("pt-BR")} ${mesesDeCaixa === 1 ? "m\xEAs" : "meses"} de despesa`, detalhe: `Saldo do Inter ${brl3(saldoInter)} contra despesa m\xE9dia de ${brl3(despesaMedia)} por m\xEAs.` });
   if (foraMes > 0) alertas.push({ id: "fora-inter", tom: "info", titulo: `${brl3(r25(foraMes))} pagos fora do Inter neste m\xEAs`, detalhe: "Despesa paga no cart\xE3o ou do bolso. Entra no resultado, mas n\xE3o mexe no saldo do Inter: acompanhe o que voc\xEA precisa repor." });
@@ -6035,6 +6035,7 @@ function createHandler(svc) {
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain2));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain2.db, brain2.clock()));
+      if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...await gscPainelCompleto(brain2, svc.env, svc.fetch ?? fetch), ga: gaPainel(brain2, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain2, url.searchParams.get("semana") ?? void 0));
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain2, svc.env));
@@ -6307,8 +6308,27 @@ function createHandler(svc) {
         const text = String(body.text ?? "").trim().slice(0, 2e3);
         if (!text) throw new BrainError("invalid", "Mensagem vazia.");
         if (!svc.chat) return out(501, { error: "Jarvis indispon\xEDvel" });
-        const reply = await svc.chat(text);
+        const reply = await svc.chat(text, { voz: body.voz === true });
         return out(200, { reply, snapshot: snapshot() });
+      }
+      if (url.pathname === "/api/voz/falar") {
+        const chave2 = svc.env.OPENAI_API_KEY;
+        if (!chave2) return out(501, { error: "Sem OPENAI_API_KEY: uso a voz do navegador." });
+        const texto2 = String(body.texto ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
+        if (!texto2) throw new BrainError("invalid", "Nada para falar.");
+        const hoje = brtDay(brain2.clock());
+        const uso = brain2.policy("voz_uso", { dia: hoje, n: 0 });
+        const n3 = uso.dia === hoje ? uso.n : 0;
+        const teto = Number(svc.env.VOZ_TETO_DIA ?? 600);
+        if (n3 >= teto) return out(429, { error: `Limite di\xE1rio de voz neural (${teto} falas) atingido: uso a voz do navegador.` });
+        const r = await (svc.fetch ?? fetch)("https://api.openai.com/v1/audio/speech", {
+          method: "POST",
+          headers: { authorization: `Bearer ${chave2}`, "content-type": "application/json" },
+          body: JSON.stringify({ model: svc.env.VOZ_MODELO ?? "gpt-4o-mini-tts", voice: svc.env.VOZ_JARVIS ?? "onyx", input: texto2, response_format: "mp3", instructions: "Fale em portugu\xEAs do Brasil, com sotaque natural brasileiro. Tom de s\xF3cio experiente: calmo, direto e caloroso, ritmo de conversa, sem teatralidade." })
+        });
+        if (!r.ok) return out(502, { error: `A voz neural falhou (${r.status}): uso a voz do navegador.` });
+        brain2.setPolicy("voz_uso", { dia: hoje, n: n3 + 1 });
+        return new Response(r.body, { status: 200, headers: { "content-type": "audio/mpeg", "cache-control": "no-store", ...cors } });
       }
       if (url.pathname === "/api/integrations/check") {
         await svc.checkIntegrations?.();
@@ -6821,6 +6841,67 @@ var WEB_TOOL = {
   input_schema: { type: "object", properties: { pergunta: { type: "string", description: "Pergunta espec\xEDfica e completa." } }, required: ["pergunta"] }
 };
 
+// packages/core/src/jarvis-dados.ts
+var dia3 = (ms2) => ms2 ? new Date(ms2 - 3 * 36e5).toISOString().slice(0, 10) : null;
+function verSeo(brain2, env) {
+  const g = gscPainel(brain2, env);
+  const a = gaPainel(brain2, env);
+  return {
+    search_console: g.sites.map((s2) => ({
+      site: s2.rotulo,
+      ultimo_dia: s2.ultimoDia,
+      cliques_28d: s2.atual.clicks,
+      impressoes_28d: s2.atual.impressions,
+      posicao_media: Math.round(s2.atual.position * 10) / 10,
+      antes: { cliques: s2.anterior.clicks, impressoes: s2.anterior.impressions },
+      cliques_de_marca: s2.marca.clicks,
+      cliques_sem_marca: s2.naoMarca.clicks,
+      top_buscas: s2.queries.slice(0, 10).map((q) => ({ busca: q.chave, cliques: q.clicks, impressoes: q.impressions, posicao: Math.round(q.position * 10) / 10 })),
+      top_paginas: s2.paginas.slice(0, 10).map((p) => ({ pagina: p.caminho, cliques: p.clicks, impressoes: p.impressions })),
+      oportunidades: s2.oportunidades.slice(0, 6),
+      perfis: s2.perfis ? { vistos: s2.perfis.comImpressao, com_clique: s2.perfis.comClique, no_mapa_do_site: s2.perfis.esperados } : null,
+      leitura: s2.recados
+    })),
+    google_analytics: a.configurado ? a.sites.filter((s2) => s2.propriedade).map((s2) => ({
+      site: s2.rotulo,
+      ultimo_dia: s2.ultimoDia,
+      visitas_28d: s2.atual.sessoes,
+      pessoas_28d: s2.atual.usuarios,
+      visitas_engajadas: s2.atual.engajadas,
+      eventos_chave: s2.atual.eventos,
+      antes: { visitas: s2.anterior.sessoes, pessoas: s2.anterior.usuarios },
+      canais: s2.canais.slice(0, 6).map((c2) => ({ canal: c2.chave, visitas: c2.sessoes })),
+      top_entradas: s2.entradas.slice(0, 10).map((e) => ({ pagina: e.chave, visitas: e.sessoes, engajadas: e.engajadas })),
+      leitura: s2.recados
+    })) : `GA4 ainda n\xE3o ligado${a.ultimoErro ? `: ${a.ultimoErro}` : "."}`
+  };
+}
+function verInstagram(brain2, env) {
+  const ls = rows(brain2.db, "select id, status, tema, pilar, maturidade, legenda, agendado_para, publicado_em, permalink, erro from ig_posts order by criado_em desc limit 20");
+  return {
+    publicacao_automatica: brain2.policy("ig_auto_publicar", false) === true,
+    configurado: !!(env.META_SYSTEM_USER_TOKEN && env.META_IG_ID),
+    aguardando_sua_aprovacao: ls.filter((l) => l.status === "pendente").length,
+    posts: ls.map((l) => ({ tema: l.tema, pilar: l.pilar, status: l.status, para: dia3(l.agendado_para), publicado_em: dia3(l.publicado_em), link: l.permalink, motivo: l.erro, legenda_inicio: l.legenda.slice(0, 140) }))
+  };
+}
+function verPlanejamento(brain2, semana) {
+  const p = planPainel(brain2, semana);
+  const it = (x) => ({ id: x.id, titulo: x.titulo, tipo: x.tipo, dia: x.dia, formato: x.formato || void 0, responsavel: x.responsavel || "sem respons\xE1vel", status: x.status, subtarefas: (x.subtarefas ?? []).map((s2) => ({ titulo: s2.titulo, status: s2.status })) });
+  return { semana: p.semana, resumo: p.resumo, posts: p.posts.map(it), tarefas: p.tarefas.map(it), historico_taxas: p.historico.slice(0, 8), pendentes_da_semana_anterior: p.pendentesAnterior };
+}
+function verProspeccao(brain2) {
+  const porStatus = rows(brain2.db, "select status, count(*) as n from prospects group by status").map((r) => ({ status: r.status, quantidade: r.n }));
+  const topo = rows(brain2.db, "select nome, cidade, uf, nota, status, instagram from prospects where status in ('qualificado','revisar') order by nota desc limit 10");
+  const total = row(brain2.db, "select count(*) as n from prospects")?.n ?? 0;
+  return { total, por_status: porStatus, melhores_para_abordar: topo.map((t) => ({ nome: t.nome, cidade: t.cidade ? `${t.cidade}${t.uf ? `/${t.uf}` : ""}` : null, nota: t.nota, status: t.status, tem_instagram: !!t.instagram })) };
+}
+function planejar(brain2, i) {
+  const tipo = i.tipo === "post" ? "post" : "tarefa";
+  planAcao(brain2, { acao: "criar", tipo, titulo: i.titulo, ...Number.isInteger(i.dia) ? { dia: i.dia } : {}, formato: i.formato ?? "", responsavel: i.responsavel ?? "" });
+  return `Lancei no planejamento da semana: ${i.titulo}.`;
+}
+
 // packages/core/src/jarvis-llm.ts
 var cap = (x, n3 = 12e3) => {
   const t = JSON.stringify(x);
@@ -6842,13 +6923,23 @@ Regras que voc\xEA nunca quebra:
 - Dados cl\xEDnicos de paciente n\xE3o existem no Brain.
 - Caixa, contas, DRE, proje\xE7\xE3o e meta de MRR: use ver_financeiro. CRM (funil, reuni\xF5es do dia, leads parados, oportunidades): use ver_crm. ver_financeiro e ver_crm s\xE3o leitura. Voc\xEA n\xE3o lan\xE7a pagamento nem cadastra conta financeira. No CRM voc\xEA PROP\xD5E escritas com propor_crm (criar lead, mover etapa, registrar atividade, agendar reuni\xE3o): isso n\xE3o executa nada, s\xF3 mostra um bot\xE3o de confirmar ao Felipe, e s\xF3 o clique dele grava. Nunca exclua nada no CRM. Se faltar campo obrigat\xF3rio (por exemplo telefone), pergunte ao Felipe antes de propor; nunca invente telefone, nome ou data. Depois de propor, diga em uma frase o que vai acontecer ao confirmar.
 - Os n\xFAmeros do financeiro s\xE3o do Inter (caixa real) e das contas lan\xE7adas; MRR vem das assinaturas. CAC s\xF3 existe quando a ferramenta devolver n\xFAmero.
+- Voc\xEA enxerga TUDO o que est\xE1 no Brain, cada coisa pela sua ferramenta: ver_seo (Search Console e Google Analytics: buscas, p\xE1ginas, perfis do diret\xF3rio, visitas, canais), ver_instagram (fila de posts, o que foi publicado, o que espera aprova\xE7\xE3o), ver_planejamento (posts e tarefas da semana, respons\xE1veis, taxa de conclus\xE3o), ver_prospeccao (prospects e quais abordar), ver_financeiro, ver_crm, consultar_dados (Stripe, Meta Ads, Instagram, execu\xE7\xF5es, entregas). Nunca diga que n\xE3o tem acesso sem chamar a ferramenta certa. Se uma ferramenta devolver aviso de que algo n\xE3o est\xE1 ligado, repita o aviso e diga o que falta.
+- planejar p\xF5e um post ou tarefa na semana do planejamento: \xE9 interno e revers\xEDvel, ent\xE3o execute direto quando o Felipe pedir.
 Se a pergunta for sobre o estado do Brain, chame visao_geral antes de responder.`;
+var SYSTEM_VOZ = `
+
+MODO CONVERSA POR VOZ (o Felipe est\xE1 ouvindo voc\xEA, n\xE3o lendo): fale como um s\xF3cio que conhece o neg\xF3cio por dentro, trocando ideia. Responda em at\xE9 3 frases curtas, no m\xE1ximo uns 60 palavras, a menos que ele pe\xE7a mais. Sem markdown, sem listas, sem emoji, sem URLs lidas letra por letra e sem tabelas. Diga n\xFAmeros do jeito que se fala ("mil e duzentos reais", "quarenta por cento"). D\xEA sua opini\xE3o e, quando fizer sentido, termine com uma pergunta curta que avance a conversa. Se ele pedir um briefing, resuma em no m\xE1ximo 45 segundos de fala: o que mais mexe no MRR primeiro. Se ele s\xF3 estiver pensando em voz alta, discuta a ideia com ele: concorde s\xF3 quando fizer sentido e aponte o problema com clareza quando houver. A\xE7\xF5es que mudam algo s\xF3 depois de ele confirmar com clareza; para o que exige bot\xE3o (confirma\xE7\xE3o), diga "deixei o bot\xE3o na tela".`;
 var TOOLS = [
   DADOS_TOOL,
   WEB_TOOL,
   { name: "ver_financeiro", description: "Financeiro da Synapsa (s\xF3 leitura): saldo do Inter, resultado do m\xEAs, MRR, contas a pagar e a receber, alertas, DRE, indicadores e proje\xE7\xE3o de 36 meses em 3 cen\xE1rios com o m\xEAs em que cada um bate a meta de MRR.", input_schema: { type: "object", properties: {} } },
   { name: "ver_crm", description: "CRM da Synapsa (s\xF3 leitura): KPIs do funil, etapas, oportunidades a explorar, reuni\xF5es de hoje e pr\xF3ximas, leads parados e follow-ups. Sem telefone nem e-mail.", input_schema: { type: "object", properties: { atualizar: { type: "boolean", description: "Ignora o cache de 60 s." } } } },
   { name: "propor_crm", description: "Prop\xF5e uma escrita no CRM e pede confirma\xE7\xE3o ao Felipe. N\xC3O executa. Opera\xE7\xF5es: criar_lead (dados: name, lead_type = psicologo_individual|clinica|parceiro, phone, origin = instagram|whatsapp|landing_page|indicacao|evento|linkedin|facebook_meta|google|parceria|outbound|outro, classification opcional frio|morno|quente|super_quente); mover_etapa (dados: lead_id, status = novo_lead|contato_feito|reuniao_agendada|reuniao_realizada|em_teste|negociacao|cliente_ativo|perdido|pausado; se perdido, loss_reason {reasons[], details}); registrar_atividade (dados: lead_id, type = enviar_mensagem|ligar|agendar_reuniao|followup, scheduled_date AAAA-MM-DD, scheduled_time HH:MM, observations opcional); agendar_reuniao (dados: lead_id, title, scheduled_at ISO com fuso, channel/notes_before/duration_minutes opcionais). lead_id vem de ver_crm.", input_schema: { type: "object", properties: { op: { type: "string", enum: [...CRM_OPS] }, dados: { type: "object" }, resumo: { type: "string", description: "R\xF3tulo curto do bot\xE3o, ex.: 'Cadastrar lead TESTE'." } }, required: ["op", "dados", "resumo"] } },
+  { name: "ver_seo", description: "SEO da Synapsa (s\xF3 leitura): Search Console (cliques, impress\xF5es, posi\xE7\xE3o, buscas, p\xE1ginas e perfis de psic\xF3logos do diret\xF3rio synapsa.chat, oportunidades) e Google Analytics 4 (visitas, pessoas, engajamento, canais, p\xE1ginas de entrada, eventos-chave), \xFAltimos 28 dias contra os 28 anteriores.", input_schema: { type: "object", properties: {} } },
+  { name: "ver_instagram", description: "Fila e hist\xF3rico de posts do Instagram da Synapsa: o que espera sua aprova\xE7\xE3o, o que foi aprovado, publicado ou rejeitado, tema, pilar e legenda.", input_schema: { type: "object", properties: {} } },
+  { name: "ver_planejamento", description: "Planejamento semanal: posts por dia, tarefas e subtarefas, respons\xE1vel (Felipe Dalpra, Cassio, Felipe Augusto), status e taxa de conclus\xE3o, com hist\xF3rico das semanas.", input_schema: { type: "object", properties: { semana: { type: "string", description: "Segunda-feira da semana (AAAA-MM-DD). Omita para a semana atual." } } } },
+  { name: "ver_prospeccao", description: "Prospec\xE7\xE3o de psic\xF3logos e cl\xEDnicas: totais por etapa e os melhores prospects para abordar. Sem telefone nem e-mail.", input_schema: { type: "object", properties: {} } },
+  { name: "planejar", description: "P\xF5e um post ou uma tarefa na semana atual do planejamento. Interno e revers\xEDvel; executa direto. dia: 0 segunda a 6 domingo (s\xF3 para post).", input_schema: { type: "object", properties: { titulo: { type: "string" }, tipo: { type: "string", enum: ["post", "tarefa"] }, dia: { type: "integer" }, formato: { type: "string", description: "reel, carrossel, est\xE1tico, stories\u2026" }, responsavel: { type: "string", enum: ["Felipe Dalpra", "Cassio", "Felipe Augusto"] } }, required: ["titulo"] } },
   { name: "listar_planos", description: "Planos prontos por equipe (id, equipe, t\xEDtulo, objetivo, passos).", input_schema: { type: "object", properties: {} } },
   { name: "lancar_plano", description: "Lan\xE7a um plano pronto: os agentes dele come\xE7am na hora. Executa direto.", input_schema: { type: "object", properties: { plano_id: { type: "string" } }, required: ["plano_id"] } },
   { name: "visao_geral", description: "Estado atual: MRR e meta, funil (pode ser nulo), fila de propostas, agentes trabalhando/pausados, integra\xE7\xF5es, atividade recente, bot\xE3o de emerg\xEAncia.", input_schema: { type: "object", properties: {} } },
@@ -6881,7 +6972,8 @@ function overview(brain2, integrations) {
   };
 }
 function llmChat(brain2, integrations, cfg, fallback, fetchFn = fetch, env = {}) {
-  return async (text) => {
+  return async (text, opts = {}) => {
+    const voz = opts.voz === true;
     const history = rows(brain2.db, "select role, text from chat order by id desc limit 12").reverse();
     const messages = [...history.map((h) => ({ role: h.role === "voce" ? "user" : "assistant", content: h.text })), { role: "user", content: text }];
     const merged = [];
@@ -6909,9 +7001,9 @@ ${m.content}`;
     try {
       const { text: out, cost } = await toolLoop(
         cfg,
-        { system: `${SYSTEM}
+        { system: `${SYSTEM}${voz ? SYSTEM_VOZ : ""}
 
-Agentes (id = nome): ${agentList()}.`, messages: merged, tools: TOOLS, maxTokens: 1100, maxRounds: 8 },
+Agora \xE9 ${new Date(brain2.clock()).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "full", timeStyle: "short" })}. Agentes (id = nome): ${agentList()}.`, messages: merged, tools: TOOLS, maxTokens: voz ? 500 : 1100, maxRounds: voz ? 6 : 8 },
         async (name, input) => {
           switch (name) {
             case "consultar_dados":
@@ -6954,6 +7046,16 @@ ${w.fontes.map((f) => `- ${f.titulo}: ${f.url}`).join("\n")}`);
               confirm = { label: String(input.resumo ?? "Confirmar no CRM").slice(0, 60), action: { type: "crm", op, dados, chave: crypto.randomUUID() } };
               return "Confirma\xE7\xE3o pedida ao Felipe. Nada foi gravado. Diga em uma frase o que vai acontecer e espere o clique.";
             }
+            case "ver_seo":
+              return cap(verSeo(brain2, env), 14e3);
+            case "ver_instagram":
+              return cap(verInstagram(brain2, env));
+            case "ver_planejamento":
+              return cap(verPlanejamento(brain2, typeof input.semana === "string" ? input.semana : void 0));
+            case "ver_prospeccao":
+              return cap(verProspeccao(brain2));
+            case "planejar":
+              return planejar(brain2, { titulo: String(input.titulo ?? ""), tipo: String(input.tipo ?? "tarefa"), dia: Number.isInteger(input.dia) ? Number(input.dia) : void 0, formato: String(input.formato ?? ""), responsavel: String(input.responsavel ?? "") });
             case "listar_planos":
               return JSON.stringify(PLAYBOOKS.map((p) => ({ id: p.id, equipe: p.team, titulo: p.titulo, objetivo: p.objetivo, passos: p.passos.map((s2) => `${s2.agentId}: ${s2.titulo}`) })));
             case "lancar_plano":

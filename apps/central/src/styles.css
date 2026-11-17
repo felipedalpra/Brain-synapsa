@@ -3142,3 +3142,48 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .seo-manual { display: grid; gap: 10px; margin-top: 12px; }
 .seo-manual label { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
 @media (max-width: 640px) { .seo-manual label { grid-template-columns: 1fr; } }
+
+/* ---------- voz e Live Mode ---------- */
+.chat-head { flex-wrap: wrap; gap: 8px; }
+.chat-voz { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+.chat-voz .btn { padding: 6px 10px; font-size: 13px; }
+.btn.on { border-color: var(--core-2); background: #7c9ce824; }
+.mic { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line-strong); background: transparent; color: var(--text); display: grid; place-items: center; flex: none; }
+.mic:hover { background: #8a9cd61a; }
+.mic.on { background: var(--crit); border-color: var(--crit); color: #fff; animation: live-pulso 1.2s ease-in-out infinite; }
+
+.live { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); background: radial-gradient(ellipse at 50% 38%, #16224a 0%, var(--bg) 70%); text-align: center; overflow-y: auto; }
+.live-x { position: absolute; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--text); display: grid; place-items: center; }
+.live-x:hover { background: #8a9cd61a; }
+.live-orb { position: relative; width: 168px; height: 168px; flex: none; display: grid; place-items: center; }
+.live-orb i { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--core-2); opacity: 0.5; }
+.live-orb i:nth-child(2) { inset: 14px; opacity: 0.35; }
+.live-orb i:nth-child(3) { inset: 30px; background: radial-gradient(circle at 35% 30%, var(--core-1), var(--core-2) 55%, var(--core-3)); border: 0; opacity: 0.95; box-shadow: 0 0 60px #7c9ce866; }
+.live-orb b { position: relative; z-index: 1; color: #0a1126; display: grid; place-items: center; }
+.live-ouvindo i:nth-child(3) { animation: live-respira 3.2s ease-in-out infinite; }
+.live-ouvindo i:nth-child(1) { animation: live-onda 3.2s ease-out infinite; }
+.live-pensando i:nth-child(1) { border-style: dashed; animation: live-gira 4s linear infinite; opacity: 0.8; }
+.live-pensando i:nth-child(3) { animation: live-respira 1.4s ease-in-out infinite; filter: saturate(0.6); }
+.live-falando i:nth-child(3) { animation: live-fala 0.55s ease-in-out infinite alternate; box-shadow: 0 0 90px #7c9ce8aa; }
+.live-falando i:nth-child(1) { animation: live-onda 1.1s ease-out infinite; }
+.live-falando i:nth-child(2) { animation: live-onda 1.1s ease-out 0.4s infinite; }
+.live-mudo i, .live-erro i { opacity: 0.25; }
+.live-mudo i:nth-child(3), .live-erro i:nth-child(3) { filter: grayscale(1); box-shadow: none; }
+@keyframes live-respira { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+@keyframes live-fala { from { transform: scale(0.96); } to { transform: scale(1.12); } }
+@keyframes live-onda { from { transform: scale(0.9); opacity: 0.55; } to { transform: scale(1.5); opacity: 0; } }
+@keyframes live-gira { to { transform: rotate(360deg); } }
+@keyframes live-pulso { 50% { opacity: 0.6; } }
+.live-estado { font: 600 14px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--core-2); }
+.live-texto { width: min(680px, 100%); display: grid; gap: 14px; min-height: 120px; }
+.live-voce { font-size: 17px; color: var(--muted); line-height: 1.5; text-wrap: balance; }
+.live-voce.parcial { color: var(--text); }
+.live-jarvis { font-size: 20px; line-height: 1.55; text-wrap: pretty; }
+.live-dica { color: var(--muted); font-size: 16px; }
+.live-erro { color: var(--warn); font-size: 14px; line-height: 1.5; }
+.live-atalhos { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 680px; }
+.live-confirm { justify-content: center; }
+.live-controles { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.live-nota { color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .live-orb i, .mic.on { animation: none !important; } }
+@media (max-width: 640px) { .live-orb { width: 132px; height: 132px; } .live-jarvis { font-size: 18px; } }

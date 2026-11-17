@@ -53,10 +53,11 @@ export const api = {
     post("/api/actions", {
       action: e,
     }),
-  chat: (e) =>
+  chat: (e, voz = false) =>
     post("/api/chat", {
       text: e,
-    }),
+      voz,
+    }, 6e4),
   checkIntegrations: () => post("/api/integrations/check"),
   dashboard: () => chamar("/api/dashboard"),
   refreshData: () => post("/api/refresh-data", {}, 6e4),
