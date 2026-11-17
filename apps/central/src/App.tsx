@@ -1,6 +1,7 @@
 // @ts-nocheck
 // Gerado a partir do build de produção de 12/11/2026 (conversor mecânico). Nomes locais ainda minificados; ajuste ao mexer na tela.
 import * as React from "react";
+import { JarvisBot } from "./components/JarvisBot";
 import {
   Bot,
   Building2,
@@ -126,7 +127,7 @@ export function App() {
     <div className={`app ${e.kill ? "is-kill" : ""}`}>
       <header className="top">
         <div className="brand">
-          <span className="brand-mark" aria-hidden />
+          <JarvisBot size={34} compacto decorativo className="brand-bot" />
           <div>
             <h1>Central Synapsa</h1>
             <p>{e.mode === "live" ? "Ao vivo \xB7 Brain neste computador" : "Dados de demonstra\xE7\xE3o"}</p>

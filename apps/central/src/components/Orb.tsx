@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Q, Ze } from "../shared-inline";
 import { An } from "../lib";
+import { JarvisBot } from "./JarvisBot";
 
 export const re = 400;
 export const or = [138, 192, 246, 300, 352];
@@ -117,11 +118,10 @@ export function Orb({ runtime: e, pendingBy: a, kill: t, thinking: r, selected: 
           ) : null,
         )}
         <g className="orb-core">
-          <circle cx={re} cy={re} r={112} fill="url(#core)" className="orb-breath" />
-          <circle cx={re} cy={re} r={58} className="orb-eye" />
-          <circle cx={re} cy={re} r={84} className="orb-eye-ring" />
-          <circle cx={re} cy={re} r={84} className="orb-wave" />
-          <circle cx={re} cy={re} r={84} className="orb-wave orb-wave-2" />
+          <circle cx={re} cy={re} r={150} fill="url(#halo)" className="orb-breath" />
+          <circle cx={re} cy={re} r={120} className="orb-wave" />
+          <circle cx={re} cy={re} r={96} className="orb-wave orb-wave-2" />
+          <JarvisBot estado={t ? "kill" : r ? "pensando" : "idle"} size={200} x={re - 100} y={re - 108} decorativo />
         </g>
         {i.map((C) => {
           const k = Q.find((q) => q.id === C.id),

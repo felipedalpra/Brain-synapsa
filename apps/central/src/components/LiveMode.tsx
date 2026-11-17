@@ -3,6 +3,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { Check, Headphones, Mic, MicOff, Square, X } from "lucide-react";
+import { JarvisBot } from "./JarvisBot";
 import { useBrain } from "../store";
 import { criarOuvinte, falador, temMicrofone } from "../voz";
 
@@ -140,8 +141,9 @@ export function LiveMode({ onFechar }) {
     <div className="live" role="dialog" aria-modal="true" aria-label="Conversa por voz com o Jarvis">
       <button type="button" className="live-x" onClick={onFechar} aria-label="Encerrar conversa por voz"><X size={20} aria-hidden /></button>
       <div className={`live-orb live-${fase}`} aria-hidden>
-        <i /><i /><i />
-        <b>{fase === "ouvindo" ? <Mic size={30} /> : fase === "mudo" ? <MicOff size={30} /> : null}</b>
+        <i /><i />
+        <JarvisBot estado={fase === "erro" ? "mudo" : fase} size={150} decorativo />
+        {fase === "ouvindo" ? <b className="live-mic"><Mic size={16} /></b> : fase === "mudo" ? <b className="live-mic"><MicOff size={16} /></b> : null}
       </div>
       <p className="live-estado" role="status">{ROTULO[fase]}</p>
 

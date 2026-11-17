@@ -3155,20 +3155,20 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .live { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); background: radial-gradient(ellipse at 50% 38%, #16224a 0%, var(--bg) 70%); text-align: center; overflow-y: auto; }
 .live-x { position: absolute; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--text); display: grid; place-items: center; }
 .live-x:hover { background: #8a9cd61a; }
-.live-orb { position: relative; width: 168px; height: 168px; flex: none; display: grid; place-items: center; }
+.live-orb { position: relative; width: 210px; height: 210px; flex: none; display: grid; place-items: center; }
 .live-orb i { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--core-2); opacity: 0.5; }
 .live-orb i:nth-child(2) { inset: 14px; opacity: 0.35; }
-.live-orb i:nth-child(3) { inset: 30px; background: radial-gradient(circle at 35% 30%, var(--core-1), var(--core-2) 55%, var(--core-3)); border: 0; opacity: 0.95; box-shadow: 0 0 60px #7c9ce866; }
-.live-orb b { position: relative; z-index: 1; color: #0a1126; display: grid; place-items: center; }
-.live-ouvindo i:nth-child(3) { animation: live-respira 3.2s ease-in-out infinite; }
+.live-orb .jv { position: relative; z-index: 1; }
+.live-orb b.live-mic { position: absolute; right: 18px; bottom: 22px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; background: #171a4d; border: 2px solid #3a3f9a; color: #3fe0a5; display: grid; place-items: center; }
+.live-ouvindo .jv { animation: live-respira 3.2s ease-in-out infinite; }
 .live-ouvindo i:nth-child(1) { animation: live-onda 3.2s ease-out infinite; }
 .live-pensando i:nth-child(1) { border-style: dashed; animation: live-gira 4s linear infinite; opacity: 0.8; }
-.live-pensando i:nth-child(3) { animation: live-respira 1.4s ease-in-out infinite; filter: saturate(0.6); }
-.live-falando i:nth-child(3) { animation: live-fala 0.55s ease-in-out infinite alternate; box-shadow: 0 0 90px #7c9ce8aa; }
+.live-pensando .jv { animation: live-respira 1.8s ease-in-out infinite; }
+.live-falando .jv { filter: drop-shadow(0 0 22px #a38bda88); }
 .live-falando i:nth-child(1) { animation: live-onda 1.1s ease-out infinite; }
 .live-falando i:nth-child(2) { animation: live-onda 1.1s ease-out 0.4s infinite; }
 .live-mudo i, .live-erro i { opacity: 0.25; }
-.live-mudo i:nth-child(3), .live-erro i:nth-child(3) { filter: grayscale(1); box-shadow: none; }
+.live-mudo .jv, .live-erro .jv { filter: grayscale(0.85) brightness(0.8); }
 @keyframes live-respira { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 @keyframes live-fala { from { transform: scale(0.96); } to { transform: scale(1.12); } }
 @keyframes live-onda { from { transform: scale(0.9); opacity: 0.55; } to { transform: scale(1.5); opacity: 0; } }
@@ -3185,5 +3185,53 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .live-confirm { justify-content: center; }
 .live-controles { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .live-nota { color: var(--muted); font-size: 12px; }
-@media (prefers-reduced-motion: reduce) { .live-orb i, .mic.on { animation: none !important; } }
-@media (max-width: 640px) { .live-orb { width: 132px; height: 132px; } .live-jarvis { font-size: 18px; } }
+@media (prefers-reduced-motion: reduce) { .live-orb i, .live-orb .jv, .mic.on { animation: none !important; } .jv * { animation: none !important; } }
+@media (max-width: 640px) { .live-orb { width: 170px; height: 170px; } .live-orb .jv { width: 120px; height: auto; } .live-jarvis { font-size: 18px; } }
+
+/* ===== Jarvis no traço da Lyra (robô com cabeça de cérebro) ===== */
+.jv { display: block; overflow: visible; }
+.jv-corpo, .jv-cabeca, .jv-antena, .jv-olho { transform-box: fill-box; transform-origin: center; }
+.jv-corpo { animation: jv-flutua 4.2s ease-in-out infinite; }
+.jv-cabeca { animation: jv-flutua 4.2s ease-in-out -0.25s infinite; }
+.jv-antena { transform-origin: 50% 100%; animation: jv-balanca 3.4s ease-in-out infinite; }
+.jv-antena-d { animation-delay: -1.2s; }
+.jv-bulbo { animation: jv-pisca 2.6s ease-in-out infinite; }
+.jv-bulbo-d { animation-delay: -1.1s; }
+.jv-anel { transform-box: fill-box; transform-origin: center; animation: jv-gira 7s linear infinite; }
+.jv-anel-2 { animation-duration: 4.5s; animation-direction: reverse; }
+.jv-miolo { animation: jv-pisca 1.9s ease-in-out infinite; }
+.jv-fio { stroke-dasharray: 6 5; animation: jv-fluxo 3.2s linear infinite; }
+.jv-olho { animation: jv-pisca-olho 5.5s ease-in-out infinite; }
+.jv-ouvido { animation: jv-pisca 2.4s ease-in-out infinite; }
+.jv-boca-fala { opacity: 0; }
+.jv-sombra { transform-box: fill-box; transform-origin: center; animation: jv-sombra 4.2s ease-in-out infinite; }
+.jv-ouvindo .jv-ouvido { animation-duration: 0.7s; }
+.jv-ouvindo .jv-olho path { stroke-width: 7; }
+.jv-pensando .jv-anel { animation-duration: 1.6s; }
+.jv-pensando .jv-anel-2 { animation-duration: 1.1s; }
+.jv-pensando .jv-fio { animation-duration: 0.8s; }
+.jv-pensando .jv-bulbo { animation-duration: 0.7s; }
+.jv-pensando .jv-olho { animation: jv-olha 1.6s ease-in-out infinite; }
+.jv-falando .jv-boca { opacity: 0; }
+.jv-falando .jv-boca-fala { opacity: 1; transform-box: fill-box; transform-origin: center; animation: jv-fala 0.28s ease-in-out infinite alternate; }
+.jv-falando .jv-bulbo { animation-duration: 0.5s; }
+.jv-falando .jv-corpo, .jv-falando .jv-cabeca { animation-duration: 1.1s; }
+.jv-mudo .jv-olho path { stroke: #7b7fb8; }
+.jv-mudo .jv-boca { d: path("M92 112 Q100 110 108 112"); }
+.jv-mudo .jv-anel, .jv-mudo .jv-fio, .jv-mudo .jv-bulbo, .jv-mudo .jv-ouvido, .jv-mudo .jv-miolo { animation-play-state: paused; opacity: 0.45; }
+.jv-kill .jv-bulbo, .jv-kill .jv-miolo, .jv-kill .jv-ouvido { fill: #f2808e; }
+.jv-kill .jv-anel { stroke: #f2808e; animation-play-state: paused; }
+.jv-kill .jv-olho path { stroke: #ffb3bd; }
+.jv-kill .jv-fio, .jv-kill .jv-corpo, .jv-kill .jv-cabeca { animation-play-state: paused; }
+.brand-bot { filter: drop-shadow(0 0 10px #a38bda66); }
+.is-kill .brand-bot .jv-bulbo, .is-kill .brand-bot .jv-miolo { fill: #f2808e; }
+.orb-core .jv { pointer-events: none; }
+@keyframes jv-flutua { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes jv-balanca { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(6deg); } }
+@keyframes jv-pisca { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes jv-gira { to { transform: rotate(360deg); } }
+@keyframes jv-fluxo { to { stroke-dashoffset: -22; } }
+@keyframes jv-pisca-olho { 0%, 92%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.12); } }
+@keyframes jv-olha { 0%, 100% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
+@keyframes jv-fala { from { transform: scale(1, 0.55); } to { transform: scale(1.1, 1.15); } }
+@keyframes jv-sombra { 0%, 100% { transform: scaleX(1); opacity: 0.28; } 50% { transform: scaleX(0.88); opacity: 0.18; } }
