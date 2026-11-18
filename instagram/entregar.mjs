@@ -20,6 +20,9 @@ const post = JSON.parse(fs.readFileSync(path.join(pasta, "post.json"), "utf8"));
 const arquivos = fs.readdirSync(pasta).filter((f) => /^slide-\d+\.jpg$/.test(f)).sort();
 if (arquivos.length !== post.slides.length) { console.error(`Há ${arquivos.length} imagens para ${post.slides.length} slides: rode o render.mjs de novo.`); process.exit(1); }
 for (const k of ["tema", "pilar", "maturidade", "legenda", "chave"]) if (!post[k]) { console.error(`Falta "${k}" no post.json.`); process.exit(1); }
+if (!post.creditos) { // junta os créditos das fotos baixadas por fotos.mjs
+  try { const f = JSON.parse(fs.readFileSync(path.join(pasta, "fotos.json"), "utf8")); const usadas = new Set(post.slides.map((x) => x.foto).filter(Buffer ? Boolean : Boolean)); const c = [...new Set(f.filter((x) => usadas.has(x.arquivo)).map((x) => x.credito))]; if (c.length) post.creditos = `${c.join(", ")} / Pexels`; } catch { /* sem fotos */ }
+}
 const textos = post.slides.map((s) => [s.etiqueta, s.titulo, s.texto, s.numero, s.acao, ...(s.itens ?? []).map((i) => (typeof i === "string" ? i : `${i.titulo} ${i.texto ?? ""}`))].filter(Boolean).join(" ")).join("\n");
 const r = await chamar("/api/instagram/entrega", { method: "POST", body: JSON.stringify({
   chave: post.chave, tema: post.tema, pilar: post.pilar, maturidade: post.maturidade, legenda: post.legenda, creditos: post.creditos ?? "", agendar_para: post.agendar_para ?? "", textos,
