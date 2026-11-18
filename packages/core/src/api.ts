@@ -171,7 +171,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (acao === "publicar" || (acao === "aprovar" && body.publicarAgora === true)) message = await publicarPost(brain, svc.env, pid, (svc.fetch ?? fetch) as typeof fetch);
         return out(200, { ...igPainel(brain, svc.env), message });
       }
-      if (req.method === "POST" && url.pathname === "/api/linkedin/conectar") return out(200, { url: liUrlAutorizar(brain, svc.env, url.origin) });
+      if (req.method === "POST" && url.pathname === "/api/linkedin/conectar") return out(200, { url: liUrlAutorizar(brain, svc.env, url.origin, body.alvo === "organizacao" ? "organizacao" : "pessoa") });
       if (url.pathname === "/api/linkedin/gerar") {
         const r = await liGerar(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, { forcar: true });
         return out(200, { ...liPainel(brain, svc.env), message: r ? `Post novo: ${r.categoria}.` : "" });

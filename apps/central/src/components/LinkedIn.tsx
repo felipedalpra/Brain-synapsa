@@ -91,9 +91,9 @@ export function LinkedIn() {
     catch (e) { avisos.push({ kind: "erro", title: e instanceof Error ? e.message : "Não deu certo." }); }
     finally { setOcupado(false); }
   };
-  const conectar = async () => {
+  const conectar = async (alvo) => {
     setOcupado(true);
-    try { const r = await api.linkedinConectar(); window.location.href = r.url; }
+    try { const r = await api.linkedinConectar(alvo); window.location.href = r.url; }
     catch (e) { avisos.push({ kind: "erro", title: e instanceof Error ? e.message : "Não deu certo." }); setOcupado(false); }
   };
   if (!live) return <p className="empty">O LinkedIn aparece quando o Brain está conectado.</p>;
@@ -111,9 +111,9 @@ export function LinkedIn() {
         <p className="muted">O Brain escreve um post por {d.diasDePostar}, de manhã, girando entre 5 temas. Nada vai ao ar sem a sua aprovação.</p>
         {!d.llm ? <p className="ig-erro">Falta a chave do modelo (OpenAI ou Anthropic) nos segredos do Brain: sem ela ele não escreve.</p> : null}
         {d.configurado ? (
-          <p className="muted">Conectado: publica na página da empresa (organização {d.organizacao}){d.expiraEm ? `. O login vale até ${new Date(d.expiraEm).toLocaleDateString("pt-BR")}.` : "."} <button type="button" className="btn" disabled={ocupado} onClick={conectar}>Reconectar</button></p>
+          <p className="muted">Conectado: publica no {d.destino}{d.expiraEm ? `. O login vale até ${new Date(d.expiraEm).toLocaleDateString("pt-BR")}.` : "."} <button type="button" className="btn" disabled={ocupado} onClick={() => conectar(d.alvo)}>Reconectar</button></p>
         ) : d.appPronto ? (
-          <p className="ig-erro">O LinkedIn ainda não está conectado. <button type="button" className="btn btn-go" disabled={ocupado} onClick={conectar}>Conectar LinkedIn</button> Enquanto isso, copie o texto, poste à mão e toque em "Já postei".</p>
+          <p className="ig-erro">O LinkedIn ainda não está conectado. <button type="button" className="btn btn-go" disabled={ocupado} onClick={() => conectar("pessoa")}>Conectar meu perfil</button> <button type="button" className="btn" disabled={ocupado} onClick={() => conectar("organizacao")}>Conectar a página da empresa</button> A página exige a Community Management API no app do LinkedIn. Enquanto isso, copie o texto, poste à mão e toque em "Já postei".</p>
         ) : <p className="ig-erro">Faltam LINKEDIN_CLIENT_ID e LINKEDIN_CLIENT_SECRET nos segredos do Brain.</p>}
         {new URLSearchParams(window.location.search).get("linkedin") === "erro" ? <p className="ig-erro">O login do LinkedIn não completou. Confira se a URL de retorno está cadastrada no app do LinkedIn e tente de novo.</p> : null}
         <div className="subtabs" role="tablist">

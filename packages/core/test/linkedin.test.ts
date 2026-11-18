@@ -55,9 +55,9 @@ describe("linkedin", () => {
     const env = { OPENAI_API_KEY: "x", LINKEDIN_CLIENT_ID: "cid", LINKEDIN_CLIENT_SECRET: "sec" };
     const url = new URL(liUrlAutorizar(b, env, "https://brain.exemplo"));
     expect(url.searchParams.get("redirect_uri")).toBe("https://brain.exemplo/api/linkedin/callback");
-    expect(url.searchParams.get("scope")).toBe("w_organization_social");
+    expect(url.searchParams.get("scope")).toBe("openid profile w_member_social");
     const state = url.searchParams.get("state")!;
-    const tk = (async () => new Response(JSON.stringify({ access_token: "AT", refresh_token: "RT", expires_in: 3600 }), { status: 200 })) as unknown as typeof fetch;
+    const tk = (async (u: string) => (String(u).includes("userinfo") ? new Response(JSON.stringify({ sub: "abc123", name: "Felipe" }), { status: 200 }) : new Response(JSON.stringify({ access_token: "AT", refresh_token: "RT", expires_in: 3600 }), { status: 200 }))) as unknown as typeof fetch;
     await expect(liCallback(b, env, tk, "https://brain.exemplo", "code", "errado")).rejects.toThrow();
     const url2 = new URL(liUrlAutorizar(b, env, "https://brain.exemplo"));
     await liCallback(b, env, tk, "https://brain.exemplo", "code", url2.searchParams.get("state")!);
@@ -66,8 +66,11 @@ describe("linkedin", () => {
     const r = (await liGerar(b, env, llm("Texto. #psicologia")))!;
     liDecidir(b, r.id, "aprovar");
     let auth = "";
-    const f = (async (_u: string, i: RequestInit) => { auth = (i.headers as Record<string, string>).authorization!; return new Response("{}", { status: 201, headers: { "x-restli-id": "urn:li:share:9" } }); }) as unknown as typeof fetch;
+    let autor = "";
+    const f = (async (_u: string, i: RequestInit) => { auth = (i.headers as Record<string, string>).authorization!; autor = JSON.parse(String(i.body)).author; return new Response("{}", { status: 201, headers: { "x-restli-id": "urn:li:share:9" } }); }) as unknown as typeof fetch;
     await liPublicar(b, env, r.id, f);
     expect(auth).toBe("Bearer AT");
+    expect(autor).toBe("urn:li:person:abc123");
+    expect(liPainel(b, env).destino).toContain("Felipe");
   });
 });

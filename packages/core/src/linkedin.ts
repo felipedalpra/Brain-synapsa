@@ -42,14 +42,17 @@ const lerToken = (brain: Brain): Tok | undefined => row<Tok>(brain.db, "select a
 export function liConfigurado(brain: Brain, env: Env): boolean { const t = lerToken(brain); return !!env.LINKEDIN_ACCESS_TOKEN || (!!t && (t.expira_em > brain.clock() || !!t.refresh_token)); }
 
 const REDIRECT = (origin: string) => `${origin}/api/linkedin/callback`;
-const ESCOPO = "w_organization_social";
+export type LiAlvo = "pessoa" | "organizacao";
+const ESCOPO: Record<LiAlvo, string> = { pessoa: "openid profile w_member_social", organizacao: "w_organization_social" };
+interface Autor { alvo: LiAlvo; urn: string | null; nome: string | null }
+const lerAutor = (brain: Brain): Autor => brain.policy<Autor>("li_autor", { alvo: "organizacao", urn: null, nome: null });
 
 /** Endereço do login do LinkedIn. O `state` vale 10 minutos e uma vez só. */
-export function liUrlAutorizar(brain: Brain, env: Env, origin: string): string {
+export function liUrlAutorizar(brain: Brain, env: Env, origin: string, alvo: LiAlvo = "pessoa"): string {
   if (!env.LINKEDIN_CLIENT_ID || !env.LINKEDIN_CLIENT_SECRET) throw new BrainError("invalid", "Faltam LINKEDIN_CLIENT_ID e LINKEDIN_CLIENT_SECRET nos secrets do Brain.");
   const state = crypto.randomUUID().replace(/-/g, "");
-  brain.setPolicy("li_state", { s: state, exp: brain.clock() + 600_000 });
-  const q = new URLSearchParams({ response_type: "code", client_id: env.LINKEDIN_CLIENT_ID, redirect_uri: REDIRECT(origin), state, scope: ESCOPO });
+  brain.setPolicy("li_state", { s: state, exp: brain.clock() + 600_000, alvo });
+  const q = new URLSearchParams({ response_type: "code", client_id: env.LINKEDIN_CLIENT_ID, redirect_uri: REDIRECT(origin), state, scope: ESCOPO[alvo] });
   return `https://www.linkedin.com/oauth/v2/authorization?${q}`;
 }
 
@@ -64,11 +67,22 @@ const guardar = (brain: Brain, t: { access_token: string; refresh_token?: string
 
 /** Volta do login do LinkedIn: confere o state, troca o código pelo token e guarda. */
 export async function liCallback(brain: Brain, env: Env, f: typeof fetch, origin: string, code: string, state: string): Promise<void> {
-  const st = brain.policy<{ s: string; exp: number } | null>("li_state", null);
+  const st = brain.policy<{ s: string; exp: number; alvo?: LiAlvo } | null>("li_state", null);
   brain.setPolicy("li_state", null);
   if (!st || !code || st.s !== state || st.exp < brain.clock()) throw new BrainError("invalid", "O login expirou ou não foi iniciado por aqui. Toque em Conectar LinkedIn de novo.");
-  guardar(brain, await pedirToken(env, f, { grant_type: "authorization_code", code, redirect_uri: REDIRECT(origin) }));
-  brain.audit("voce", "li_conectou", "LinkedIn");
+  const tok = await pedirToken(env, f, { grant_type: "authorization_code", code, redirect_uri: REDIRECT(origin) });
+  const alvo: LiAlvo = st.alvo === "organizacao" ? "organizacao" : "pessoa";
+  let autor: Autor = { alvo, urn: null, nome: null };
+  if (alvo === "pessoa") {
+    // o dono do perfil vem do OpenID Connect: precisa do produto "Sign In with LinkedIn using OpenID Connect" no app
+    const u = await f("https://api.linkedin.com/v2/userinfo", { headers: { authorization: `Bearer ${tok.access_token}` } });
+    const j = (await u.json().catch(() => ({}))) as { sub?: string; name?: string };
+    if (!u.ok || !j.sub) throw new BrainError("invalid", "O LinkedIn não informou quem é você. Adicione ao app o produto Sign In with LinkedIn using OpenID Connect e conecte de novo.");
+    autor = { alvo, urn: `urn:li:person:${j.sub}`, nome: j.name ?? null };
+  }
+  guardar(brain, tok);
+  brain.setPolicy("li_autor", autor);
+  brain.audit("voce", "li_conectou", alvo === "pessoa" ? "perfil pessoal" : "página da empresa");
   brain.emit("change");
 }
 
@@ -82,10 +96,12 @@ async function tokenAtual(brain: Brain, env: Env, f: typeof fetch): Promise<stri
   return env.LINKEDIN_ACCESS_TOKEN ?? null;
 }
 
-export interface LiPainel { configurado: boolean; appPronto: boolean; expiraEm: number | null; organizacao: string; llm: boolean; diasDePostar: string; posts: LiPost[] }
+export interface LiPainel { configurado: boolean; alvo: LiAlvo; destino: string; appPronto: boolean; expiraEm: number | null; organizacao: string; llm: boolean; diasDePostar: string; posts: LiPost[] }
 export function liPainel(brain: Brain, env: Env): LiPainel {
   const ls = rows<Linha>(brain.db, "select * from li_posts order by case status when 'pendente' then 0 when 'falhou' then 1 when 'aprovado' then 2 else 3 end, criado_em desc limit 40");
-  return { configurado: liConfigurado(brain, env), appPronto: !!(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET), expiraEm: lerToken(brain)?.expira_em ?? null, organizacao: env.LINKEDIN_ORG_ID ?? ORG_PADRAO, llm: !!llmConfig(env, "agent"), diasDePostar: "segunda, quarta e sexta", posts: ls.map(row2) };
+  const au = lerAutor(brain);
+  const doToken = !!lerToken(brain);
+  return { configurado: liConfigurado(brain, env), alvo: doToken ? au.alvo : "organizacao", destino: doToken && au.alvo === "pessoa" ? `perfil de ${au.nome ?? "você"}` : `página da empresa (${env.LINKEDIN_ORG_ID ?? ORG_PADRAO})`, appPronto: !!(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET), expiraEm: lerToken(brain)?.expira_em ?? null, organizacao: env.LINKEDIN_ORG_ID ?? ORG_PADRAO, llm: !!llmConfig(env, "agent"), diasDePostar: "segunda, quarta e sexta", posts: ls.map(row2) };
 }
 
 /** Escreve um post novo e deixa pendente. Um por dia (a menos que `forcar`). */
@@ -158,14 +174,16 @@ export async function liPublicar(brain: Brain, env: Env, id: string, f: typeof f
   if (p.status !== "aprovado" && p.status !== "falhou") throw new BrainError("invalid", "Só publico o que foi aprovado.");
   const token = await tokenAtual(brain, env, f);
   if (!token) throw new BrainError("invalid", "O LinkedIn não está conectado: toque em Conectar LinkedIn na aba. Enquanto isso, copie o texto, poste no LinkedIn e use \"Já postei\".");
-  const org = env.LINKEDIN_ORG_ID ?? ORG_PADRAO;
+  const au = lerAutor(brain);
+  const doToken = !!lerToken(brain);
+  const autor = doToken && au.alvo === "pessoa" && au.urn ? au.urn : `urn:li:organization:${env.LINKEDIN_ORG_ID ?? ORG_PADRAO}`;
   // marca antes de chamar: se a resposta se perder, não publica duas vezes
   run(brain.db, "update li_posts set status = 'falhou', erro = 'publicação interrompida: confira a página antes de tentar de novo' where id = ?", id);
   try {
     const res = await f("https://api.linkedin.com/rest/posts", {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "x-restli-protocol-version": "2.0.0", "linkedin-version": env.LINKEDIN_VERSION ?? "202511" },
-      body: JSON.stringify({ author: `urn:li:organization:${org}`, commentary: escaparLinkedIn(p.texto), visibility: "PUBLIC", distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: "PUBLISHED", isReshareDisabledByAuthor: false }),
+      body: JSON.stringify({ author: autor, commentary: escaparLinkedIn(p.texto), visibility: "PUBLIC", distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: "PUBLISHED", isReshareDisabledByAuthor: false }),
     });
     if (!res.ok) {
       const b = (await res.json().catch(() => ({}))) as { message?: string };
