@@ -1,6 +1,7 @@
 import type { Brain } from "./brain";
 import { brtDay } from "./brain";
 import { refreshDados } from "./data";
+import { sincronizarMidia } from "./midia-sync";
 import { row, rows } from "./sql";
 
 type Env = Record<string, string | undefined>;
@@ -48,6 +49,23 @@ export function salvarPremissas(brain: Brain, entrada: Partial<Premissas>): Prem
   return novo;
 }
 
+export interface Periodo { de: string; ate: string; dias: number; anterior: { de: string; ate: string } }
+
+const somaDias = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const difDias = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+const dataValida = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+
+/** Período pedido (de/até, inclusive). Sem pedido: últimos 30 dias. O anterior tem o mesmo tamanho e vem logo antes. */
+export function periodoDe(brain: Brain, de?: unknown, ate?: unknown): Periodo {
+  const hoje = brtDay(brain.clock());
+  let fim = dataValida(ate) ? (ate > hoje ? hoje : ate) : hoje;
+  let ini = dataValida(de) ? de : somaDias(fim, -29);
+  if (ini > fim) [ini, fim] = [fim, ini];
+  if (difDias(ini, fim) > 400) ini = somaDias(fim, -400);
+  const dias = difDias(ini, fim) + 1;
+  return { de: ini, ate: fim, dias, anterior: { de: somaDias(ini, -dias), ate: somaDias(ini, -1) } };
+}
+
 const formato = (t: string | null) => (t === "CAROUSEL_ALBUM" ? "Carrossel" : t === "VIDEO" || t === "REELS" ? "Reel" : t === "IMAGE" ? "Imagem" : (t ?? "Outro"));
 
 interface PostLinha {
@@ -73,7 +91,7 @@ function grupo(posts: PostWork[], chave: (p: PostWork) => string) {
 
 interface PostWork extends PostLinha { alcance: number; salvos: number; compartilhados: number; interacoesN: number; taxaInteracao: number; taxaSalvo: number; dia: string; diaSemana: number; formato: string; tituloCurto: string }
 
-export function analiseInstagram(brain: Brain) {
+export function analiseInstagram(brain: Brain, per: Periodo = periodoDe(brain)) {
   const now = brain.clock();
   const seg = rows<{ day: string; followers: number | null }>(brain.db, "select day, followers from instagram_daily order by day");
   const seguidores = seg.at(-1)?.followers ?? null;
@@ -94,14 +112,27 @@ export function analiseInstagram(brain: Brain) {
       tituloCurto: (p.legenda ?? "").replace(/\s+/g, " ").slice(0, 70),
     };
   });
+  const noPeriodo = posts.filter((p) => p.dia >= per.de && p.dia <= per.ate);
 
   const leitura: Leitura[] = [];
   const dias14 = brtDay(now - 14 * 86_400_000);
-  const dias7 = brtDay(now - 7 * 86_400_000);
   const recentes14 = posts.filter((p) => p.dia >= dias14).length;
-  const novosDia = brain.policy<{ novos: { day: string; novos: number }[] } | null>("cache_ig_novos", null)?.novos ?? [];
-  const ganho7 = novosDia.filter((d) => d.day > dias7).reduce((n, d) => n + d.novos, 0);
-  const ganhoAnt = novosDia.filter((d) => d.day <= dias7 && d.day > dias14).reduce((n, d) => n + d.novos, 0);
+
+  // Dia a dia do período (alcance, visitas, toques no link, seguidores novos).
+  const dd = rows<{ day: string; reach: number | null; profile_views: number | null; link_taps: number | null; interacoes: number | null; novos: number | null }>(
+    brain.db, "select day, reach, profile_views, link_taps, interacoes, novos from ig_dia where day >= ? and day <= ? order by day", per.de, per.ate,
+  );
+  const ddAnt = rows<{ day: string; reach: number | null; profile_views: number | null; link_taps: number | null; novos: number | null }>(
+    brain.db, "select day, reach, profile_views, link_taps, novos from ig_dia where day >= ? and day <= ?", per.anterior.de, per.anterior.ate,
+  );
+  const soma = (xs: (number | null)[]) => xs.reduce<number>((n, v) => n + (v ?? 0), 0);
+  const temDia = (k: "reach" | "profile_views" | "link_taps" | "novos") => dd.some((r) => r[k] !== null);
+  const segPeriodo = seg.filter((r) => r.day >= per.de && r.day <= per.ate && r.followers !== null);
+  const segIni = segPeriodo[0]?.followers ?? null, segFim = segPeriodo.at(-1)?.followers ?? null;
+  const visitas = temDia("profile_views") ? soma(dd.map((r) => r.profile_views)) : null;
+  const toques = temDia("link_taps") ? soma(dd.map((r) => r.link_taps)) : null;
+  const novos = temDia("novos") ? soma(dd.map((r) => r.novos)) : null;
+  const novosAnt = ddAnt.some((r) => r.novos !== null) ? soma(ddAnt.map((r) => r.novos)) : null;
 
   if (!posts.length) {
     leitura.push({ nivel: "atencao", titulo: "Ainda não tenho métricas por post", detalhe: "Toque em “Atualizar dados”. Se continuar vazio, o token da Meta precisa da permissão instagram_manage_insights." });
@@ -132,7 +163,6 @@ export function analiseInstagram(brain: Brain) {
         leitura.push({ nivel: "fazer", titulo: `Poste mais na ${melhorDia.nome}`, detalhe: `Alcance médio de ${melhorDia.alcance_medio} contra ${piorDia.alcance_medio} na ${piorDia.nome}.` });
     }
 
-    const mediaAlcance = media(posts.map((p) => p.alcance)) ?? 0;
     // Mediana, não média: um post viral puxa a média para cima e faz o resto parecer fraco.
     const tipico = mediana(posts.map((p) => p.alcance));
     const fracos = posts.filter((p) => p.alcance < tipico * 0.5 && p.dia >= brtDay(now - 30 * 86_400_000));
@@ -149,34 +179,44 @@ export function analiseInstagram(brain: Brain) {
     }
   }
 
+  if (visitas !== null && toques !== null && visitas >= 50) {
+    const taxa = (toques / visitas) * 100;
+    if (taxa < 8)
+      leitura.push({ nivel: "fazer", titulo: `Só ${r1(taxa)}% de quem visita o perfil toca no link da bio`, detalhe: `${visitas} visitas ao perfil e ${toques} toques no link no período. Reescreva a bio com uma frase de benefício para o psicólogo e uma chamada clara antes do link: é o passo entre o Instagram e o seu site.` });
+    else leitura.push({ nivel: "ok", titulo: `${r1(taxa)}% das visitas ao perfil viram toque no link`, detalhe: `${visitas} visitas e ${toques} toques no período.` });
+  }
   if (recentes14 < 6)
     leitura.push({ nivel: recentes14 < 3 ? "atencao" : "ok", titulo: `${recentes14} posts nos últimos 14 dias`, detalhe: recentes14 < 6 ? "Abaixo de 3 por semana. Constância pesa mais no alcance do que acertar o formato perfeito." : "" });
-  if (novosDia.length >= 10)
-    leitura.push({ nivel: ganho7 > ganhoAnt ? "ok" : ganho7 < ganhoAnt ? "atencao" : "ok", titulo: `${ganho7 >= 0 ? "+" : ""}${ganho7} seguidores em 7 dias`, detalhe: `Na semana anterior: ${ganhoAnt >= 0 ? "+" : ""}${ganhoAnt}.` });
+  if (novos !== null)
+    leitura.push({ nivel: novosAnt !== null && novos < novosAnt ? "atencao" : "ok", titulo: `${novos >= 0 ? "+" : ""}${novos} seguidores no período`, detalhe: novosAnt !== null ? `No período anterior: ${novosAnt >= 0 ? "+" : ""}${novosAnt}.` : "" });
 
-  const top = [...posts].sort((a, b) => b.alcance - a.alcance).slice(0, 3);
-  const fundo = [...posts].sort((a, b) => a.alcance - b.alcance).slice(0, 3);
-  const slim = (p: PostWork) => ({ id: p.media_id, titulo: p.tituloCurto, formato: p.formato, tema: p.tema, dia: p.dia, link: p.permalink, alcance: p.alcance, salvos: p.salvos, compartilhados: p.compartilhados, curtidas: p.curtidas ?? 0, comentarios: p.comentarios ?? 0, views: p.views, interacao_pct: r1(p.taxaInteracao * 100), salvo_pct: r1(p.taxaSalvo * 100) });
+  const top = [...noPeriodo.length ? noPeriodo : posts].sort((a, b) => b.alcance - a.alcance).slice(0, 3);
+  const fundo = [...noPeriodo.length ? noPeriodo : posts].sort((a, b) => a.alcance - b.alcance).slice(0, 3);
+  const slim = (p: PostWork) => ({ id: p.media_id, titulo: p.tituloCurto, formato: p.formato, tema: p.tema, pilar: p.pilar, dia: p.dia, link: p.permalink, alcance: p.alcance, salvos: p.salvos, compartilhados: p.compartilhados, curtidas: p.curtidas ?? 0, comentarios: p.comentarios ?? 0, views: p.views, interacao_pct: r1(p.taxaInteracao * 100), salvo_pct: r1(p.taxaSalvo * 100) });
   const atualizadoEm = row<{ u: number | null }>(brain.db, "select max(atualizado_em) as u from ig_post_metricas")?.u ?? null;
 
   return {
     seguidores,
     atualizado_em: atualizadoEm ? new Date(atualizadoEm).toISOString() : null,
     posts_analisados: posts.length,
-    resumo: posts.length
-      ? {
-          alcance_medio: Math.round(media(posts.map((p) => p.alcance)) ?? 0),
-          salvos_medio: r1(media(posts.map((p) => p.salvos)) ?? 0),
-          compartilhados_medio: r1(media(posts.map((p) => p.compartilhados)) ?? 0),
-          interacao_pct: r1((media(posts.map((p) => p.taxaInteracao)) ?? 0) * 100),
-          posts_14d: recentes14,
-          seguidores_novos_7d: novosDia.length >= 10 ? ganho7 : null,
-          seguidores_novos_7d_anterior: novosDia.length >= 10 ? ganhoAnt : null,
-        }
-      : null,
-    por_formato: grupo(posts, (p) => p.formato),
-    por_tema: grupo(posts.filter((p) => p.pilar), (p) => p.pilar!),
-    por_dia: grupo(posts.filter((p) => p.dia), (p) => DIAS[p.diaSemana] ?? ""),
+    periodo: {
+      posts: noPeriodo.length,
+      alcance_post_medio: noPeriodo.length ? Math.round(media(noPeriodo.map((p) => p.alcance)) ?? 0) : null,
+      salvos: noPeriodo.reduce((n, p) => n + p.salvos, 0),
+      compartilhamentos: noPeriodo.reduce((n, p) => n + p.compartilhados, 0),
+      interacao_pct: noPeriodo.length ? r1((media(noPeriodo.map((p) => p.taxaInteracao)) ?? 0) * 100) : null,
+      seguidores_inicio: segIni, seguidores_fim: segFim,
+      seguidores_novos: novos, seguidores_novos_anterior: novosAnt,
+      visitas_perfil: visitas, visitas_perfil_anterior: ddAnt.some((r) => r.profile_views !== null) ? soma(ddAnt.map((r) => r.profile_views)) : null,
+      toques_link: toques, toques_link_anterior: ddAnt.some((r) => r.link_taps !== null) ? soma(ddAnt.map((r) => r.link_taps)) : null,
+      alcance_diario_medio: temDia("reach") ? Math.round(soma(dd.map((r) => r.reach)) / Math.max(1, dd.filter((r) => r.reach !== null).length)) : null,
+      posts_14d: recentes14,
+    },
+    serie: dd.map((r) => ({ day: r.day, alcance: r.reach, visitas: r.profile_views, toques: r.link_taps, novos: r.novos })),
+    seguidores_serie: segPeriodo.map((r) => ({ day: r.day, seguidores: r.followers })),
+    por_formato: grupo(noPeriodo.length >= 3 ? noPeriodo : posts, (p) => p.formato),
+    por_tema: grupo((noPeriodo.length >= 3 ? noPeriodo : posts).filter((p) => p.pilar), (p) => p.pilar!),
+    por_dia: grupo((noPeriodo.length >= 3 ? noPeriodo : posts).filter((p) => p.dia), (p) => DIAS[p.diaSemana] ?? ""),
     melhores: top.map(slim),
     piores: fundo.map(slim),
     posts: posts.slice(0, 30).map(slim),
@@ -184,60 +224,70 @@ export function analiseInstagram(brain: Brain) {
   };
 }
 
-interface Camp { campaign_id: string; campaign_name: string; spend: number; impressions: number; clicks: number; leads: number; dias: number; ultimo_dia: string }
+// ---------- Anúncios ----------
 
-function totais(cs: { spend: number; impressions: number; clicks: number; leads: number }[]) {
+interface LinhaAd { campaign_id: string; campaign_name: string; spend: number; impressions: number; reach: number; clicks: number; link_clicks: number; leads: number; ultimo_dia: string | null }
+interface Soma { spend: number; impressions: number; clicks: number; leads: number }
+
+function totais(cs: Soma[]) {
   const t = cs.reduce((a, c) => ({ spend: a.spend + c.spend, impressions: a.impressions + c.impressions, clicks: a.clicks + c.clicks, leads: a.leads + c.leads }), { spend: 0, impressions: 0, clicks: 0, leads: 0 });
-  return { gasto: r2(t.spend), impressoes: t.impressions, cliques: t.clicks, leads: t.leads, ctr_pct: t.impressions ? r2((t.clicks / t.impressions) * 100) : null, cpc: t.clicks ? r2(t.spend / t.clicks) : null, cpl: t.leads ? r2(t.spend / t.leads) : null };
+  return { gasto: r2(t.spend), impressoes: t.impressions, cliques: t.clicks, leads: t.leads, ctr_pct: t.impressions ? r2((t.clicks / t.impressions) * 100) : null, cpc: t.clicks ? r2(t.spend / t.clicks) : null, cpl: t.leads ? r2(t.spend / t.leads) : null, cpm: t.impressions ? r2((t.spend / t.impressions) * 1000) : null };
 }
 const delta = (a: number | null, b: number | null) => (a === null || b === null || b === 0 ? null : r1(((a - b) / b) * 100));
 
-export function analiseAnuncios(brain: Brain) {
-  const now = brain.clock();
-  const d30 = brtDay(now - 30 * 86_400_000), d60 = brtDay(now - 60 * 86_400_000);
-  const q = (de: string, ate: string | null) =>
-    rows<Camp>(
-      brain.db,
-      `select campaign_id, campaign_name, sum(spend) as spend, sum(impressions) as impressions, sum(clicks) as clicks, sum(leads) as leads, count(*) as dias, max(case when spend > 0 then day end) as ultimo_dia
-       from meta_ads_daily where day >= ? ${ate ? "and day < ?" : ""} group by campaign_id, campaign_name order by spend desc`,
-      ...(ate ? [de, ate] : [de]),
-    );
-  const atual = q(d30, null);
-  const anterior = q(d60, d30);
-  const tAtual = totais(atual), tAnt = totais(anterior);
+/** Campanhas no intervalo. Usa o dado por anúncio; se ainda não houver, cai no por campanha. */
+function campanhasEm(brain: Brain, de: string, ate: string): LinhaAd[] {
+  const porAnuncio = row<{ n: number }>(brain.db, "select count(*) as n from meta_ad_dia")!.n > 0;
+  if (porAnuncio)
+    return rows<LinhaAd>(brain.db, `select campaign_id, campaign_name, sum(spend) as spend, sum(impressions) as impressions, sum(reach) as reach, sum(clicks) as clicks, sum(link_clicks) as link_clicks, sum(leads) as leads, max(case when spend > 0 then day end) as ultimo_dia from meta_ad_dia where day >= ? and day <= ? group by campaign_id, campaign_name order by spend desc`, de, ate);
+  return rows<LinhaAd>(brain.db, `select campaign_id, campaign_name, sum(spend) as spend, sum(impressions) as impressions, 0 as reach, sum(clicks) as clicks, sum(clicks) as link_clicks, sum(leads) as leads, max(case when spend > 0 then day end) as ultimo_dia from meta_ads_daily where day >= ? and day <= ? group by campaign_id, campaign_name order by spend desc`, de, ate);
+}
 
-  // Premissas e limite de custo: quanto posso pagar por lead sem perder dinheiro.
+function economiaDe(brain: Brain) {
   const premissas = lerPremissas(brain);
   const ativos = rows<{ preco: number }>(brain.db, "select effective_price_brl as preco from subscriptions where status in ('active','trialing','past_due')");
   const ticket = ativos.length ? ativos.reduce((n, a) => n + a.preco, 0) / ativos.length : null;
   const ltv = ticket ? ticket * premissas.retencaoMeses : null;
   const cacMax = ltv ? ltv / premissas.razaoLtvCac : null;
   const cplMax = cacMax ? cacMax * premissas.conversaoLeadCliente : null;
-  const economia = { ticket_medio: ticket ? r2(ticket) : null, ltv: ltv ? r2(ltv) : null, cac_maximo: cacMax ? r2(cacMax) : null, cpl_maximo: cplMax ? r2(cplMax) : null, payback_meses_no_limite: ticket && cacMax ? r1(cacMax / ticket) : null };
+  return { premissas, ticket, cplMax, economia: { ticket_medio: ticket ? r2(ticket) : null, ltv: ltv ? r2(ltv) : null, cac_maximo: cacMax ? r2(cacMax) : null, cpl_maximo: cplMax ? r2(cplMax) : null, payback_meses_no_limite: ticket && cacMax ? r1(cacMax / ticket) : null } };
+}
+
+type Veredito = "pausar" | "escalar" | "manter" | "cedo";
+function veredito(spend: number, leads: number, cplMax: number | null): { veredito: Veredito; motivo: string } {
+  const cpl = leads ? spend / leads : null;
+  if (leads === 0 && spend >= 30) return { veredito: "pausar", motivo: `${brl(spend)} gastos sem nenhum lead.` };
+  if (cpl !== null && cplMax && leads >= 3) {
+    if (cpl > cplMax) return { veredito: "pausar", motivo: `Lead a ${brl(cpl)}, acima do limite de ${brl(cplMax)}.` };
+    if (cpl <= cplMax * 0.6) return { veredito: "escalar", motivo: `Lead a ${brl(cpl)}, bem abaixo do limite de ${brl(cplMax)}.` };
+    return { veredito: "manter", motivo: `Lead a ${brl(cpl)}, dentro do limite de ${brl(cplMax)}.` };
+  }
+  if (leads > 0 && leads < 3) return { veredito: "cedo", motivo: `${leads} lead(s): poucos para decidir. Deixe chegar a 3.` };
+  return { veredito: "cedo", motivo: "Pouco gasto para concluir algo." };
+}
+
+export function analiseAnuncios(brain: Brain, per: Periodo = periodoDe(brain)) {
+  const now = brain.clock();
+  const atual = campanhasEm(brain, per.de, per.ate);
+  const anterior = campanhasEm(brain, per.anterior.de, per.anterior.ate);
+  const tAtual = totais(atual), tAnt = totais(anterior);
+  const { premissas, ticket, cplMax, economia } = economiaDe(brain);
 
   const campanhas = atual.map((c) => {
-    const cpl = c.leads ? c.spend / c.leads : null;
-    let veredito: "pausar" | "escalar" | "manter" | "cedo" = "cedo";
-    let motivo = "Pouco gasto para concluir algo.";
-    if (c.leads === 0 && c.spend >= 30) { veredito = "pausar"; motivo = `${brl(c.spend)} gastos sem nenhum lead.`; }
-    else if (cpl !== null && cplMax && c.leads >= 3) {
-      if (cpl > cplMax) { veredito = "pausar"; motivo = `Lead a ${brl(cpl)}, acima do limite de ${brl(cplMax)}.`; }
-      else if (cpl <= cplMax * 0.6) { veredito = "escalar"; motivo = `Lead a ${brl(cpl)}, bem abaixo do limite de ${brl(cplMax)}.`; }
-      else { veredito = "manter"; motivo = `Lead a ${brl(cpl)}, dentro do limite de ${brl(cplMax)}.`; }
-    } else if (c.leads > 0 && c.leads < 3) motivo = `${c.leads} lead(s): poucos para decidir. Deixe chegar a 3.`;
+    const v = veredito(c.spend, c.leads, cplMax);
     return {
       id: c.campaign_id, nome: c.campaign_name, gasto: r2(c.spend), impressoes: c.impressions, cliques: c.clicks, leads: c.leads,
-      ctr_pct: c.impressions ? r2((c.clicks / c.impressions) * 100) : null, cpc: c.clicks ? r2(c.spend / c.clicks) : null, cpl: cpl ? r2(cpl) : null,
-      ultimo_gasto: c.ultimo_dia, veredito, motivo,
+      ctr_pct: c.impressions ? r2((c.clicks / c.impressions) * 100) : null, cpc: c.clicks ? r2(c.spend / c.clicks) : null, cpl: c.leads ? r2(c.spend / c.leads) : null,
+      ultimo_gasto: c.ultimo_dia, ...v,
     };
   });
 
-  const ultimoGasto = row<{ d: string | null }>(brain.db, "select max(day) as d from meta_ads_daily where spend > 0")?.d ?? null;
-  const diasParado = ultimoGasto ? Math.max(0, Math.round((Date.parse(`${brtDay(now)}T12:00:00Z`) - Date.parse(`${ultimoGasto}T12:00:00Z`)) / 86_400_000)) : null;
+  const ultimoGasto = row<{ d: string | null }>(brain.db, "select max(d) as d from (select max(day) as d from meta_ads_daily where spend > 0 union all select max(day) from meta_ad_dia where spend > 0)")?.d ?? null;
+  const diasParado = ultimoGasto ? Math.max(0, difDias(ultimoGasto, brtDay(now))) : null;
 
   const leitura: Leitura[] = [];
   if (tAtual.gasto === 0) {
-    leitura.push({ nivel: "atencao", titulo: ultimoGasto ? `Sem anúncio rodando há ${diasParado} dias` : "Nenhum gasto em anúncios nos últimos 60 dias", detalhe: ultimoGasto ? `Último gasto em ${ultimoGasto.slice(8, 10)}/${ultimoGasto.slice(5, 7)}. Todo o crescimento hoje vem do orgânico.` : "Todo o crescimento recente vem do orgânico." });
+    leitura.push({ nivel: "atencao", titulo: ultimoGasto ? `Sem anúncio rodando há ${diasParado} dias` : "Nenhum gasto em anúncios nos dados lidos", detalhe: ultimoGasto ? `Último gasto em ${ultimoGasto.slice(8, 10)}/${ultimoGasto.slice(5, 7)}. Todo o crescimento hoje vem do orgânico.` : "Todo o crescimento recente vem do orgânico." });
     if (cplMax)
       leitura.push({
         nivel: "fazer", titulo: `Se for testar anúncio, o teto é ${brl(cplMax)} por lead`,
@@ -246,7 +296,7 @@ export function analiseAnuncios(brain: Brain) {
   } else {
     const dgasto = delta(tAtual.gasto, tAnt.gasto), dleads = delta(tAtual.leads, tAnt.leads);
     if (tAnt.gasto > 0 && dgasto !== null)
-      leitura.push({ nivel: "ok", titulo: `Gasto ${dgasto >= 0 ? "subiu" : "caiu"} ${Math.abs(dgasto)}% e leads ${dleads === null ? "sem base de comparação" : `${dleads >= 0 ? "subiram" : "caíram"} ${Math.abs(dleads)}%`}`, detalhe: `Últimos 30 dias contra os 30 anteriores.` });
+      leitura.push({ nivel: "ok", titulo: `Gasto ${dgasto >= 0 ? "subiu" : "caiu"} ${Math.abs(dgasto)}% e leads ${dleads === null ? "sem base de comparação" : `${dleads >= 0 ? "subiram" : "caíram"} ${Math.abs(dleads)}%`}`, detalhe: "Contra o período anterior de mesmo tamanho." });
     if (tAtual.cpl && cplMax)
       leitura.push({ nivel: tAtual.cpl > cplMax ? "atencao" : "ok", titulo: `Custo por lead ${brl(tAtual.cpl)} (limite ${brl(cplMax)})`, detalhe: tAtual.cpl > cplMax ? "Acima do limite: cada cliente custa mais do que o que ele devolve. Corte as campanhas piores primeiro." : "Dentro do limite que se paga no tempo de vida do cliente." });
     for (const c of campanhas.filter((x) => x.veredito === "pausar").slice(0, 3)) leitura.push({ nivel: "fazer", titulo: `Pausar “${c.nome}”`, detalhe: c.motivo });
@@ -257,13 +307,20 @@ export function analiseAnuncios(brain: Brain) {
     }
   }
 
-  const porDia = rows<{ day: string; gasto: number; cliques: number; leads: number }>(brain.db, "select day, sum(spend) as gasto, sum(clicks) as cliques, sum(leads) as leads from meta_ads_daily where day >= ? group by day order by day", d30);
-  const atualizado = row<{ u: number | null }>(brain.db, "select max(updated_at) as u from meta_ads_daily")?.u ?? null;
+  const porAnuncio = row<{ n: number }>(brain.db, "select count(*) as n from meta_ad_dia")!.n > 0;
+  const porDia = rows<{ day: string; gasto: number; cliques: number; leads: number; impressoes: number }>(
+    brain.db,
+    porAnuncio
+      ? "select day, sum(spend) as gasto, sum(clicks) as cliques, sum(leads) as leads, sum(impressions) as impressoes from meta_ad_dia where day >= ? and day <= ? group by day order by day"
+      : "select day, sum(spend) as gasto, sum(clicks) as cliques, sum(leads) as leads, sum(impressions) as impressoes from meta_ads_daily where day >= ? and day <= ? group by day order by day",
+    per.de, per.ate,
+  );
+  const atualizado = row<{ u: number | null }>(brain.db, "select max(u) as u from (select max(updated_at) as u from meta_ads_daily union all select max(updated_at) from meta_ad_dia)")?.u ?? null;
   return {
     atualizado_em: atualizado ? new Date(atualizado).toISOString() : null,
     atual: tAtual,
     anterior: tAnt,
-    variacao: { gasto: delta(tAtual.gasto, tAnt.gasto), leads: delta(tAtual.leads, tAnt.leads), cpl: delta(tAtual.cpl, tAnt.cpl), ctr: delta(tAtual.ctr_pct, tAnt.ctr_pct) },
+    variacao: { gasto: delta(tAtual.gasto, tAnt.gasto), leads: delta(tAtual.leads, tAnt.leads), cpl: delta(tAtual.cpl, tAnt.cpl), ctr: delta(tAtual.ctr_pct, tAnt.ctr_pct), cliques: delta(tAtual.cliques, tAnt.cliques) },
     premissas,
     economia,
     campanhas,
@@ -274,8 +331,133 @@ export function analiseAnuncios(brain: Brain) {
   };
 }
 
-export function midiaPainel(brain: Brain) {
-  return { instagram: analiseInstagram(brain), anuncios: analiseAnuncios(brain) };
+// ---------- Criativos ----------
+
+export function analiseCriativos(brain: Brain, per: Periodo = periodoDe(brain)) {
+  const { cplMax } = economiaDe(brain);
+  const meio = somaDias(per.de, Math.floor(per.dias / 2));
+  const linhas = rows<{ ad_id: string; ad_name: string; campanha: string; conjunto: string; spend: number; impressions: number; reach: number; clicks: number; link_clicks: number; leads: number; dias: number; ultimo: string | null }>(
+    brain.db,
+    "select ad_id, max(ad_name) as ad_name, max(campaign_name) as campanha, max(adset_name) as conjunto, sum(spend) as spend, sum(impressions) as impressions, sum(reach) as reach, sum(clicks) as clicks, sum(link_clicks) as link_clicks, sum(leads) as leads, count(case when spend > 0 then 1 end) as dias, max(case when spend > 0 then day end) as ultimo from meta_ad_dia where day >= ? and day <= ? group by ad_id order by spend desc",
+    per.de, per.ate,
+  );
+  const ctrMetade = (id: string, de: string, ate: string) => {
+    const r = row<{ i: number; c: number }>(brain.db, "select sum(impressions) as i, sum(clicks) as c from meta_ad_dia where ad_id = ? and day >= ? and day <= ?", id, de, ate);
+    return r && r.i >= 500 ? (r.c / r.i) * 100 : null;
+  };
+  const cri = new Map(rows<{ ad_id: string; nome: string; status: string; criado: string | null; campanha: string | null; conjunto: string | null; miniatura: string | null; imagem: string | null; texto: string | null; titulo: string | null; cta: string | null; link_ig: string | null }>(brain.db, "select * from meta_criativo").map((c) => [c.ad_id, c]));
+  const vistos = new Set<string>();
+  const itens = linhas.map((l) => {
+    vistos.add(l.ad_id);
+    const c = cri.get(l.ad_id);
+    const v = veredito(l.spend, l.leads, cplMax);
+    const freq = l.reach ? l.impressions / l.reach : null;
+    const ctr1 = ctrMetade(l.ad_id, per.de, somaDias(meio, -1)), ctr2 = ctrMetade(l.ad_id, meio, per.ate);
+    const cansado = freq !== null && freq >= 2.5 && ctr1 !== null && ctr2 !== null && ctr2 < ctr1 * 0.75;
+    return {
+      id: l.ad_id, nome: c?.nome ?? l.ad_name, campanha: l.campanha, conjunto: l.conjunto, status: c?.status ?? "", miniatura: c?.miniatura ?? null, imagem: c?.imagem ?? null,
+      texto: c?.texto ?? null, titulo: c?.titulo ?? null, cta: c?.cta ?? null, link_ig: c?.link_ig ?? null,
+      gasto: r2(l.spend), impressoes: l.impressions, alcance: l.reach, frequencia: freq ? r2(freq) : null, cliques: l.clicks, cliques_link: l.link_clicks,
+      ctr_pct: l.impressions ? r2((l.clicks / l.impressions) * 100) : null, cpc: l.clicks ? r2(l.spend / l.clicks) : null, leads: l.leads, cpl: l.leads ? r2(l.spend / l.leads) : null,
+      dias_veiculando: l.dias, ultimo_gasto: l.ultimo, cansado, ...v,
+    };
+  });
+  // Criativos que existem mas não veicularam no período: aparecem no fim, para você saber o que já foi testado.
+  const parados = [...cri.values()].filter((c) => !vistos.has(c.ad_id)).map((c) => ({
+    id: c.ad_id, nome: c.nome, campanha: c.campanha ?? "", conjunto: c.conjunto ?? "", status: c.status, miniatura: c.miniatura, imagem: c.imagem, texto: c.texto, titulo: c.titulo, cta: c.cta, link_ig: c.link_ig,
+    gasto: 0, impressoes: 0, alcance: 0, frequencia: null, cliques: 0, cliques_link: 0, ctr_pct: null, cpc: null, leads: 0, cpl: null, dias_veiculando: 0, ultimo_gasto: null, cansado: false, veredito: "cedo" as Veredito, motivo: "Não veiculou no período.",
+  }));
+
+  const leitura: Leitura[] = [];
+  const comLead = itens.filter((i) => i.leads >= 3 && i.cpl !== null).sort((a, b) => a.cpl! - b.cpl!);
+  if (comLead.length >= 2) {
+    const m = comLead[0]!, p = comLead.at(-1)!;
+    if (p.cpl! / m.cpl! >= 1.5) leitura.push({ nivel: "fazer", titulo: `Faça mais como “${m.nome}”`, detalhe: `Lead a ${brl(m.cpl!)} contra ${brl(p.cpl!)} em “${p.nome}” (${r1(p.cpl! / m.cpl!)}× mais caro). Copie o ângulo do primeiro no próximo teste.` });
+  }
+  for (const i of itens.filter((x) => x.cansado).slice(0, 3)) leitura.push({ nivel: "atencao", titulo: `“${i.nome}” está cansando`, detalhe: `Frequência ${i.frequencia} e o CTR caiu mais de 25% na segunda metade do período. Troque o criativo antes de pagar mais por menos clique.` });
+  for (const i of itens.filter((x) => x.veredito === "pausar").slice(0, 3)) leitura.push({ nivel: "fazer", titulo: `Pausar “${i.nome}”`, detalhe: i.motivo });
+  if (!itens.length && !parados.length) leitura.push({ nivel: "ok", titulo: "Nenhum criativo encontrado", detalhe: "A conta não tem anúncios, ou a leitura ainda não rodou. Toque em “Atualizar dados”." });
+  return { itens, parados, leitura };
+}
+
+// ---------- Pixel e rastreio ----------
+
+const FUNIL = ["PageView", "ViewContent", "InitiateCheckout", "Lead", "CompleteRegistration", "Subscribe", "Purchase"];
+
+export function analisePixel(brain: Brain, per: Periodo = periodoDe(brain)) {
+  const now = brain.clock();
+  const pixels = rows<{ pixel_id: string; nome: string; ultimo_disparo: string | null; indisponivel: number }>(brain.db, "select pixel_id, nome, ultimo_disparo, indisponivel from meta_pixel order by nome");
+  const soma = (de: string, ate: string) => Object.fromEntries(rows<{ evento: string; t: number }>(brain.db, "select evento, sum(total) as t from meta_pixel_dia where day >= ? and day <= ? group by evento", de, ate).map((r) => [r.evento, r.t]));
+  const atual = soma(per.de, per.ate) as Record<string, number>;
+  const ant = soma(per.anterior.de, per.anterior.ate) as Record<string, number>;
+  const eventos = Object.keys({ ...atual, ...ant }).map((e) => ({ evento: e, total: atual[e] ?? 0, anterior: ant[e] ?? 0, variacao: delta(atual[e] ?? 0, ant[e] ?? 0) })).sort((a, b) => b.total - a.total);
+  const ordemFunil = FUNIL.filter((e) => atual[e] !== undefined);
+  const funil = ordemFunil.map((e, i) => ({ evento: e, total: atual[e]!, do_anterior_pct: i === 0 ? null : atual[ordemFunil[i - 1]!]! > 0 ? r1((atual[e]! / atual[ordemFunil[i - 1]!]!) * 100) : null }));
+  const topo = eventos.filter((e) => e.total > 0).slice(0, 4).map((e) => e.evento);
+  const serie = rows<{ day: string; evento: string; total: number }>(brain.db, "select day, evento, sum(total) as total from meta_pixel_dia where day >= ? and day <= ? group by day, evento order by day", per.de, per.ate).filter((r) => topo.includes(r.evento));
+
+  const ads = totais(campanhasEm(brain, per.de, per.ate));
+  const cliquesLink = campanhasEm(brain, per.de, per.ate).reduce((n, c) => n + c.link_clicks, 0);
+  const leitura: Leitura[] = [];
+  if (!pixels.length) {
+    leitura.push({ nivel: "atencao", titulo: "Nenhum pixel encontrado na conta de anúncios", detalhe: "Sem pixel, a Meta não enxerga o que acontece no seu site: não dá para medir lead, nem otimizar anúncio para conversão. Se você já instalou um, o token precisa de ads_read, ou o pixel está em outra conta." });
+  } else {
+    for (const p of pixels) {
+      const horas = p.ultimo_disparo ? (now - Date.parse(p.ultimo_disparo)) / 3_600_000 : null;
+      if (p.indisponivel) leitura.push({ nivel: "atencao", titulo: `Pixel “${p.nome}” indisponível`, detalhe: "A Meta marcou o pixel como indisponível. Abra o Gerenciador de Eventos para ver o motivo." });
+      else if (horas === null) leitura.push({ nivel: "atencao", titulo: `Pixel “${p.nome}” nunca disparou`, detalhe: "O código não está no site, ou está num lugar que não carrega. Instale e teste com a extensão Meta Pixel Helper." });
+      else if (horas > 48) leitura.push({ nivel: "atencao", titulo: `Pixel “${p.nome}” parado há ${Math.round(horas / 24)} dias`, detalhe: "O último disparo foi há mais de 48 horas. Se o site recebe visita todo dia, o código saiu do ar: confira a página inicial e a de agradecimento." });
+      else leitura.push({ nivel: "ok", titulo: `Pixel “${p.nome}” ativo`, detalhe: `Último disparo há ${horas < 1 ? "menos de 1 hora" : `${Math.round(horas)} horas`}.` });
+    }
+    const pv = atual.PageView ?? 0, ld = atual.Lead ?? 0;
+    if (pv > 0 && ld === 0 && !atual.CompleteRegistration && !atual.Subscribe && !atual.Purchase)
+      leitura.push({ nivel: "fazer", titulo: "O pixel vê visitas, mas nenhuma conversão", detalhe: `${pv} visitas e nenhum evento de Lead, cadastro ou compra no período. Sem isso, os anúncios não aprendem quem vira cliente. Configure o evento Lead na página de agradecimento ou no clique de “Agendar demonstração”.` });
+    if (pv > 0 && ld > 0) leitura.push({ nivel: "ok", titulo: `${r1((ld / pv) * 100)}% das visitas viram lead`, detalhe: `${ld} leads em ${pv} visitas no período.` });
+    if (ads.gasto > 0 && ads.leads > 0 && ld < ads.leads * 0.5)
+      leitura.push({ nivel: "atencao", titulo: `A Meta conta ${ads.leads} leads e o pixel só ${ld}`, detalhe: "Parte dos leads vem de formulário da própria Meta e não passa pelo seu site, ou o evento do site está falhando. Confira qual formulário cada anúncio usa." });
+    if (ads.gasto > 0 && cliquesLink >= 30 && pv < cliquesLink * 0.6)
+      leitura.push({ nivel: "fazer", titulo: `Perdendo ${Math.round((1 - pv / cliquesLink) * 100)}% dos cliques antes da página carregar`, detalhe: `${cliquesLink} cliques no link e ${pv} visitas no pixel. Página lenta, bloqueador de rastreio ou link quebrado. Teste a velocidade da página de destino no celular.` });
+  }
+  return { pixels: pixels.map((p) => ({ ...p, indisponivel: !!p.indisponivel })), eventos, funil, serie, ads_leads: ads.leads, cliques_link: cliquesLink, leitura };
+}
+
+// ---------- Públicos e posicionamentos ----------
+
+export function analisePublicos(brain: Brain, per: Periodo = periodoDe(brain)) {
+  const { cplMax } = economiaDe(brain);
+  const linhas = rows<{ tipo: string; chave: string; spend: number; impressions: number; clicks: number; leads: number }>(brain.db, "select tipo, chave, sum(spend) as spend, sum(impressions) as impressions, sum(clicks) as clicks, sum(leads) as leads from meta_quebra_dia where day >= ? and day <= ? group by tipo, chave order by spend desc", per.de, per.ate);
+  const porTipo = (t: string) => {
+    const ls = linhas.filter((l) => l.tipo === t);
+    const total = ls.reduce((n, l) => n + l.spend, 0);
+    return ls.map((l) => ({ chave: l.chave, gasto: r2(l.spend), parte_pct: total ? r1((l.spend / total) * 100) : 0, impressoes: l.impressions, cliques: l.clicks, ctr_pct: l.impressions ? r2((l.clicks / l.impressions) * 100) : null, leads: l.leads, cpl: l.leads ? r2(l.spend / l.leads) : null }));
+  };
+  const out = { posicionamento: porTipo("posicionamento"), idade_genero: porTipo("idade_genero"), dispositivo: porTipo("dispositivo") };
+  const leitura: Leitura[] = [];
+  const rotulo: Record<string, string> = { posicionamento: "posicionamento", idade_genero: "público", dispositivo: "dispositivo" };
+  for (const [tipo, ls] of Object.entries(out)) {
+    const gastoTotal = ls.reduce((n, l) => n + l.gasto, 0);
+    for (const l of ls.filter((x) => x.leads === 0 && x.parte_pct >= 15 && x.gasto >= 30).slice(0, 2))
+      leitura.push({ nivel: "fazer", titulo: `Tire ${rotulo[tipo]} “${l.chave}”`, detalhe: `${l.parte_pct}% da verba (${brl(l.gasto)}) e nenhum lead.` });
+    const comLead = ls.filter((x) => x.leads >= 3 && x.cpl !== null).sort((a, b) => a.cpl! - b.cpl!);
+    if (comLead.length >= 2 && gastoTotal > 0) {
+      const m = comLead[0]!, p = comLead.at(-1)!;
+      if (p.cpl! / m.cpl! >= 1.5) leitura.push({ nivel: "fazer", titulo: `Concentre verba em ${rotulo[tipo]} “${m.chave}”`, detalhe: `Lead a ${brl(m.cpl!)} contra ${brl(p.cpl!)} em “${p.chave}”${cplMax ? ` (limite ${brl(cplMax)})` : ""}.` });
+    }
+  }
+  return { ...out, leitura };
+}
+
+export function midiaPainel(brain: Brain, de?: unknown, ate?: unknown) {
+  const per = periodoDe(brain, de, ate);
+  return {
+    periodo: per,
+    instagram: analiseInstagram(brain, per),
+    anuncios: analiseAnuncios(brain, per),
+    criativos: analiseCriativos(brain, per),
+    pixel: analisePixel(brain, per),
+    publicos: analisePublicos(brain, per),
+    diagnostico: brain.policy<{ at: number; itens: { parte: string; ok: boolean; linhas?: number; erro?: string }[] } | null>("midia_diagnostico", null),
+  };
 }
 
 /** Uma vez por dia: lê Meta e Instagram e guarda, para a análise não depender de alguém apertar o botão. */
@@ -284,5 +466,6 @@ export async function midiaRotina(brain: Brain, env: Env): Promise<void> {
   if (brain.policy<string>("midia_ultima_leitura", "") === hoje) return;
   if (!env.META_SYSTEM_USER_TOKEN) return;
   await refreshDados(brain, env);
+  await sincronizarMidia(brain, env, { dias: 90 });
   brain.setPolicy("midia_ultima_leitura", hoje);
 }

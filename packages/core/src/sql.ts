@@ -143,6 +143,19 @@ create table if not exists ig_post_metricas (
   curtidas integer, comentarios integer, alcance integer, salvos integer, compartilhados integer, views integer, interacoes integer,
   atualizado_em integer not null
 );
+create table if not exists meta_ad_dia (
+  day text not null, ad_id text not null, ad_name text not null, adset_id text not null, adset_name text not null, campaign_id text not null, campaign_name text not null,
+  spend real not null, impressions integer not null, reach integer not null, clicks integer not null, link_clicks integer not null, leads integer not null,
+  updated_at integer not null, primary key (day, ad_id)
+);
+create table if not exists meta_criativo (
+  ad_id text primary key, nome text not null, status text not null, criado text, campanha text, conjunto text,
+  miniatura text, imagem text, texto text, titulo text, cta text, link_ig text, atualizado_em integer not null
+);
+create table if not exists meta_pixel (pixel_id text primary key, nome text not null, ultimo_disparo text, indisponivel integer not null default 0, atualizado_em integer not null);
+create table if not exists meta_pixel_dia (day text not null, pixel_id text not null, evento text not null, total integer not null, primary key (day, pixel_id, evento));
+create table if not exists meta_quebra_dia (day text not null, tipo text not null, chave text not null, spend real not null, impressions integer not null, clicks integer not null, leads integer not null, primary key (day, tipo, chave));
+create table if not exists ig_dia (day text primary key, reach integer, profile_views integer, link_taps integer, interacoes integer, novos integer, updated_at integer not null);
 create table if not exists deliverables (
   id integer primary key autoincrement,
   run_id integer,
