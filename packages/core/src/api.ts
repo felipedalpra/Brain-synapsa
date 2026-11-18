@@ -39,7 +39,7 @@ export interface Services {
   authorize?: (req: Request, url: URL) => Response | null | Promise<Response | null>;
 }
 
-export const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; media-src 'self' blob: data:; frame-ancestors 'none'";
+export const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data: https://*.fbcdn.net https://*.cdninstagram.com; media-src 'self' blob: data:; frame-ancestors 'none'";
 
 export const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
