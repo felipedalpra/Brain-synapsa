@@ -131,8 +131,13 @@ export function analiseInstagram(brain: Brain, per: Periodo = periodoDe(brain)) 
   const segIni = segPeriodo[0]?.followers ?? null, segFim = segPeriodo.at(-1)?.followers ?? null;
   const visitas = temDia("profile_views") ? soma(dd.map((r) => r.profile_views)) : null;
   const toques = temDia("link_taps") ? soma(dd.map((r) => r.link_taps)) : null;
-  const novos = temDia("novos") ? soma(dd.map((r) => r.novos)) : null;
-  const novosAnt = ddAnt.some((r) => r.novos !== null) ? soma(ddAnt.map((r) => r.novos)) : null;
+  // A Meta só entrega "seguidores novos por dia" a partir de 100 seguidores. Antes disso, uso a diferença entre os dias que o Brain guardou.
+  const liquido = (de: string, ate: string) => {
+    const ls = seg.filter((r) => r.day >= de && r.day <= ate && r.followers !== null);
+    return ls.length >= 2 ? ls.at(-1)!.followers! - ls[0]!.followers! : null;
+  };
+  const novos = temDia("novos") ? soma(dd.map((r) => r.novos)) : liquido(per.de, per.ate);
+  const novosAnt = ddAnt.some((r) => r.novos !== null) ? soma(ddAnt.map((r) => r.novos)) : liquido(per.anterior.de, per.anterior.ate);
 
   if (!posts.length) {
     leitura.push({ nivel: "atencao", titulo: "Ainda não tenho métricas por post", detalhe: "Toque em “Atualizar dados”. Se continuar vazio, o token da Meta precisa da permissão instagram_manage_insights." });
@@ -382,7 +387,7 @@ export function analiseCriativos(brain: Brain, per: Periodo = periodoDe(brain)) 
 
 // ---------- Pixel e rastreio ----------
 
-const FUNIL = ["PageView", "ViewContent", "InitiateCheckout", "Lead", "CompleteRegistration", "Subscribe", "Purchase"];
+const FUNIL = ["PageView", "ViewContent", "Scroll50", "CTA_Click", "OpenForm", "InitiateCheckout", "Lead", "CompleteRegistration", "Subscribe", "Purchase"];
 
 export function analisePixel(brain: Brain, per: Periodo = periodoDe(brain)) {
   const now = brain.clock();
@@ -409,10 +414,23 @@ export function analisePixel(brain: Brain, per: Periodo = periodoDe(brain)) {
       else if (horas > 48) leitura.push({ nivel: "atencao", titulo: `Pixel “${p.nome}” parado há ${Math.round(horas / 24)} dias`, detalhe: "O último disparo foi há mais de 48 horas. Se o site recebe visita todo dia, o código saiu do ar: confira a página inicial e a de agradecimento." });
       else leitura.push({ nivel: "ok", titulo: `Pixel “${p.nome}” ativo`, detalhe: `Último disparo há ${horas < 1 ? "menos de 1 hora" : `${Math.round(horas)} horas`}.` });
     }
-    const pv = atual.PageView ?? 0, ld = atual.Lead ?? 0;
+    const pv = atual.PageView ?? 0, ld = atual.Lead ?? 0, form = atual.OpenForm ?? 0;
     if (pv > 0 && ld === 0 && !atual.CompleteRegistration && !atual.Subscribe && !atual.Purchase)
       leitura.push({ nivel: "fazer", titulo: "O pixel vê visitas, mas nenhuma conversão", detalhe: `${pv} visitas e nenhum evento de Lead, cadastro ou compra no período. Sem isso, os anúncios não aprendem quem vira cliente. Configure o evento Lead na página de agradecimento ou no clique de “Agendar demonstração”.` });
-    if (pv > 0 && ld > 0) leitura.push({ nivel: "ok", titulo: `${r1((ld / pv) * 100)}% das visitas viram lead`, detalhe: `${ld} leads em ${pv} visitas no período.` });
+    if (pv >= 200 && ld > 0) {
+      const taxa = (ld / pv) * 100;
+      leitura.push({
+        nivel: taxa < 1 ? "fazer" : "ok",
+        titulo: `${taxa < 0.1 ? "Menos de 0,1" : r1(taxa)}% das visitas viram lead`,
+        detalhe: `${ld} leads em ${pv} visitas no período.${taxa < 1 ? " Um site de captação costuma converter de 1% a 5%. Com esse volume de visita, o problema é a página (promessa, chamada, formulário) ou a qualidade do tráfego, não a falta de gente." : ""}`,
+      });
+    } else if (pv > 0 && ld > 0) leitura.push({ nivel: "ok", titulo: `${r1((ld / pv) * 100)}% das visitas viram lead`, detalhe: `${ld} leads em ${pv} visitas no período.` });
+    if (pv >= 200 && form > 0 && form / pv < 0.01)
+      leitura.push({ nivel: "fazer", titulo: `Só ${r1((form / pv) * 100)}% das visitas chegam a abrir o formulário`, detalhe: `${form} aberturas em ${pv} visitas. A chamada para agir está fraca ou escondida: deixe o botão visível sem rolar a página e com uma promessa concreta.` });
+    if (form >= 10 && ld / form < 0.25)
+      leitura.push({ nivel: "fazer", titulo: `Só ${Math.round((ld / form) * 100)}% de quem abre o formulário envia`, detalhe: `${form} aberturas e ${ld} envios. Corte campos (peça só nome e WhatsApp) e confira se o botão de enviar funciona no celular.` });
+    if (pv >= 1000 && !atual.ViewContent && !atual.Scroll50)
+      leitura.push({ nivel: "atencao", titulo: "Não dá para saber se a visita lê a página", detalhe: "Sem evento de rolagem ou de conteúdo visto, não separo visita real de acesso que sai na hora." });
     if (ads.gasto > 0 && ads.leads > 0 && ld < ads.leads * 0.5)
       leitura.push({ nivel: "atencao", titulo: `A Meta conta ${ads.leads} leads e o pixel só ${ld}`, detalhe: "Parte dos leads vem de formulário da própria Meta e não passa pelo seu site, ou o evento do site está falhando. Confira qual formulário cada anúncio usa." });
     if (ads.gasto > 0 && cliquesLink >= 30 && pv < cliquesLink * 0.6)

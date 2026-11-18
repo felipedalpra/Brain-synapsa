@@ -410,7 +410,6 @@ function AbaPixel({ d }) {
           {dias.length >= 2 ? (
             <GraficoLinhas label="Eventos por dia" labels={dias.map(dm)} series={nomes.map((n, i) => ({ name: n, color: CORES[i % CORES.length], values: dias.map((dia) => px.serie.find((s) => s.day === dia && s.evento === n)?.total ?? 0) }))} />
           ) : null}
-          <div className="mid-legenda">{nomes.map((n, i) => <span key={n}><i style={{ background: CORES[i % CORES.length] }} />{n}</span>)}</div>
           <div className="table-wrap">
             <table>
               <thead><tr><th>Evento</th><th className="num">No período</th><th className="num">Período anterior</th><th className="num">Variação</th></tr></thead>

@@ -186,3 +186,24 @@ describe("sincronização", () => {
     expect(p.diagnostico?.itens.length).toBeGreaterThan(2);
   });
 });
+
+describe("ajustes", () => {
+  it("conversão baixa vira ação, não 'ok', e usa o OpenForm do site", () => {
+    const b = mk();
+    b.db.prepare("insert into meta_pixel (pixel_id, nome, ultimo_disparo, indisponivel, atualizado_em) values ('p1', 'Site', ?, 0, 0)").run(new Date(b.clock()).toISOString());
+    const ev = (e: string, n: number) => b.db.prepare("insert into meta_pixel_dia (day, pixel_id, evento, total) values (?, 'p1', ?, ?)").run(diaDe(b, 2), e, n);
+    ev("PageView", 8301); ev("OpenForm", 30); ev("Lead", 4);
+    const p = analisePixel(b);
+    const por = Object.fromEntries(p.leitura.map((l) => [l.titulo, l.nivel]));
+    expect(por["Menos de 0,1% das visitas viram lead"]).toBe("fazer");
+    expect(p.leitura.some((l) => /Só 13% de quem abre o formulário envia/.test(l.titulo))).toBe(true);
+    expect(p.leitura.some((l) => /chegam a abrir o formulário/.test(l.titulo))).toBe(true);
+    expect(p.funil.map((f) => f.evento)).toEqual(["PageView", "OpenForm", "Lead"]);
+  });
+  it("seguidores novos pela diferença dos dias guardados quando a Meta não entrega", () => {
+    const b = mk();
+    const seg = (atras: number, n: number) => b.db.prepare("insert into instagram_daily (day, ig_id, followers, reach, profile_views, updated_at) values (?, 'i', ?, null, null, 0)").run(diaDe(b, atras), n);
+    seg(20, 80); seg(10, 86); seg(1, 92);
+    expect(analiseInstagram(b).periodo.seguidores_novos).toBe(12);
+  });
+});
