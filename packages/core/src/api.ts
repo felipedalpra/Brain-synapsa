@@ -16,7 +16,7 @@ import { planAcao, planPainel } from "./planejamento";
 import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
-import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finPagarConta, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, type ContaIn, type ExtratoIn } from "./fin";
+import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finPagarConta, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
 import { TEAMS, AGENTS } from "@brain/shared";
 
 export interface Services {
@@ -248,6 +248,12 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
           const r = finAddConta(brain.db, agora, body.conta as ContaIn);
           conciliar(brain.db);
           brain.audit("voce", "financeiro_conta_nova", undefined, { criadas: r.criadas });
+          return out(200, { ...r, painel: finPainel(brain.db, agora) });
+        }
+        if (rota === "venda") {
+          const r = finNovaVenda(brain.db, agora, body.venda as VendaIn);
+          brain.audit("voce", "financeiro_venda", String((body.venda as VendaIn)?.cliente ?? ""), r);
+          brain.emit("change");
           return out(200, { ...r, painel: finPainel(brain.db, agora) });
         }
         if (rota === "conta/pagar") {

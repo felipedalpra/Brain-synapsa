@@ -114,6 +114,10 @@ export const api = {
     post("/api/financeiro/conta", {
       conta: e,
     }),
+  finVenda: (e) =>
+    post("/api/financeiro/venda", {
+      venda: e,
+    }),
   finPagar: (e, a, t) =>
     post("/api/financeiro/conta/pagar", {
       id: e,

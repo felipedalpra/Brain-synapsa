@@ -9,6 +9,8 @@ import { jaDigitados } from "./Command";
 import { th } from "../shared-inline";
 import { useBrain } from "../store";
 import { avisos } from "./Avisos";
+import { FinDre } from "./FinDre";
+import { FinLancar } from "./FinLancar";
 
 export const Qt = (e) =>
   `${["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"][Number(e.slice(5, 7)) - 1]}/${e.slice(2, 4)}`;
@@ -344,7 +346,7 @@ export function FinMrr({ d: e }) {
   );
 }
 export const Jl = (e) => (e < 0 ? `-${_(Math.abs(e))}` : _(e));
-export function FinDre({ d: e }) {
+export function FinDreMensal({ d: e }) {
   const [a, t] = React.useState(6),
     [r, o] = React.useState(false),
     s = e.dre.meses.length - a,
@@ -862,6 +864,7 @@ export function Financeiro() {
           kind: "ok",
           title: f,
         }));
+      return true;
     } catch (d) {
       avisos.push({
         kind: "erro",
@@ -869,6 +872,7 @@ export function Financeiro() {
         text: d instanceof Error ? d.message : "Erro desconhecido.",
         sticky: true,
       });
+      return false;
     }
   };
   if (!e)
@@ -922,7 +926,7 @@ export function Financeiro() {
         </div>
         <button type="button" className="btn" onClick={() => c((h) => !h)}>
           <Plus size={15} aria-hidden />
-          {" Nova conta"}
+          {" Lançar"}
         </button>
       </header>
       {r ? (
@@ -930,14 +934,7 @@ export function Financeiro() {
           {r}
         </p>
       ) : null}
-      <NovaContaForm
-        d={a}
-        aberto={l}
-        onFechar={() => c(false)}
-        onSalvar={async (h) => {
-          (await x(() => api.finConta(h), "Conta cadastrada"), c(false));
-        }}
-      />
+      <FinLancar d={a} aberto={l} onFechar={() => c(false)} rodar={x} />
       <nav className="subtabs" aria-label="Seções do financeiro">
         {[
           ["resumo", "Resumo"],

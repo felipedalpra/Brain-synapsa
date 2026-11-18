@@ -239,6 +239,73 @@ export function finAddConta(db: Db, agora: number, entrada: ContaIn): { criadas:
   return { criadas };
 }
 
+export interface VendaIn {
+  cliente: string;
+  /** Valor da mensalidade. Sem recorrência (venda única), é o valor do serviço. */
+  valorMensal: number;
+  /** Data da venda (AAAA-MM-DD). */
+  inicio: string;
+  /** Mensalidade recorrente: entra no MRR e gera as próximas cobranças. */
+  recorrente?: boolean;
+  /** Quantos meses seguintes prever (além do primeiro). Padrão 11. */
+  mesesPrevistos?: number;
+  /** Taxa de implementação, se houver. */
+  taxaSetup?: number;
+  taxaSetupPaga?: boolean;
+  /** Divisão do primeiro mês. A soma precisa fechar com o valor. Sem isso, entra tudo em uma parcela pendente na data da venda. */
+  parcelas?: { valor: number; pagoEm?: string | null; vencimento?: string | null; nota?: string | null }[];
+}
+
+/**
+ * Lança uma venda inteira: cliente no MRR, parcelas do primeiro mês (pagas ou a receber),
+ * taxa de implementação e as próximas mensalidades. O que já foi pago entra no caixa e no resultado.
+ */
+export function finNovaVenda(db: Db, agora: number, v: VendaIn): { contas: number; mrr: boolean } {
+  const cliente = String(v.cliente ?? "").trim().slice(0, 80);
+  if (!cliente) throw new BrainError("invalid", "Informe o nome do cliente.");
+  if (typeof v.valorMensal !== "number" || !(v.valorMensal > 0 && v.valorMensal <= 100_000)) throw new BrainError("invalid", "O valor da mensalidade é um número positivo.");
+  if (!DATA.test(String(v.inicio))) throw new BrainError("invalid", "A data da venda precisa ser AAAA-MM-DD.");
+  const recorrente = v.recorrente !== false;
+  const meses = v.mesesPrevistos ?? 11;
+  if (!Number.isInteger(meses) || meses < 0 || meses > 59) throw new BrainError("invalid", "Meses previstos: de 0 a 59.");
+  const setup = v.taxaSetup ? r2(Number(v.taxaSetup)) : 0;
+  if (setup < 0 || !Number.isFinite(setup)) throw new BrainError("invalid", "A taxa de implementação é um número positivo.");
+  const valor = r2(v.valorMensal);
+  const parcelas = v.parcelas && v.parcelas.length ? v.parcelas : [{ valor, pagoEm: null, vencimento: v.inicio }];
+  if (parcelas.length > 12) throw new BrainError("invalid", "No máximo 12 parcelas no primeiro mês.");
+  for (const [i, p] of parcelas.entries()) {
+    if (typeof p.valor !== "number" || !(p.valor > 0)) throw new BrainError("invalid", `Parcela ${i + 1}: valor inválido.`);
+    if (p.pagoEm != null && p.pagoEm !== "" && !DATA.test(String(p.pagoEm))) throw new BrainError("invalid", `Parcela ${i + 1}: data de pagamento inválida.`);
+    if (p.vencimento != null && p.vencimento !== "" && !DATA.test(String(p.vencimento))) throw new BrainError("invalid", `Parcela ${i + 1}: vencimento inválido.`);
+  }
+  const somaP = r2(parcelas.reduce((t, p) => t + p.valor, 0));
+  if (Math.abs(somaP - valor) > 0.009) throw new BrainError("invalid", `As parcelas somam R$ ${somaP.toFixed(2)}, mas o valor é R$ ${valor.toFixed(2)}.`);
+  if (recorrente && row(db, "select 1 as x from subscriptions where source = 'manual' and lower(label) = lower(?) and status = 'active'", cliente)) throw new BrainError("invalid", `Já existe um cliente "${cliente}" no MRR. Use outro nome ou remova o anterior.`);
+
+  let contas = 0;
+  tx(db, () => {
+    const ins = (descricao: string, cat: string, venc: string, val: number, pago: string | null, grupo: string | null, obs: string | null) => {
+      run(db, "insert into fin_contas (tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, grupo, obs, criado_em) values ('receber', ?, ?, ?, ?, ?, ?, ?, ?, ?)", descricao, cliente, cat, venc, val, pago, grupo, obs, agora);
+      contas++;
+    };
+    const n = parcelas.length;
+    parcelas.forEach((p, i) => {
+      const pago = p.pagoEm ? String(p.pagoEm) : null;
+      const venc = p.vencimento ? String(p.vencimento) : pago ?? v.inicio;
+      ins(n > 1 ? `${cliente}: mensalidade 1 (parcela ${i + 1}/${n})` : `${cliente}: mensalidade 1`, recorrente ? "Recorrência (Mensalidade)" : "Outras Receitas", venc, p.valor, pago, null, p.nota ? String(p.nota).slice(0, 200) : null);
+    });
+    if (setup > 0) ins(`${cliente}: implementação`, "Implementação/Setup", v.inicio, setup, v.taxaSetupPaga ? v.inicio : null, null, null);
+    if (recorrente) {
+      const grupo = crypto.randomUUID();
+      for (let k = 1; k <= meses; k++) ins(`${cliente}: mensalidade ${k + 1}`, "Recorrência (Mensalidade)", somaMeses(v.inicio, k), valor, null, grupo, null);
+      const id = `manual-${crypto.randomUUID().slice(0, 8)}`;
+      run(db, "insert into subscriptions (source, external_id, label, list_price_brl, effective_price_brl, discount_ends_at, status, origin, updated_at) values ('manual', ?, ?, ?, ?, null, 'active', 'informado', ?)", id, cliente, valor, valor, agora);
+    }
+  });
+  conciliar(db);
+  return { contas, mrr: recorrente };
+}
+
 /** Marca como pago/recebido. O valor real pode diferir do previsto (ex.: Stripe líquido). */
 export function finPagarConta(db: Db, id: number, pagoEm: string, valor?: number): void {
   if (!DATA.test(pagoEm)) throw new BrainError("invalid", "A data precisa ser AAAA-MM-DD.");
