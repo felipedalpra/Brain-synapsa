@@ -37,12 +37,55 @@ export function proximoTema(brain: Brain): { categoria: string; prompt: string }
   return [...TEMAS].sort((a, b) => (ult.get(a.categoria) ?? 0) - (ult.get(b.categoria) ?? 0))[0]!;
 }
 
-export function liConfigurado(env: Env): boolean { return !!env.LINKEDIN_ACCESS_TOKEN; }
+interface Tok { access_token: string; refresh_token: string | null; expira_em: number }
+const lerToken = (brain: Brain): Tok | undefined => row<Tok>(brain.db, "select access_token, refresh_token, expira_em from li_token where id = 1");
+export function liConfigurado(brain: Brain, env: Env): boolean { const t = lerToken(brain); return !!env.LINKEDIN_ACCESS_TOKEN || (!!t && (t.expira_em > brain.clock() || !!t.refresh_token)); }
 
-export interface LiPainel { configurado: boolean; organizacao: string; llm: boolean; diasDePostar: string; posts: LiPost[] }
+const REDIRECT = (origin: string) => `${origin}/api/linkedin/callback`;
+const ESCOPO = "w_organization_social";
+
+/** Endereço do login do LinkedIn. O `state` vale 10 minutos e uma vez só. */
+export function liUrlAutorizar(brain: Brain, env: Env, origin: string): string {
+  if (!env.LINKEDIN_CLIENT_ID || !env.LINKEDIN_CLIENT_SECRET) throw new BrainError("invalid", "Faltam LINKEDIN_CLIENT_ID e LINKEDIN_CLIENT_SECRET nos secrets do Brain.");
+  const state = crypto.randomUUID().replace(/-/g, "");
+  brain.setPolicy("li_state", { s: state, exp: brain.clock() + 600_000 });
+  const q = new URLSearchParams({ response_type: "code", client_id: env.LINKEDIN_CLIENT_ID, redirect_uri: REDIRECT(origin), state, scope: ESCOPO });
+  return `https://www.linkedin.com/oauth/v2/authorization?${q}`;
+}
+
+async function pedirToken(env: Env, f: typeof fetch, params: Record<string, string>): Promise<{ access_token: string; refresh_token?: string; expires_in: number }> {
+  const res = await f("https://www.linkedin.com/oauth/v2/accessToken", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ ...params, client_id: env.LINKEDIN_CLIENT_ID ?? "", client_secret: env.LINKEDIN_CLIENT_SECRET ?? "" }) });
+  const b = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; expires_in?: number; error_description?: string; error?: string };
+  if (!res.ok || !b.access_token) throw new BrainError("invalid", `LinkedIn recusou o login (${res.status}): ${b.error_description ?? b.error ?? "erro"}`);
+  return { access_token: b.access_token, refresh_token: b.refresh_token, expires_in: b.expires_in ?? 5_184_000 };
+}
+const guardar = (brain: Brain, t: { access_token: string; refresh_token?: string | null; expires_in: number }) =>
+  run(brain.db, "insert into li_token (id, access_token, refresh_token, expira_em, atualizado_em) values (1, ?, ?, ?, ?) on conflict(id) do update set access_token = excluded.access_token, refresh_token = coalesce(excluded.refresh_token, li_token.refresh_token), expira_em = excluded.expira_em, atualizado_em = excluded.atualizado_em", t.access_token, t.refresh_token ?? null, brain.clock() + t.expires_in * 1000 - 60_000, brain.clock());
+
+/** Volta do login do LinkedIn: confere o state, troca o código pelo token e guarda. */
+export async function liCallback(brain: Brain, env: Env, f: typeof fetch, origin: string, code: string, state: string): Promise<void> {
+  const st = brain.policy<{ s: string; exp: number } | null>("li_state", null);
+  brain.setPolicy("li_state", null);
+  if (!st || !code || st.s !== state || st.exp < brain.clock()) throw new BrainError("invalid", "O login expirou ou não foi iniciado por aqui. Toque em Conectar LinkedIn de novo.");
+  guardar(brain, await pedirToken(env, f, { grant_type: "authorization_code", code, redirect_uri: REDIRECT(origin) }));
+  brain.audit("voce", "li_conectou", "LinkedIn");
+  brain.emit("change");
+}
+
+/** Token válido: renova com o refresh token se venceu; cai no secret LINKEDIN_ACCESS_TOKEN se não houver login. */
+async function tokenAtual(brain: Brain, env: Env, f: typeof fetch): Promise<string | null> {
+  const t = lerToken(brain);
+  if (t && t.expira_em > brain.clock()) return t.access_token;
+  if (t?.refresh_token && env.LINKEDIN_CLIENT_ID) {
+    try { guardar(brain, await pedirToken(env, f, { grant_type: "refresh_token", refresh_token: t.refresh_token })); return lerToken(brain)!.access_token; } catch { /* cai no próximo */ }
+  }
+  return env.LINKEDIN_ACCESS_TOKEN ?? null;
+}
+
+export interface LiPainel { configurado: boolean; appPronto: boolean; expiraEm: number | null; organizacao: string; llm: boolean; diasDePostar: string; posts: LiPost[] }
 export function liPainel(brain: Brain, env: Env): LiPainel {
   const ls = rows<Linha>(brain.db, "select * from li_posts order by case status when 'pendente' then 0 when 'falhou' then 1 when 'aprovado' then 2 else 3 end, criado_em desc limit 40");
-  return { configurado: liConfigurado(env), organizacao: env.LINKEDIN_ORG_ID ?? ORG_PADRAO, llm: !!llmConfig(env, "agent"), diasDePostar: "segunda, quarta e sexta", posts: ls.map(row2) };
+  return { configurado: liConfigurado(brain, env), appPronto: !!(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET), expiraEm: lerToken(brain)?.expira_em ?? null, organizacao: env.LINKEDIN_ORG_ID ?? ORG_PADRAO, llm: !!llmConfig(env, "agent"), diasDePostar: "segunda, quarta e sexta", posts: ls.map(row2) };
 }
 
 /** Escreve um post novo e deixa pendente. Um por dia (a menos que `forcar`). */
@@ -113,8 +156,8 @@ export async function liPublicar(brain: Brain, env: Env, id: string, f: typeof f
   if (!p) throw new BrainError("not_found", "Post não encontrado.");
   if (p.status === "publicado") throw new BrainError("already_decided", "Já foi publicado.");
   if (p.status !== "aprovado" && p.status !== "falhou") throw new BrainError("invalid", "Só publico o que foi aprovado.");
-  const token = env.LINKEDIN_ACCESS_TOKEN;
-  if (!token) throw new BrainError("invalid", "Falta o LINKEDIN_ACCESS_TOKEN nos secrets do Brain. Enquanto isso, copie o texto, poste no LinkedIn e use \"Já postei\".");
+  const token = await tokenAtual(brain, env, f);
+  if (!token) throw new BrainError("invalid", "O LinkedIn não está conectado: toque em Conectar LinkedIn na aba. Enquanto isso, copie o texto, poste no LinkedIn e use \"Já postei\".");
   const org = env.LINKEDIN_ORG_ID ?? ORG_PADRAO;
   // marca antes de chamar: se a resposta se perder, não publica duas vezes
   run(brain.db, "update li_posts set status = 'falhou', erro = 'publicação interrompida: confira a página antes de tentar de novo' where id = ?", id);
@@ -126,7 +169,7 @@ export async function liPublicar(brain: Brain, env: Env, id: string, f: typeof f
     });
     if (!res.ok) {
       const b = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new BrainError("invalid", `LinkedIn recusou (${res.status}): ${b.message ?? "erro"}${res.status === 401 ? ". O token venceu: gere outro." : ""}`);
+      throw new BrainError("invalid", `LinkedIn recusou (${res.status}): ${b.message ?? "erro"}${res.status === 401 ? ". O login venceu: toque em Conectar LinkedIn de novo." : ""}`);
     }
     const urn = res.headers.get("x-restli-id") ?? "";
     const link = urn ? `https://www.linkedin.com/feed/update/${urn}/` : null;

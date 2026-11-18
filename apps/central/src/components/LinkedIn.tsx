@@ -91,6 +91,11 @@ export function LinkedIn() {
     catch (e) { avisos.push({ kind: "erro", title: e instanceof Error ? e.message : "Não deu certo." }); }
     finally { setOcupado(false); }
   };
+  const conectar = async () => {
+    setOcupado(true);
+    try { const r = await api.linkedinConectar(); window.location.href = r.url; }
+    catch (e) { avisos.push({ kind: "erro", title: e instanceof Error ? e.message : "Não deu certo." }); setOcupado(false); }
+  };
   if (!live) return <p className="empty">O LinkedIn aparece quando o Brain está conectado.</p>;
   if (erro) return <p className="empty">{erro}</p>;
   if (!d) return <p className="empty">Carregando…</p>;
@@ -105,7 +110,12 @@ export function LinkedIn() {
         </div>
         <p className="muted">O Brain escreve um post por {d.diasDePostar}, de manhã, girando entre 5 temas. Nada vai ao ar sem a sua aprovação.</p>
         {!d.llm ? <p className="ig-erro">Falta a chave do modelo (OpenAI ou Anthropic) nos segredos do Brain: sem ela ele não escreve.</p> : null}
-        {!d.configurado ? <p className="ig-erro">Falta o LINKEDIN_ACCESS_TOKEN nos segredos do Brain. Enquanto isso: copie o texto, poste no LinkedIn e toque em "Já postei".</p> : <p className="muted">Publica na página da empresa (organização {d.organizacao}).</p>}
+        {d.configurado ? (
+          <p className="muted">Conectado: publica na página da empresa (organização {d.organizacao}){d.expiraEm ? `. O login vale até ${new Date(d.expiraEm).toLocaleDateString("pt-BR")}.` : "."} <button type="button" className="btn" disabled={ocupado} onClick={conectar}>Reconectar</button></p>
+        ) : d.appPronto ? (
+          <p className="ig-erro">O LinkedIn ainda não está conectado. <button type="button" className="btn btn-go" disabled={ocupado} onClick={conectar}>Conectar LinkedIn</button> Enquanto isso, copie o texto, poste à mão e toque em "Já postei".</p>
+        ) : <p className="ig-erro">Faltam LINKEDIN_CLIENT_ID e LINKEDIN_CLIENT_SECRET nos segredos do Brain.</p>}
+        {new URLSearchParams(window.location.search).get("linkedin") === "erro" ? <p className="ig-erro">O login do LinkedIn não completou. Confira se a URL de retorno está cadastrada no app do LinkedIn e tente de novo.</p> : null}
         <div className="subtabs" role="tablist">
           {[["fila", "Para aprovar"], ["aprovados", "Aprovados"], ["publicados", "Publicados"], ["rejeitados", "Rejeitados"]].map(([id, r]) => (
             <button key={id} type="button" role="tab" aria-selected={filtro === id} className={filtro === id ? "on" : ""} onClick={() => setFiltro(id)}>{r} ({grupos[id].length})</button>

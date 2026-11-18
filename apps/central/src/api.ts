@@ -92,6 +92,7 @@ export const api = {
   instagramAuto: (ligado) => post("/api/instagram/auto", { ligado }),
   linkedin: () => chamar("/api/linkedin"),
   linkedinAcao: (id, acao, corpo) => post(`/api/linkedin/${encodeURIComponent(id)}/${acao}`, corpo ?? {}, 9e4),
+  linkedinConectar: () => post("/api/linkedin/conectar", {}),
   linkedinGerar: () => post("/api/linkedin/gerar", {}, 9e4),
   seoSincronizar: () => post("/api/seo/sincronizar", {}),
   seoGa: (corpo) => post("/api/seo/ga", corpo),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Brain } from "../src/brain";
 import { openDb } from "../src/node-db";
-import { diaDePostar, escaparLinkedIn, liDecidir, liGerar, liPainel, liPublicar, liRotina, proximoTema } from "../src/linkedin";
+import { liCallback, liUrlAutorizar, diaDePostar, escaparLinkedIn, liDecidir, liGerar, liPainel, liPublicar, liRotina, proximoTema } from "../src/linkedin";
 
 const mk = () => new Brain(openDb(":memory:"));
 const ENV = { OPENAI_API_KEY: "sk-teste", LINKEDIN_ACCESS_TOKEN: "tok" };
@@ -44,10 +44,30 @@ describe("linkedin", () => {
     const b = mk();
     const r = (await liGerar(b, { OPENAI_API_KEY: "x" }, llm("Texto. #psicologia")))!;
     liDecidir(b, r.id, "aprovar");
-    await expect(liPublicar(b, { OPENAI_API_KEY: "x" }, r.id)).rejects.toThrow(/LINKEDIN_ACCESS_TOKEN/);
+    await expect(liPublicar(b, { OPENAI_API_KEY: "x" }, r.id)).rejects.toThrow(/não está conectado/);
     expect(escaparLinkedIn("a|b*c")).toBe("a\\|b\\*c");
     const c = mk();
     c.clock = () => Date.parse("2026-11-19T12:00:00Z"); // quinta
     expect(await liRotina(c, ENV, llm("x"))).toBeNull();
+  });
+  it("login do LinkedIn: state de uso único, guarda o token e publica com ele", async () => {
+    const b = mk();
+    const env = { OPENAI_API_KEY: "x", LINKEDIN_CLIENT_ID: "cid", LINKEDIN_CLIENT_SECRET: "sec" };
+    const url = new URL(liUrlAutorizar(b, env, "https://brain.exemplo"));
+    expect(url.searchParams.get("redirect_uri")).toBe("https://brain.exemplo/api/linkedin/callback");
+    expect(url.searchParams.get("scope")).toBe("w_organization_social");
+    const state = url.searchParams.get("state")!;
+    const tk = (async () => new Response(JSON.stringify({ access_token: "AT", refresh_token: "RT", expires_in: 3600 }), { status: 200 })) as unknown as typeof fetch;
+    await expect(liCallback(b, env, tk, "https://brain.exemplo", "code", "errado")).rejects.toThrow();
+    const url2 = new URL(liUrlAutorizar(b, env, "https://brain.exemplo"));
+    await liCallback(b, env, tk, "https://brain.exemplo", "code", url2.searchParams.get("state")!);
+    await expect(liCallback(b, env, tk, "https://brain.exemplo", "code", state)).rejects.toThrow();
+    expect(liPainel(b, env).configurado).toBe(true);
+    const r = (await liGerar(b, env, llm("Texto. #psicologia")))!;
+    liDecidir(b, r.id, "aprovar");
+    let auth = "";
+    const f = (async (_u: string, i: RequestInit) => { auth = (i.headers as Record<string, string>).authorization!; return new Response("{}", { status: 201, headers: { "x-restli-id": "urn:li:share:9" } }); }) as unknown as typeof fetch;
+    await liPublicar(b, env, r.id, f);
+    expect(auth).toBe("Bearer AT");
   });
 });

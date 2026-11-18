@@ -13,7 +13,7 @@ import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
 import { descobrirPropriedades, gaPainel, propriedadesGa, sincronizarGa } from "./ga";
 import { planAcao, planPainel } from "./planejamento";
-import { liDecidir, liEditar, liGerar, liMarcarPublicado, liPainel, liPublicar } from "./linkedin";
+import { liCallback, liUrlAutorizar, liDecidir, liEditar, liGerar, liMarcarPublicado, liPainel, liPublicar } from "./linkedin";
 import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
@@ -73,6 +73,14 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
 
       // Webhook do Resend: público, protegido pela assinatura Svix (não pelo login).
       if (req.method === "POST" && url.pathname === "/api/webhooks/resend") return receberWebhook(brain, svc.env, req);
+
+      // LinkedIn: o navegador volta do login sem o cookie (SameSite), então o retorno é público e protegido pelo state de uso único.
+      if (req.method === "GET" && url.pathname === "/api/linkedin/callback") {
+        let destino = "/#linkedin";
+        try { await liCallback(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, url.origin, url.searchParams.get("code") ?? "", url.searchParams.get("state") ?? ""); }
+        catch (e) { brain.audit("sistema", "li_conexao_falhou", e instanceof Error ? e.message.slice(0, 200) : "erro"); destino = `/?linkedin=erro#linkedin`; }
+        return new Response(null, { status: 302, headers: { location: destino } });
+      }
 
       // Instagram: imagem pública (o Instagram precisa buscar) e entrega de posts prontos por token próprio, que só enfileira.
       if (req.method === "GET" && url.pathname.startsWith("/api/midia/")) return servirMidia(brain, url.pathname.slice("/api/midia/".length));
@@ -163,6 +171,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (acao === "publicar" || (acao === "aprovar" && body.publicarAgora === true)) message = await publicarPost(brain, svc.env, pid, (svc.fetch ?? fetch) as typeof fetch);
         return out(200, { ...igPainel(brain, svc.env), message });
       }
+      if (req.method === "POST" && url.pathname === "/api/linkedin/conectar") return out(200, { url: liUrlAutorizar(brain, svc.env, url.origin) });
       if (url.pathname === "/api/linkedin/gerar") {
         const r = await liGerar(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, { forcar: true });
         return out(200, { ...liPainel(brain, svc.env), message: r ? `Post novo: ${r.categoria}.` : "" });
