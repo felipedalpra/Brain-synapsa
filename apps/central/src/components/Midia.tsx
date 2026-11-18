@@ -14,7 +14,8 @@ const pct = (v) => (v === null || v === undefined ? "–" : `${v.toLocaleString(
 const dm = (d) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : "–");
 const NIVEL = { fazer: "Fazer", atencao: "Atenção", ok: "Ok" };
 
-function Variacao({ v, inverso = false }) {
+function Variacao({ v, inverso = false, mostrar = true }) {
+  if (!mostrar) return null;
   if (v === null || v === undefined) return <small className="muted">sem base para comparar</small>;
   const bom = inverso ? v <= 0 : v >= 0;
   return <small className={bom ? "mid-bom" : "mid-ruim"}>{v >= 0 ? "▲" : "▼"} {Math.abs(v)}% vs 30 dias antes</small>;
@@ -167,7 +168,7 @@ export function Midia() {
             <Leitura itens={ig.leitura} />
             <div className="mid-grupos">
               <Grupo titulo="Alcance por formato" linhas={ig.por_formato} vazio="Sem posts ainda." />
-              <Grupo titulo="Alcance por tema" linhas={ig.por_tema} vazio="Só os posts publicados pelo Brain têm tema." />
+              <Grupo titulo="Alcance por pilar" linhas={ig.por_tema} vazio="Só os posts publicados pelo Brain têm pilar." />
               <Grupo titulo="Alcance por dia da semana" linhas={ig.por_dia} vazio="Sem posts ainda." />
             </div>
             <div className="mid-top">
@@ -209,10 +210,10 @@ export function Midia() {
       <section className="panel" aria-labelledby="m-ads">
         <h2 id="m-ads">Anúncios (Meta), 30 dias</h2>
         <div className="mini-kpis">
-          <div><span>Gasto</span><b>{_(ad.atual.gasto)}</b><Variacao v={ad.variacao.gasto} inverso /></div>
-          <div><span>Leads</span><b>{n0(ad.atual.leads)}</b><Variacao v={ad.variacao.leads} /></div>
-          <div><span>Custo por lead</span><b>{ad.atual.cpl === null ? "–" : _(ad.atual.cpl)}</b><Variacao v={ad.variacao.cpl} inverso /></div>
-          <div><span>CTR</span><b>{pct(ad.atual.ctr_pct)}</b><Variacao v={ad.variacao.ctr} /></div>
+          <div><span>Gasto</span><b>{_(ad.atual.gasto)}</b><Variacao v={ad.variacao.gasto} inverso mostrar={ad.anterior.gasto > 0} /></div>
+          <div><span>Leads</span><b>{n0(ad.atual.leads)}</b><Variacao v={ad.variacao.leads} mostrar={ad.anterior.gasto > 0} /></div>
+          <div><span>Custo por lead</span><b>{ad.atual.cpl === null ? "–" : _(ad.atual.cpl)}</b><Variacao v={ad.variacao.cpl} inverso mostrar={ad.anterior.gasto > 0} /></div>
+          <div><span>CTR</span><b>{pct(ad.atual.ctr_pct)}</b><Variacao v={ad.variacao.ctr} mostrar={ad.anterior.gasto > 0} /></div>
           <div><span>Custo por clique</span><b>{ad.atual.cpc === null ? "–" : _(ad.atual.cpc)}</b></div>
         </div>
         <Leitura itens={ad.leitura} />

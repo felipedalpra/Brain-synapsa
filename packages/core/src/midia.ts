@@ -7,6 +7,7 @@ type Env = Record<string, string | undefined>;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const r1 = (n: number) => Math.round(n * 10) / 10;
+const mediana = (xs: number[]) => { const o = [...xs].sort((a, b) => a - b); const m = Math.floor(o.length / 2); return o.length ? (o.length % 2 ? o[m]! : (o[m - 1]! + o[m]!) / 2) : 0; };
 const media = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const DIAS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const brl = (n: number) => `R$ ${n.toFixed(2).replace(".", ",")}`;
@@ -116,12 +117,12 @@ export function analiseInstagram(brain: Brain) {
       leitura.push({ nivel: "ok", titulo: "Formatos ainda sem amostra para comparar", detalhe: `Preciso de pelo menos ${AMOSTRA_MIN} posts de cada formato. Hoje: ${porFormato.map((g) => `${g.nome} ${g.posts}`).join(", ")}.` });
     }
 
-    const porTema = grupo(posts.filter((p) => p.tema), (p) => p.tema!).filter((g) => g.posts >= 2);
+    const porTema = grupo(posts.filter((p) => p.pilar), (p) => p.pilar!).filter((g) => g.posts >= 2);
     if (porTema.length >= 2) {
       const t1 = porTema[0]!, resto = porTema.slice(1);
       const tn = resto.at(-1)!;
       if (t1.salvos_medio > tn.salvos_medio)
-        leitura.push({ nivel: "fazer", titulo: `Tema que mais salva: ${t1.nome}`, detalhe: `${t1.salvos_medio} salvamentos por post contra ${tn.salvos_medio} em “${tn.nome}”. Salvar é o sinal mais forte de conteúdo útil: repita o ângulo.` });
+        leitura.push({ nivel: "fazer", titulo: `Pilar que mais salva: ${t1.nome}`, detalhe: `${t1.salvos_medio} salvamentos por post contra ${tn.salvos_medio} em “${tn.nome}”. Salvar é o sinal mais forte de conteúdo útil: repita o ângulo.` });
     }
 
     const porDia = grupo(posts.filter((p) => p.dia), (p) => DIAS[p.diaSemana] ?? "").filter((g) => g.posts >= 2);
@@ -132,14 +133,19 @@ export function analiseInstagram(brain: Brain) {
     }
 
     const mediaAlcance = media(posts.map((p) => p.alcance)) ?? 0;
-    const fracos = posts.filter((p) => p.alcance < mediaAlcance * 0.5 && p.dia >= brtDay(now - 30 * 86_400_000));
-    if (fracos.length >= 2)
-      leitura.push({ nivel: "atencao", titulo: `${fracos.length} posts recentes com menos da metade do alcance médio`, detalhe: `Média: ${Math.round(mediaAlcance)}. Veja o que eles têm em comum antes do próximo post: ${fracos.slice(0, 2).map((p) => `“${p.tituloCurto.slice(0, 40)}…”`).join(" e ")}.` });
+    // Mediana, não média: um post viral puxa a média para cima e faz o resto parecer fraco.
+    const tipico = mediana(posts.map((p) => p.alcance));
+    const fracos = posts.filter((p) => p.alcance < tipico * 0.5 && p.dia >= brtDay(now - 30 * 86_400_000));
+    if (fracos.length >= 3)
+      leitura.push({ nivel: "atencao", titulo: `${fracos.length} posts recentes com menos da metade do alcance típico`, detalhe: `Alcance típico (mediana): ${Math.round(tipico)}. Veja o que eles têm em comum antes do próximo post: ${fracos.slice(0, 2).map((p) => `“${p.tituloCurto.slice(0, 40)}…”`).join(" e ")}.` });
 
+    const salvosMed = media(posts.map((p) => p.salvos)) ?? 0, compartMed = media(posts.map((p) => p.compartilhados)) ?? 0;
+    if (posts.length >= 8 && salvosMed < 1 && compartMed < 1)
+      leitura.push({ nivel: "fazer", titulo: "Quase ninguém salva ou compartilha seus posts", detalhe: `Média de ${r1(salvosMed)} salvamentos e ${r1(compartMed)} compartilhamentos por post. A curtida mostra que gostaram, mas o Instagram só empurra para quem não te segue o que é salvo e enviado. Termine o post com algo para guardar (checklist, modelo, passo a passo) e peça o envio para uma colega.` });
     if (seguidores) {
-      const alcanceSeg = mediaAlcance / seguidores;
+      const alcanceSeg = tipico / seguidores;
       if (alcanceSeg < 0.5)
-        leitura.push({ nivel: "atencao", titulo: "Seu conteúdo quase só alcança quem já te segue", detalhe: `O alcance médio (${Math.round(mediaAlcance)}) equivale a ${Math.round(alcanceSeg * 100)}% dos ${seguidores} seguidores. Para crescer, faça conteúdo para ser compartilhado e salvo, com gancho para quem ainda não te conhece.` });
+        leitura.push({ nivel: "atencao", titulo: "Seu conteúdo quase só alcança quem já te segue", detalhe: `O alcance típico (${Math.round(tipico)}) equivale a ${Math.round(alcanceSeg * 100)}% dos ${seguidores} seguidores. Para crescer, faça conteúdo para ser compartilhado e salvo, com gancho para quem ainda não te conhece.` });
     }
   }
 
@@ -169,7 +175,7 @@ export function analiseInstagram(brain: Brain) {
         }
       : null,
     por_formato: grupo(posts, (p) => p.formato),
-    por_tema: grupo(posts.filter((p) => p.tema), (p) => p.tema!),
+    por_tema: grupo(posts.filter((p) => p.pilar), (p) => p.pilar!),
     por_dia: grupo(posts.filter((p) => p.dia), (p) => DIAS[p.diaSemana] ?? ""),
     melhores: top.map(slim),
     piores: fundo.map(slim),
@@ -231,7 +237,7 @@ export function analiseAnuncios(brain: Brain) {
 
   const leitura: Leitura[] = [];
   if (tAtual.gasto === 0) {
-    leitura.push({ nivel: "atencao", titulo: ultimoGasto ? `Sem anúncio rodando há ${diasParado} dias` : "Nunca houve gasto em anúncios nesta conta", detalhe: ultimoGasto ? `Último gasto em ${ultimoGasto.slice(8, 10)}/${ultimoGasto.slice(5, 7)}. Todo o crescimento hoje vem do orgânico.` : "Todo o crescimento hoje vem do orgânico." });
+    leitura.push({ nivel: "atencao", titulo: ultimoGasto ? `Sem anúncio rodando há ${diasParado} dias` : "Nenhum gasto em anúncios nos últimos 60 dias", detalhe: ultimoGasto ? `Último gasto em ${ultimoGasto.slice(8, 10)}/${ultimoGasto.slice(5, 7)}. Todo o crescimento hoje vem do orgânico.` : "Todo o crescimento recente vem do orgânico." });
     if (cplMax)
       leitura.push({
         nivel: "fazer", titulo: `Se for testar anúncio, o teto é ${brl(cplMax)} por lead`,

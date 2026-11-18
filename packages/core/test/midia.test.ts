@@ -9,7 +9,7 @@ const dia = (b: Brain, atras: number) => new Date(b.clock() - atras * 86_400_000
 function post(b: Brain, id: string, tipo: string, atras: number, alcance: number, salvos: number, compart = 0, tema?: string) {
   b.db.prepare("insert into ig_post_metricas (media_id, tipo, publicado, permalink, legenda, curtidas, comentarios, alcance, salvos, compartilhados, views, interacoes, atualizado_em) values (?, ?, ?, ?, ?, 5, 1, ?, ?, ?, null, ?, ?)")
     .run(id, tipo, new Date(b.clock() - atras * 86_400_000).toISOString(), `https://ig/${id}`, `Legenda ${id}`, alcance, salvos, compart, salvos + compart + 6, b.clock());
-  if (tema) b.db.prepare("insert into ig_posts (id, status, tema, pilar, legenda, agendado_para, criado_em, media_id) values (?, 'publicado', ?, 'p', 'x', 0, 0, ?)").run(`ig-${id}`, tema, id);
+  if (tema) b.db.prepare("insert into ig_posts (id, status, tema, pilar, legenda, agendado_para, criado_em, media_id) values (?, 'publicado', ?, ?, 'x', 0, 0, ?)").run(`ig-${id}`, tema, tema, id);
 }
 
 describe("analise do instagram", () => {
@@ -25,7 +25,7 @@ describe("analise do instagram", () => {
     const a = analiseInstagram(b);
     expect(a.por_formato[0]!.nome).toBe("Carrossel");
     expect(a.leitura.some((l) => l.nivel === "fazer" && /carrossel/i.test(l.titulo))).toBe(true);
-    expect(a.leitura.some((l) => /Faltas/.test(l.titulo))).toBe(true);
+    expect(a.leitura.some((l) => /Pilar que mais salva: Faltas/.test(l.titulo))).toBe(true);
     expect(a.melhores[0]!.alcance).toBe(300);
   });
   it("não compara formatos com menos de 3 posts", () => {
