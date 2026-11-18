@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, rodarRotina, sincronizarGsc, sincronizarGa, publicarDevidos, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, rodarRotina, sincronizarGsc, sincronizarGa, publicarDevidos, liRotina, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -62,6 +62,8 @@ export class BrainDO extends DurableObject<Env> {
     try { await sincronizarGa(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece como último erro do GA4 */ }
     // Instagram: publica o post aprovado cujo horário chegou (no máximo 1 por dia, por padrão).
     try { await publicarDevidos(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro fica no próprio post, na Central */ }
+    // LinkedIn: segunda, quarta e sexta deixa o post do dia pronto para aprovar.
+    try { await liRotina(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao gerar pela Central */ }
     const started = this.runner.tick();
     await this.runner.idle();
     return { ...rec, started };

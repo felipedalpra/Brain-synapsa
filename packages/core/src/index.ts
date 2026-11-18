@@ -38,4 +38,5 @@ export * from "./prospeccao-whatsapp";
 export * from "./gsc";
 export * from "./ga";
 export * from "./instagram";
+export * from "./linkedin";
 export * from "./planejamento";

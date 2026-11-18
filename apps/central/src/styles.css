@@ -3274,3 +3274,4 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .dre-resumo span { font-size: 12px; color: var(--muted); }
 .dre-resumo b { font: 600 20px var(--display); font-variant-numeric: tabular-nums; }
 .dre-resumo small { color: var(--muted); font-size: 12px; }
+.li-post { grid-template-columns: minmax(0, 1fr); }

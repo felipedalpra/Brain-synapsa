@@ -15,6 +15,7 @@ import {
   Users,
   Wallet,
   Images,
+  Linkedin,
 } from "lucide-react";
 import { Q, Ze } from "./shared-inline";
 import { useBrain } from "./store";
@@ -31,6 +32,7 @@ import { Aprovacoes } from "./components/Aprovacoes";
 import { Integracoes } from "./components/Integracoes";
 import { Avisos } from "./components/Avisos";
 import { Instagram } from "./components/Instagram";
+import { LinkedIn } from "./components/LinkedIn";
 
 export const Du = [
   {
@@ -67,6 +69,11 @@ export const Du = [
     id: "instagram",
     label: "Instagram",
     icon: Images,
+  },
+  {
+    id: "linkedin",
+    label: "LinkedIn",
+    icon: Linkedin,
   },
   {
     id: "equipes",
@@ -196,6 +203,7 @@ export function App() {
         {o === "financeiro" ? <Financeiro /> : null}
         {o === "seo" ? <Seo /> : null}
         {o === "instagram" ? <Instagram /> : null}
+        {o === "linkedin" ? <LinkedIn /> : null}
         {o === "equipes" ? (
           <Equipes teamId={i} setTeamId={(d) => m("equipes", d)} goApprovals={() => m("aprovacoes")} />
         ) : null}
