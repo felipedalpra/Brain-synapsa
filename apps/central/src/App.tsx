@@ -96,6 +96,15 @@ export const Du = [
     icon: Plug,
   },
 ];
+// Abas agrupadas por função. Os ids das telas (e os links #financeiro, #instagram…) continuam os mesmos.
+export const GRUPOS = [
+  { id: "g-comando", label: "Comando", icon: Radio, filhos: ["comando", "escritorio", "aprovacoes"] },
+  { id: "g-negocio", label: "Negócio", icon: LayoutDashboard, filhos: ["dashboard", "crm", "financeiro"] },
+  { id: "g-marketing", label: "Marketing", icon: Images, filhos: ["seo", "instagram", "linkedin"] },
+  { id: "g-ia", label: "Agentes de IA", icon: Bot, filhos: ["equipes", "agentes"] },
+  { id: "g-config", label: "Integrações", icon: Plug, filhos: ["integracoes"] },
+];
+export const grupoDe = (tab) => GRUPOS.find((g) => g.filhos.includes(tab)) ?? GRUPOS[0];
 export const Ts = () => window.location.hash.slice(1).split("/");
 export const rc = () => {
   const e = Ts()[0] === "hoje" ? "dashboard" : Ts()[0];
@@ -115,7 +124,9 @@ export function App() {
     };
     return (window.addEventListener("hashchange", d), () => window.removeEventListener("hashchange", d));
   }, []);
+  const ultimo = React.useRef({});
   const m = (d, p) => {
+      ultimo.current[grupoDe(d).id] = d;
       (s(d), p && l(p));
       try {
         window.history.replaceState(null, "", d === "equipes" ? `#equipes/${p ?? i}` : `#${d}`);
@@ -140,20 +151,26 @@ export function App() {
             <p>{e.mode === "live" ? "Ao vivo \xB7 Brain neste computador" : "Dados de demonstra\xE7\xE3o"}</p>
           </div>
         </div>
-        <nav className="nav" aria-label="Seções">
-          {Du.map(({ id: d, label: p, icon: S }) => (
-            <button
-              type="button"
-              title={p}
-              className={`nav-btn ${o === d ? "on" : ""}`}
-              aria-current={o === d ? "page" : void 0}
-              onClick={() => m(d)}
-            >
-              <S size={17} aria-hidden />
-              <span>{p}</span>
-              {d === "aprovacoes" && a.length ? <em className="badge">{a.length}</em> : null}
-            </button>
-          ))}
+        <nav className="nav" aria-label="Áreas">
+          {GRUPOS.map((g) => {
+            const S = g.icon;
+            const ativo = grupoDe(o).id === g.id;
+            const pend = g.filhos.includes("aprovacoes") && a.length ? a.length : 0;
+            return (
+              <button
+                key={g.id}
+                type="button"
+                title={g.label}
+                className={`nav-btn ${ativo ? "on" : ""}`}
+                aria-current={ativo ? "page" : void 0}
+                onClick={() => m(ultimo.current[g.id] ?? g.filhos[0])}
+              >
+                <S size={17} aria-hidden />
+                <span>{g.label}</span>
+                {pend ? <em className="badge">{pend}</em> : null}
+              </button>
+            );
+          })}
         </nav>
         <button
           type="button"
@@ -173,6 +190,21 @@ export function App() {
             Fechar
           </button>
         </p>
+      ) : null}
+      {grupoDe(o).filhos.length > 1 ? (
+        <nav className="nav-sub" aria-label={`Telas de ${grupoDe(o).label}`}>
+          {grupoDe(o).filhos.map((id) => {
+            const t = Du.find((x) => x.id === id);
+            const S = t.icon;
+            return (
+              <button key={id} type="button" className={o === id ? "on" : ""} aria-current={o === id ? "page" : void 0} onClick={() => m(id)}>
+                <S size={15} aria-hidden />
+                <span>{t.label}</span>
+                {id === "aprovacoes" && a.length ? <em className="badge">{a.length}</em> : null}
+              </button>
+            );
+          })}
+        </nav>
       ) : null}
       <main>
         {o === "comando" ? (

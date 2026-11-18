@@ -3275,3 +3275,13 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .dre-resumo b { font: 600 20px var(--display); font-variant-numeric: tabular-nums; }
 .dre-resumo small { color: var(--muted); font-size: 12px; }
 .li-post { grid-template-columns: minmax(0, 1fr); }
+
+/* Navegação em dois níveis: áreas no topo, telas da área logo abaixo */
+.nav-sub { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding: 2px 0 14px; scrollbar-width: none; }
+.nav-sub::-webkit-scrollbar { display: none; }
+.nav-sub button { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 99px; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); font: inherit; font-size: 13.5px; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.nav-sub button:hover { color: var(--text); border-color: var(--core-2); }
+.nav-sub button.on { color: var(--text); background: var(--panel-2); border-color: var(--core-2); }
+.nav-sub button:focus-visible { outline: 2px solid var(--core-2); outline-offset: 2px; }
+.nav-sub .badge { margin-left: 2px; }
+@media (max-width: 1100px) { .nav-sub { padding-bottom: 10px; } }
