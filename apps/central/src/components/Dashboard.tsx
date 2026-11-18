@@ -110,6 +110,7 @@ export function Dashboard({ midia = false }) {
         </p>
       ) : null}
         {!midia ? (
+<>
       <section className="kpis" aria-label="Números principais">
         <div className="kpi kpi-hero">
           <span>MRR</span>
@@ -161,9 +162,11 @@ export function Dashboard({ midia = false }) {
           <small>Se ninguém cancelar quando os descontos acabarem</small>
         </div>
       </section>
+</>
         ) : null}
       <div className="dash-grid">
         {!midia ? (
+<>
         <section className="panel span-2" aria-labelledby="d-mrr">
           <h2 id="d-mrr">MRR por dia</h2>
           {d.length >= 2 ? (
@@ -269,8 +272,10 @@ export function Dashboard({ midia = false }) {
             Jarvis.
           </p>
         </section>
+</>
         ) : null}
         {midia ? (
+<>
         <section className="panel span-2" aria-labelledby="d-ads">
           <h2 id="d-ads">Anúncios (Meta), 30 dias</h2>
           <div className="mini-kpis">
@@ -330,8 +335,10 @@ export function Dashboard({ midia = false }) {
             </div>
           )}
         </section>
+</>
         ) : null}
         {!midia ? (
+<>
         <section className="panel" aria-labelledby="d-fun">
           <h2 id="d-fun">Funil e fila</h2>
           {w ? (
@@ -366,8 +373,10 @@ export function Dashboard({ midia = false }) {
             {_(r.custoIa.teto)}.
           </p>
         </section>
+</>
         ) : null}
         {midia ? (
+<>
         <section className="panel span-3" aria-labelledby="d-ig">
           <h2 id="d-ig">Instagram @synapsa.ai</h2>
           <div className="mini-kpis">
@@ -464,8 +473,10 @@ export function Dashboard({ midia = false }) {
             </div>
           </div>
         </section>
+</>
         ) : null}
         {!midia ? (
+<>
         <section className="panel span-3" aria-labelledby="d-feed">
           <h2 id="d-feed">Atividade recente</h2>
           {e.activity.length === 0 ? (
@@ -489,6 +500,7 @@ export function Dashboard({ midia = false }) {
             ))}
           </ol>
         </section>
+</>
         ) : null}
       </div>
     </div>
