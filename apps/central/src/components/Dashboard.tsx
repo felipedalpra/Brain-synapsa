@@ -24,7 +24,7 @@ export const $h = {
   manual: "Manual",
   platform: "Plataforma",
 };
-export function Dashboard() {
+export function Dashboard({ midia = false }) {
   const { state: e, live: a, pending: t } = useBrain(),
     [r, o] = React.useState(null),
     [s, i] = React.useState(false),
@@ -89,14 +89,14 @@ export function Dashboard() {
     <div className="page">
       <header className="page-head head-row">
         <div>
-          <h1>Dashboard</h1>
+          <h1>{midia ? "Anúncios e Instagram" : "Dashboard"}</h1>
           <p>
-            {"Receita, clientes, an\xFAncios e Instagram, direto das fontes. Atualizado "}
+            {midia ? "Anúncios da Meta e Instagram orgânico, direto das fontes. Atualizado " : "Receita e clientes, direto das fontes. Atualizado "}
             {Ia(
               r.agora,
               Math.max(p.atualizadoEm ?? 0, S.atualizado_em ? Date.parse(S.atualizado_em) : 0) || r.agora,
             )}
-            {" atr\xE1s na Meta; o MRR fecha todo dia \xE0s 7h."}
+            {midia ? " atrás." : " atrás na Meta; o MRR fecha todo dia às 7h."}
           </p>
         </div>
         <button type="button" className="btn" onClick={x} disabled={s}>
@@ -109,6 +109,7 @@ export function Dashboard() {
           {l.join(" \xB7 ")}
         </p>
       ) : null}
+        {!midia ? (
       <section className="kpis" aria-label="Números principais">
         <div className="kpi kpi-hero">
           <span>MRR</span>
@@ -160,7 +161,9 @@ export function Dashboard() {
           <small>Se ninguém cancelar quando os descontos acabarem</small>
         </div>
       </section>
+        ) : null}
       <div className="dash-grid">
+        {!midia ? (
         <section className="panel span-2" aria-labelledby="d-mrr">
           <h2 id="d-mrr">MRR por dia</h2>
           {d.length >= 2 ? (
@@ -266,6 +269,8 @@ export function Dashboard() {
             Jarvis.
           </p>
         </section>
+        ) : null}
+        {midia ? (
         <section className="panel span-2" aria-labelledby="d-ads">
           <h2 id="d-ads">Anúncios (Meta), 30 dias</h2>
           <div className="mini-kpis">
@@ -325,6 +330,8 @@ export function Dashboard() {
             </div>
           )}
         </section>
+        ) : null}
+        {!midia ? (
         <section className="panel" aria-labelledby="d-fun">
           <h2 id="d-fun">Funil e fila</h2>
           {w ? (
@@ -359,6 +366,8 @@ export function Dashboard() {
             {_(r.custoIa.teto)}.
           </p>
         </section>
+        ) : null}
+        {midia ? (
         <section className="panel span-3" aria-labelledby="d-ig">
           <h2 id="d-ig">Instagram @synapsa.ai</h2>
           <div className="mini-kpis">
@@ -455,6 +464,8 @@ export function Dashboard() {
             </div>
           </div>
         </section>
+        ) : null}
+        {!midia ? (
         <section className="panel span-3" aria-labelledby="d-feed">
           <h2 id="d-feed">Atividade recente</h2>
           {e.activity.length === 0 ? (
@@ -478,6 +489,7 @@ export function Dashboard() {
             ))}
           </ol>
         </section>
+        ) : null}
       </div>
     </div>
   );

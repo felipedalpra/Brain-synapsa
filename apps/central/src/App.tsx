@@ -16,6 +16,7 @@ import {
   Wallet,
   Images,
   Linkedin,
+  Megaphone,
 } from "lucide-react";
 import { Q, Ze } from "./shared-inline";
 import { useBrain } from "./store";
@@ -49,6 +50,11 @@ export const Du = [
     id: "dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    id: "midia",
+    label: "Anúncios e Instagram",
+    icon: Megaphone,
   },
   {
     id: "crm",
@@ -100,7 +106,7 @@ export const Du = [
 export const GRUPOS = [
   { id: "g-comando", label: "Comando", icon: Radio, filhos: ["comando", "escritorio", "aprovacoes"] },
   { id: "g-negocio", label: "Negócio", icon: LayoutDashboard, filhos: ["dashboard", "crm", "financeiro"] },
-  { id: "g-marketing", label: "Marketing", icon: Images, filhos: ["seo", "instagram", "linkedin"] },
+  { id: "g-marketing", label: "Marketing", icon: Images, filhos: ["seo", "midia", "instagram", "linkedin"] },
   { id: "g-ia", label: "Agentes de IA", icon: Bot, filhos: ["equipes", "agentes"] },
   { id: "g-config", label: "Integrações", icon: Plug, filhos: ["integracoes"] },
 ];
@@ -231,6 +237,7 @@ export function App() {
         ) : null}
         {o === "escritorio" ? <Escritorio goApprovals={() => m("aprovacoes")} sel={x} setSel={j} /> : null}
         {o === "dashboard" ? <Dashboard /> : null}
+        {o === "midia" ? <Dashboard midia /> : null}
         {o === "crm" ? <Prospeccoes /> : null}
         {o === "financeiro" ? <Financeiro /> : null}
         {o === "seo" ? <Seo /> : null}
