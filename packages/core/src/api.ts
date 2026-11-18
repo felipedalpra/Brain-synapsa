@@ -6,6 +6,7 @@ import { sendApproved, suppress } from "./dispatch";
 import { integrationsView } from "./integrations";
 import { row, rows, run } from "./sql";
 import { dashboardData, refreshDados } from "./data";
+import { midiaPainel, salvarPremissas } from "./midia";
 import { crmPainel } from "./crm-painel";
 import { finImportarExtrato, lerExtratoInter } from "./fin-import";
 import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-email";
@@ -98,6 +99,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/health") return out(200, { ok: true, server: "brain-server", llm: brain.llm, sse: svc.sse === true });
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain));
+      if (req.method === "GET" && url.pathname === "/api/midia") return out(200, midiaPainel(brain));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain.db, brain.clock()));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
@@ -359,7 +361,11 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       }
       if (url.pathname === "/api/refresh-data") {
         const avisos = await refreshDados(brain, svc.env);
-        return out(200, { avisos, dashboard: dashboardData(brain) });
+        return out(200, { avisos, dashboard: dashboardData(brain), midia: midiaPainel(brain) });
+      }
+      if (url.pathname === "/api/midia/premissas") {
+        salvarPremissas(brain, { conversaoLeadCliente: Number(body.conversaoLeadCliente), retencaoMeses: Number(body.retencaoMeses), razaoLtvCac: Number(body.razaoLtvCac) });
+        return out(200, midiaPainel(brain));
       }
       if (url.pathname === "/api/subscriptions/add") {
         // Receita que não passa pelo Stripe (Pix, por exemplo), informada por você.

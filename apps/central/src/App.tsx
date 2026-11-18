@@ -24,6 +24,7 @@ import { Orb } from "./components/Orb";
 import { Comando } from "./components/Command";
 import { Escritorio } from "./components/Escritorio";
 import { Dashboard } from "./components/Dashboard";
+import { Midia } from "./components/Midia";
 import { Prospeccoes } from "./components/Crm";
 import { Financeiro } from "./components/Financeiro";
 import { Seo } from "./components/Seo";
@@ -237,7 +238,7 @@ export function App() {
         ) : null}
         {o === "escritorio" ? <Escritorio goApprovals={() => m("aprovacoes")} sel={x} setSel={j} /> : null}
         {o === "dashboard" ? <Dashboard /> : null}
-        {o === "midia" ? <Dashboard midia /> : null}
+        {o === "midia" ? <Midia /> : null}
         {o === "crm" ? <Prospeccoes /> : null}
         {o === "financeiro" ? <Financeiro /> : null}
         {o === "seo" ? <Seo /> : null}

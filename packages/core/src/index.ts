@@ -40,3 +40,4 @@ export * from "./ga";
 export * from "./instagram";
 export * from "./linkedin";
 export * from "./planejamento";
+export * from "./midia";

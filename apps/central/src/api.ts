@@ -60,7 +60,9 @@ export const api = {
     }, 6e4),
   checkIntegrations: () => post("/api/integrations/check"),
   dashboard: () => chamar("/api/dashboard"),
-  refreshData: () => post("/api/refresh-data", {}, 6e4),
+  refreshData: () => post("/api/refresh-data", {}, 9e4),
+  midia: () => chamar("/api/midia"),
+  midiaPremissas: (b) => post("/api/midia/premissas", b),
   crmPainel: (e = false) => chamar(`/api/crm/painel${e ? "?atualizar=1" : ""}`, void 0, 45e3),
   prospeccao: () => chamar("/api/prospeccao"),
   prospeccaoDescoberta: (e, a) =>

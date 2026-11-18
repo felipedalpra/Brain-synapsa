@@ -2,7 +2,7 @@ import { FONTES_CRM, crmDados } from "./crm-data";
 import { AGENTS, TEAMS } from "@brain/shared";
 import type { Brain } from "./brain";
 import { brtDay } from "./brain";
-import { fetchAdsInsights, fetchIgFollowerSeries, fetchIgPosts, fetchInstagram } from "./meta";
+import { fetchAdsInsights, fetchIgFollowerSeries, fetchIgPostMetricas, fetchIgPosts, fetchInstagram } from "./meta";
 import { row, rows, run } from "./sql";
 import type { SubscriptionRow } from "./types";
 
@@ -123,6 +123,14 @@ export async function refreshInstagram(brain: Brain, env: Env, dias = 30): Promi
   await syncIg(brain, env, now).catch((e) => avisos.push(`Seguidores: ${e instanceof Error ? e.message : String(e)}`));
   const posts = await fetchIgPosts(version, igId, token, 12).catch((e) => (avisos.push(`Posts: ${e instanceof Error ? e.message : String(e)}`), null));
   if (posts) brain.setPolicy("cache_ig_posts", { at: now, posts });
+  const met = await fetchIgPostMetricas(version, igId, token, 30).catch((e) => (avisos.push(`Métricas por post: ${e instanceof Error ? e.message : String(e)}`), null));
+  if (met) {
+    for (const p of met.posts)
+      run(brain.db, `insert into ig_post_metricas (media_id, tipo, publicado, permalink, legenda, curtidas, comentarios, alcance, salvos, compartilhados, views, interacoes, atualizado_em) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        on conflict(media_id) do update set tipo = excluded.tipo, permalink = excluded.permalink, legenda = excluded.legenda, curtidas = excluded.curtidas, comentarios = excluded.comentarios, alcance = excluded.alcance, salvos = excluded.salvos, compartilhados = excluded.compartilhados, views = excluded.views, interacoes = excluded.interacoes, atualizado_em = excluded.atualizado_em`,
+        p.id, p.tipo, p.publicado, p.link, p.legenda, p.curtidas, p.comentarios, p.alcance, p.salvos, p.compartilhados, p.views, p.interacoes, now);
+    if (met.erros.length) avisos.push(`Métricas de ${met.erros.length} post(s) indisponíveis: ${met.erros[0]}`);
+  }
   const novos = await fetchIgFollowerSeries(version, igId, token, Math.min(dias, 30), new Date(now)).catch((e) => (avisos.push(`Seguidores por dia: ${e instanceof Error ? e.message : String(e)}`), null));
   if (novos) brain.setPolicy("cache_ig_novos", { at: now, novos });
   return avisos;
@@ -274,7 +282,7 @@ export function dashboardData(brain: Brain) {
 /** Lê Meta e Instagram agora e guarda. Chamado pelo botão "Atualizar dados". */
 export async function refreshDados(brain: Brain, env: Env): Promise<string[]> {
   const avisos: string[] = [];
-  await syncAds(brain, env, brain.clock(), 30).catch((e) => avisos.push(`Anúncios: ${e instanceof Error ? e.message : String(e)}`));
+  await syncAds(brain, env, brain.clock(), 60).catch((e) => avisos.push(`Anúncios: ${e instanceof Error ? e.message : String(e)}`));
   avisos.push(...(await refreshInstagram(brain, env, 30)));
   brain.emit("change");
   return avisos;

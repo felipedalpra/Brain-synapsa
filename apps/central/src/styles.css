@@ -3285,3 +3285,37 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .nav-sub button:focus-visible { outline: 2px solid var(--core-2); outline-offset: 2px; }
 .nav-sub .badge { margin-left: 2px; }
 @media (max-width: 1100px) { .nav-sub { padding-bottom: 10px; } }
+
+/* Anúncios e Instagram */
+.mid-leitura { list-style: none; margin: 14px 0 4px; padding: 0; display: grid; gap: 8px; }
+.mid-leitura li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 10px; background: rgba(255, 255, 255, 0.02); }
+.mid-leitura p { margin: 3px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.mid-l-fazer { border-left-color: var(--core-2); }
+.mid-l-atencao { border-left-color: var(--warn); }
+.mid-l-ok { border-left-color: var(--ok); }
+.mid-badge { font-size: 11.5px; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; margin-top: 2px; }
+.mid-bom { color: var(--ok); }
+.mid-ruim { color: var(--crit); }
+.mid-grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; margin-top: 20px; }
+.mid-grupo h3, .mid-top h3, .mid-econ h3, .mid-ads h3 { font-size: 13.5px; font-weight: 600; margin: 0 0 10px; }
+.mid-linha { margin-bottom: 12px; min-width: 0; }
+.mid-linha-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+.mid-linha-top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mid-barra { height: 6px; border-radius: 99px; background: var(--line); margin: 5px 0 3px; overflow: hidden; }
+.mid-barra i { display: block; height: 100%; background: linear-gradient(90deg, var(--core-3), var(--core-2)); border-radius: 99px; }
+.mid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; margin-top: 20px; }
+.mid-post { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.mid-post > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mid-post a, .mid-post span { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.mid-post-n { text-align: right; flex: none; }
+.mid-todos { margin-top: 20px; }
+.mid-todos summary { cursor: pointer; color: var(--muted); font-size: 13.5px; margin-bottom: 10px; }
+.mid-econ { margin: 22px 0 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.mid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end; margin: 14px 0 8px; }
+.mid-form label { display: grid; gap: 5px; font-size: 12.5px; color: var(--muted); }
+.mid-form input { background: var(--bg-2); border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; color: var(--text); font: inherit; }
+.mid-v { font-size: 12px; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line-strong); white-space: nowrap; }
+.mid-v-pausar { color: var(--crit); border-color: var(--crit); }
+.mid-v-escalar { color: var(--ok); border-color: var(--ok); }
+.mid-v-manter { color: var(--core-2); border-color: var(--core-2); }
+.panel + .panel { margin-top: 18px; }

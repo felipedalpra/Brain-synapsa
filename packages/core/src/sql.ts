@@ -138,6 +138,11 @@ create table if not exists instagram_daily (
   day text not null, ig_id text not null, followers integer, reach integer, profile_views integer,
   updated_at integer not null, primary key (day, ig_id)
 );
+create table if not exists ig_post_metricas (
+  media_id text primary key, tipo text, publicado text, permalink text, legenda text,
+  curtidas integer, comentarios integer, alcance integer, salvos integer, compartilhados integer, views integer, interacoes integer,
+  atualizado_em integer not null
+);
 create table if not exists deliverables (
   id integer primary key autoincrement,
   run_id integer,

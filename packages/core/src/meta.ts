@@ -88,7 +88,7 @@ export async function fetchAdsInsights(version: string, adAccountId: string, tok
   const first = await graphGet<{ data: RawInsight[]; paging?: { next?: string } }>(
     version,
     `${acct}/insights`,
-    { level: "campaign", time_increment: "1", date_preset: days <= 7 ? "last_7d" : "last_30d", fields: "campaign_id,campaign_name,account_currency,spend,impressions,clicks,actions", limit: "200" },
+    { level: "campaign", time_increment: "1", ...(days > 30 ? { time_range: JSON.stringify({ since: new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10), until: new Date().toISOString().slice(0, 10) }) } : { date_preset: days <= 7 ? "last_7d" : "last_30d" }), fields: "campaign_id,campaign_name,account_currency,spend,impressions,clicks,actions", limit: "200" },
     token,
   );
   rows.push(...parseAdsInsights(acct, first.data));
@@ -144,4 +144,40 @@ export async function fetchIgFollowerSeries(version: string, igId: string, token
   const r = await graphGet<{ data: { name: string; values?: { value: number; end_time: string }[] }[] }>(version, `${igId}/insights`, { metric: "follower_count", period: "day", since: String(since), until: String(until) }, token);
   const m = r.data.find((x) => x.name === "follower_count");
   return (m?.values ?? []).map((v) => ({ day: v.end_time.slice(0, 10), novos: v.value }));
+}
+
+export interface IgPostMetricas {
+  id: string;
+  tipo: string | null;
+  publicado: string | null;
+  link: string | null;
+  legenda: string | null;
+  curtidas: number | null;
+  comentarios: number | null;
+  alcance: number | null;
+  salvos: number | null;
+  compartilhados: number | null;
+  views: number | null;
+  interacoes: number | null;
+}
+
+/** Posts recentes com métricas de verdade (alcance, salvos, compartilhamentos, visualizações). Falha de um post não derruba os outros. */
+export async function fetchIgPostMetricas(version: string, igId: string, token: string, limit = 30): Promise<{ posts: IgPostMetricas[]; erros: string[] }> {
+  const base = await fetchIgPosts(version, igId, token, limit);
+  const erros: string[] = [];
+  const posts: IgPostMetricas[] = [];
+  for (const p of base) {
+    let m: Record<string, number> = {};
+    for (const metricas of ["reach,saved,shares,total_interactions,views", "reach,saved,shares,total_interactions", "reach,saved"]) {
+      try {
+        const r = await graphGet<{ data: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }>(version, `${p.id}/insights`, { metric: metricas }, token);
+        m = Object.fromEntries(r.data.map((d) => [d.name, d.values?.[0]?.value ?? d.total_value?.value ?? 0]));
+        break;
+      } catch (e) {
+        if (metricas === "reach,saved") erros.push(`${p.id}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    posts.push({ id: p.id, tipo: p.tipo, publicado: p.data, link: p.link, legenda: p.legenda, curtidas: p.curtidas, comentarios: p.comentarios, alcance: m.reach ?? null, salvos: m.saved ?? null, compartilhados: m.shares ?? null, views: m.views ?? null, interacoes: m.total_interactions ?? null });
+  }
+  return { posts, erros };
 }
