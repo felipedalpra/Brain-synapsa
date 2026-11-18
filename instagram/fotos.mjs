@@ -31,8 +31,10 @@ let escolhidas = [];
 const chave = process.env.PEXELS_KEY;
 if (chave && termos.length) {
   try {
-    // a API pede busca em inglês: se vier em português, o catálogo cobre; aqui usa os termos como vieram
-    const q = encodeURIComponent(termosArg.trim());
+    // a API busca melhor em inglês: traduz as palavras-chave do catálogo e deixa passar o que já vier em inglês
+    const EN = { consultorio: "therapist office", sessao: "therapy session", terapia: "therapy session", escuta: "listening therapist", anotacoes: "taking notes", prontuario: "writing notes", trabalho: "woman working laptop", laptop: "laptop", agenda: "planning schedule desk", organizacao: "organized desk workspace", gestao: "business owner", financeiro: "working laptop finance", cafe: "coffee conversation", conversa: "women talking", equipe: "team meeting women", colegas: "colleagues talking", comunidade: "friends talking cafe", estudo: "student studying", biblioteca: "library students", graduacao: "university students", formacao: "student learning", reflexao: "thoughtful woman window", calma: "calm woman sunlight", autocuidado: "woman relaxing home", carreira: "professional woman", psicologo: "male psychologist", psicologa: "female psychologist", paciente: "therapy patient", clinica: "clinic office therapist", presenca: "woman content creator", marketing: "woman laptop home office", ia: "woman laptop", tecnologia: "woman using laptop" };
+    const trad = [...new Set(termos.map((t) => EN[t] ?? t))].slice(0, 3).join(" ");
+    const q = encodeURIComponent(trad || termosArg.trim());
     const pagina = 1 + (dia % 4);
     const r = await fetch(`https://api.pexels.com/v1/search?query=${q}&orientation=${orientArg === "h" ? "landscape" : "portrait"}&size=large&per_page=40&page=${pagina}`, { headers: { Authorization: chave }, signal: AbortSignal.timeout(20000) });
     if (!r.ok) throw new Error(`API ${r.status}`);
@@ -41,7 +43,7 @@ if (chave && termos.length) {
     for (let k = 0; k < boas.length && escolhidas.length < n; k++) {
       const f = boas[(k * 7 + dia) % boas.length];
       if (escolhidas.some((e) => e.id === f.id)) continue;
-      escolhidas.push({ id: f.id, o: f.height >= f.width ? "v" : "h", foco: "50% 40%", credito: f.photographer ?? "Pexels", u: f.src?.large2x ?? url(f.id) });
+      escolhidas.push({ id: f.id, o: f.height >= f.width ? "v" : "h", foco: "50% 40%", credito: /^https?:/.test(f.photographer ?? "") ? "Kaboompics" : (f.photographer ?? "Pexels"), u: f.src?.large2x ?? url(f.id) });
     }
     if (escolhidas.length) console.log(`Pexels API: ${escolhidas.length} fotos.`);
   } catch (e) { console.error(`API do Pexels indisponível (${e.message}); uso o catálogo.`); escolhidas = []; }
