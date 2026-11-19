@@ -41,9 +41,9 @@ export function FinDre({ d }) {
     const mes = idx.map(ymDe).join(",");
     insp.abrir({
       titulo: rot.replace(/^[=(−)\s]+/, "").replace(/^\(−\)\s*/, "") || rot,
-      sub: `${colunas[ci].rot} · regime de caixa`,
-      nota: "Receita = entradas no extrato do Inter + recebimentos marcados como pagos fora do Inter. Despesa = contas pagas + saídas do extrato sem conta.",
-      carregar: () => finDetalhe(linha, mes).then((r) => ({ total: r.total, itens: r.itens })),
+      sub: `${colunas[ci].rot} · competência`,
+      nota: "Competência: conta pelo vencimento do lançamento (cliente, recorrência, conta a pagar), pago ou não. Entrada do extrato sem lançamento não entra.",
+      carregar: () => finDetalhe(linha, mes, "competencia").then((r) => ({ total: r.total, itens: r.itens })),
     });
   };
   const linhas = Object.fromEntries(d.dre.linhas.map((l) => [l.label, l.valores]));
@@ -171,7 +171,7 @@ export function FinDre({ d }) {
           </table>
         </div>
         <p className="muted">
-          Regime de caixa: receita é o que entrou (Inter e recebimentos marcados como recebidos); despesa é o que foi pago. Parcela a receber ainda não entra no resultado: ela aparece no fluxo de caixa e vira receita quando você marcar como recebida. Imposto é a guia paga, não estimativa.
+          Regime de competência: receita é o que foi lançado para o mês (vendas, mensalidades, parcelas pelo vencimento), recebido ou não; despesa é a conta do mês, paga ou não. O que entrou e saiu de fato está no fluxo de caixa. Imposto é a guia lançada, não estimativa.
         </p>
       </section>
       <section className="panel span-3" aria-labelledby="dv-g">

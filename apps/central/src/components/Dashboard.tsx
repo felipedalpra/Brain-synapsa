@@ -7,6 +7,7 @@ import { api } from "../api";
 import { Ia, _, so } from "../lib";
 import { GraficoBarras, GraficoLinhas } from "./charts";
 import { jaDigitados } from "./Command";
+import { useInspetor, NumClick, verAssinaturas } from "./Inspetor";
 import { th } from "../shared-inline";
 
 export const Va = (e) => `${e.slice(8, 10)}/${e.slice(5, 7)}`;
@@ -53,6 +54,7 @@ export function Dashboard({ midia = false }) {
         .catch((y) => v(y instanceof Error ? y.message : "Erro ao atualizar."))
         .finally(() => i(false)));
   };
+  const insp = useInspetor();
   if (!a)
     return (
       <div className="page">
@@ -114,7 +116,7 @@ export function Dashboard({ midia = false }) {
       <section className="kpis" aria-label="Números principais">
         <div className="kpi kpi-hero">
           <span>MRR</span>
-          <b>{_(m.total)}</b>
+          <b><NumClick onClick={() => verAssinaturas(insp, "efetivo")}>{_(m.total)}</NumClick></b>
           <small>
             {N}
             {"% de "}
@@ -149,16 +151,16 @@ export function Dashboard({ midia = false }) {
         </div>
         <div className="kpi">
           <span>Clientes pagantes</span>
-          <b>{j.clientes_ativos}</b>
+          <b><NumClick onClick={() => verAssinaturas(insp, "ativos")}>{j.clientes_ativos}</NumClick></b>
           <small>
-            {j.clientes_cancelados}
+            <NumClick onClick={() => verAssinaturas(insp, "cancelados")}>{j.clientes_cancelados}</NumClick>
             {" cancelados \xB7 ticket "}
-            {_(j.ticket_medio_brl)}
+            <NumClick onClick={() => verAssinaturas(insp, "ativos")}>{_(j.ticket_medio_brl)}</NumClick>
           </small>
         </div>
         <div className="kpi">
           <span>MRR sem descontos</span>
-          <b>{_(j.mrr_quando_todos_os_descontos_acabarem_brl)}</b>
+          <b><NumClick onClick={() => verAssinaturas(insp, "cheio")}>{_(j.mrr_quando_todos_os_descontos_acabarem_brl)}</NumClick></b>
           <small>Se ninguém cancelar quando os descontos acabarem</small>
         </div>
       </section>
@@ -503,6 +505,7 @@ export function Dashboard({ midia = false }) {
 </>
         ) : null}
       </div>
+      {insp.painel}
     </div>
   );
 }

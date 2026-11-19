@@ -4265,6 +4265,59 @@ async function midiaRotina(brain2, env) {
   await sincronizarMidia(brain2, env, { dias: 90 });
   brain2.setPolicy("midia_ultima_leitura", hoje);
 }
+function midiaDetalhe(brain2, tipo, metrica, de, ate) {
+  const per = periodoDe(brain2, de, ate);
+  const periodo = { de: per.de, ate: per.ate };
+  if (tipo === "anuncios") {
+    const r = rows(
+      brain2.db,
+      "select day, ad_name, campaign_name, spend, impressions, clicks, link_clicks, leads from meta_ad_dia where day >= ? and day <= ? order by day desc, spend desc limit 500",
+      per.de,
+      per.ate
+    );
+    const campo = (x) => metrica === "leads" ? x.leads : metrica === "impressoes" ? x.impressions : metrica === "cliques" ? x.clicks : x.spend;
+    return {
+      formato: metrica === "leads" || metrica === "impressoes" || metrica === "cliques" ? "num" : "brl",
+      periodo,
+      itens: r.map((x) => ({ data: x.day, desc: x.ad_name, origem: `Meta Ads \xB7 ${x.campaign_name}`, valor: campo(x), aviso: `gasto R$ ${x.spend.toFixed(2).replace(".", ",")} \xB7 ${x.impressions} impr. \xB7 ${x.clicks} cliques \xB7 ${x.leads} leads` }))
+    };
+  }
+  if (tipo === "posts") {
+    const r = rows(
+      brain2.db,
+      "select publicado, tipo, legenda, alcance, curtidas, comentarios, salvos, compartilhados from ig_post_metricas where substr(publicado,1,10) >= ? and substr(publicado,1,10) <= ? order by publicado desc",
+      per.de,
+      per.ate
+    );
+    const campo = (x) => metrica === "salvos" ? (x.salvos ?? 0) + (x.compartilhados ?? 0) : metrica === "posts" ? 1 : x.alcance ?? 0;
+    return {
+      formato: "num",
+      periodo,
+      itens: r.map((x) => ({ data: (x.publicado ?? "").slice(0, 10), desc: (x.legenda ?? "(sem legenda)").replace(/\s+/g, " ").slice(0, 90), origem: `Instagram \xB7 ${x.tipo ?? "post"}`, valor: campo(x), aviso: `alcance ${x.alcance ?? 0} \xB7 ${x.curtidas ?? 0} curtidas \xB7 ${x.comentarios ?? 0} coment. \xB7 ${x.salvos ?? 0} salvos \xB7 ${x.compartilhados ?? 0} compart.` }))
+    };
+  }
+  if (tipo === "instagram") {
+    const r = rows(
+      brain2.db,
+      "select day, reach, profile_views, link_taps, novos from ig_dia where day >= ? and day <= ? order by day desc",
+      per.de,
+      per.ate
+    );
+    const campo = (x) => (metrica === "visitas" ? x.profile_views : metrica === "toques" ? x.link_taps : metrica === "novos" ? x.novos : x.reach) ?? 0;
+    return { formato: "num", periodo, itens: r.map((x) => ({ data: x.day, desc: "Instagram, total do dia", origem: "Instagram Insights", valor: campo(x) })) };
+  }
+  if (tipo === "pixel") {
+    const r = rows(
+      brain2.db,
+      "select day, sum(total) as total from meta_pixel_dia where evento = ? and day >= ? and day <= ? group by day order by day desc",
+      metrica,
+      per.de,
+      per.ate
+    );
+    return { formato: "num", periodo, itens: r.map((x) => ({ data: x.day, desc: `Evento ${metrica}`, origem: "Pixel da Meta", valor: x.total })) };
+  }
+  return { formato: "num", periodo, itens: [] };
+}
 
 // packages/core/src/crm-painel.ts
 var DIA = 864e5;
@@ -6899,10 +6952,22 @@ function movimentosFin(ext, contas) {
       entradas.push({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: "Recebido fora do Inter", ref: `conta:${c2.id}`, conciliado: false });
   return { entradas, despesas };
 }
-function finDetalhe(db, agora, linha, mes2) {
+function movimentosCompetencia(ext, contas, hoje) {
+  const sit = (c2) => c2.pago_em ? "pago" : c2.vencimento < hoje ? "atrasado" : "a vencer";
+  const entradas = [
+    ...contas.filter((c2) => c2.tipo === "receber" && c2.valor).map((c2) => ({ data: c2.vencimento, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: c2.grupo ? "Recorr\xEAncia / venda" : "Conta a receber", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null, situacao: sit(c2) })),
+    ...ext.filter((e) => e.valor > 0 && e.fonte === "avulso" && e.conta_id === null).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Lan\xE7amento avulso", ref: `extrato:${e.id}`, conciliado: true, situacao: "avulso" }))
+  ];
+  const despesas = [
+    ...contas.filter((c2) => c2.tipo === "pagar" && c2.valor).map((c2) => ({ data: c2.vencimento, valor: c2.valor, cat: categoria(c2.categoria, false), desc: c2.descricao, origem: c2.grupo ? "Recorr\xEAncia" : "Conta a pagar", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null, situacao: sit(c2) })),
+    ...ext.filter((e) => e.valor < 0 && e.conta_id === null).map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: e.fonte === "avulso" ? "Lan\xE7amento avulso" : "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false, situacao: "extrato" }))
+  ];
+  return { entradas, despesas };
+}
+function finDetalhe(db, agora, linha, mes2, base = "competencia") {
   const ext = rows(db, "select id, data, descricao, valor, categoria, conta_id, fonte from fin_extrato order by data, id");
   const contas = rows(db, "select id, tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, extrato_id, grupo, obs from fin_contas order by vencimento, id");
-  const { entradas, despesas } = movimentosFin(ext, contas);
+  const { entradas, despesas } = base === "caixa" ? movimentosFin(ext, contas) : movimentosCompetencia(ext, contas, brtDay(agora));
   const limpo = linha.replace(/^\(-\)\s*/, "");
   const lista = mes2.split(",").filter(Boolean);
   const noMes = (l) => l.filter((m) => lista.includes(mesDe(m.data)));
@@ -6934,7 +6999,7 @@ function finDetalhe(db, agora, linha, mes2) {
     lado = "saida";
   }
   itens2.sort((a, b) => a.data < b.data ? 1 : -1);
-  return { linha, mes: mes2, lado, total: r26(itens2.reduce((s2, m) => s2 + m.valor, 0)), itens: itens2 };
+  return { linha, mes: mes2, base, lado, total: r26(itens2.reduce((s2, m) => s2 + m.valor, 0)), itens: itens2 };
 }
 function finPainel(db, agora) {
   const hoje = brtDay(agora);
@@ -6961,6 +7026,7 @@ function finPainel(db, agora) {
   const saldoInter = r26(ext.reduce((s2, e) => s2 + e.valor, 0));
   const ultimo = ext.length ? ext[ext.length - 1].data : null;
   const { entradas, despesas } = movimentosFin(ext, contas);
+  const comp = movimentosCompetencia(ext, contas, hoje);
   const meses = (n3) => {
     const out = [];
     for (let i = n3 - 1; i >= 0; i--) out.push(mesDe(somaMeses(`${mesRef}-01`, -i)));
@@ -6971,17 +7037,17 @@ function finPainel(db, agora) {
   const atual = serie[serie.length - 1];
   const mDre = meses(12);
   const linha = (label, tipo, f) => ({ label, tipo, valores: mDre.map(f) });
-  const recBruta = (m) => soma2(entradas, m);
-  const imp = (m) => soma2(despesas, m, "Impostos e Taxas");
+  const recBruta = (m) => soma2(comp.entradas, m);
+  const imp = (m) => soma2(comp.despesas, m, "Impostos e Taxas");
   const dre = {
     meses: mDre.map(nomeMes),
     linhas: [
-      ...CATEGORIAS_RECEITA.map((c2) => linha(c2, "receita", (m) => soma2(entradas, m, c2))),
+      ...CATEGORIAS_RECEITA.map((c2) => linha(c2, "receita", (m) => soma2(comp.entradas, m, c2))),
       linha("Receita bruta", "total", recBruta),
       linha("(-) Impostos e Taxas", "despesa", imp),
       linha("Receita l\xEDquida", "total", (m) => r26(recBruta(m) - imp(m))),
-      ...CATEGORIAS_DESPESA.filter((c2) => c2 !== "Impostos e Taxas").map((c2) => linha(`(-) ${c2}`, "despesa", (m) => soma2(despesas, m, c2))),
-      linha("Resultado", "total", (m) => r26(recBruta(m) - soma2(despesas, m)))
+      ...CATEGORIAS_DESPESA.filter((c2) => c2 !== "Impostos e Taxas").map((c2) => linha(`(-) ${c2}`, "despesa", (m) => soma2(comp.despesas, m, c2))),
+      linha("Resultado", "total", (m) => r26(recBruta(m) - soma2(comp.despesas, m)))
     ]
   };
   const fechados = meses(4).slice(0, 3).filter((m) => soma2(despesas, m) > 0 || soma2(entradas, m) > 0);
@@ -7193,9 +7259,10 @@ function createHandler(svc) {
       if (req.method === "GET" && url.pathname === "/api/health") return out(200, { ok: true, server: "brain-server", llm: brain2.llm, sse: svc.sse === true });
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain2));
+      if (req.method === "GET" && url.pathname === "/api/midia-detalhe") return out(200, midiaDetalhe(brain2, url.searchParams.get("tipo") ?? "", url.searchParams.get("metrica") ?? "", url.searchParams.get("de"), url.searchParams.get("ate")));
       if (req.method === "GET" && url.pathname === "/api/midia") return out(200, midiaPainel(brain2, url.searchParams.get("de"), url.searchParams.get("ate")));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain2.db, brain2.clock()));
-      if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain2.db, brain2.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? ""));
+      if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain2.db, brain2.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? "", url.searchParams.get("base") === "caixa" ? "caixa" : "competencia"));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...await gscPainelCompleto(brain2, svc.env, svc.fetch ?? fetch), ga: gaPainel(brain2, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain2, url.searchParams.get("semana") ?? void 0));

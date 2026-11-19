@@ -26,6 +26,7 @@ export function useInspetor() {
     return () => window.removeEventListener("keydown", fn);
   }, [cfg]);
 
+  const fmt = cfg ? cfg.formato ?? (dados?.formato === "num" ? (v) => Number(v).toLocaleString("pt-BR") : _) : _;
   const soma = dados ? Math.round(dados.itens.reduce((t, i) => t + (Number(i.valor) || 0), 0) * 100) / 100 : 0;
   const painel = cfg ? (
     <div className="insp-fundo" onClick={() => setCfg(null)}>
@@ -41,7 +42,7 @@ export function useInspetor() {
           <>
             <p className="insp-total">
               <span>{dados.itens.length} lançamento(s)</span>
-              <b>{cfg.formato ? cfg.formato(soma) : _(soma)}</b>
+              <b>{fmt(soma)}</b>
             </p>
             {dados.itens.length === 0 ? <p className="muted">Nenhum lançamento compõe este número.</p> : (
               <div className="table-wrap">
@@ -53,7 +54,7 @@ export function useInspetor() {
                         <td>{dia(i.data)}</td>
                         <td>{i.desc}{i.aviso ? <small className="t-warn"> · {i.aviso}</small> : null}</td>
                         <td className="muted">{i.origem}{i.conciliado === false ? " · sem conciliar" : ""}</td>
-                        <td className={`num ${i.valor < 0 ? "t-crit" : ""}`}>{cfg.formato ? cfg.formato(i.valor) : _(i.valor)}</td>
+                        <td className={`num ${i.valor < 0 ? "t-crit" : ""}`}>{fmt(i.valor)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -76,4 +77,38 @@ export function NumClick({ onClick, children, titulo = "Ver lançamentos" }) {
       {children}
     </button>
   );
+}
+
+const ATIVAS = ["active", "trialing", "past_due"];
+
+/** Abre as assinaturas que compõem MRR, ARR, clientes ou ticket. modo: efetivo | cheio | ativos | cancelados | arr */
+export function verAssinaturas(insp, modo = "efetivo") {
+  const cfg = {
+    efetivo: ["MRR", "Assinaturas ativas pelo preço efetivo (o que cada cliente paga hoje)"],
+    cheio: ["MRR sem descontos", "Assinaturas ativas pelo preço de tabela"],
+    ativos: ["Clientes pagantes", "Assinaturas ativas, com o preço efetivo de cada uma"],
+    cancelados: ["Clientes cancelados", "Assinaturas que não estão mais ativas"],
+    arr: ["ARR", "MRR de cada assinatura ativa × 12"],
+  }[modo];
+  insp.abrir({
+    titulo: cfg[0],
+    sub: cfg[1],
+    nota: "Se um cliente aparece duplicado, com valor errado ou como ativo sem dever estar, é aqui que dá para ver.",
+    carregar: () =>
+      import("../api").then(({ chamar }) =>
+        chamar("/api/subscriptions").then((r) => ({
+          itens: r.subscriptions
+            .filter((s) => (modo === "cancelados" ? !ATIVAS.includes(s.status) : ATIVAS.includes(s.status)))
+            .map((s) => {
+              const base = modo === "cheio" ? s.list_price_brl : s.effective_price_brl;
+              return {
+                desc: s.label || s.external_id,
+                origem: `${s.source}${s.origin ? " · " + s.origin : ""} · ${s.status}`,
+                valor: (base ?? 0) * (modo === "arr" ? 12 : 1),
+                aviso: s.discount_ends_at && modo !== "cheio" ? `desconto até ${String(s.discount_ends_at).slice(0, 10)}` : "",
+              };
+            }),
+        })),
+      ),
+  });
 }

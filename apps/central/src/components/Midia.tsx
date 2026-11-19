@@ -2,7 +2,8 @@
 // Anúncios e Instagram: tudo que a Meta entrega num só lugar, por período, com a leitura do que fazer em cada parte.
 import * as React from "react";
 import { RefreshCw, ExternalLink } from "lucide-react";
-import { api } from "../api";
+import { api, chamar } from "../api";
+import { useInspetor, NumClick } from "./Inspetor";
 import { useBrain } from "../store";
 import { _ } from "../lib";
 import { avisos } from "./Avisos";
@@ -46,9 +47,18 @@ function Delta({ atual, ant, inverso = false }) {
   const bom = inverso ? v <= 0 : v >= 0;
   return <small className={bom ? "mid-bom" : "mid-ruim"}>{v >= 0 ? "▲" : "▼"} {Math.abs(v)}% vs período anterior</small>;
 }
-const Kpi = ({ titulo, valor, extra, children }) => (
-  <div><span>{titulo}</span><b>{valor}</b>{extra ? <small className="muted">{extra}</small> : null}{children}</div>
-);
+const VerCtx = React.createContext(null);
+const Kpi = ({ titulo, valor, extra, children, ver }) => {
+  const abrir = React.useContext(VerCtx);
+  return (
+  <div><span>{titulo}</span><b>{ver && abrir ? <NumClick onClick={() => abrir(titulo, ver)}>{valor}</NumClick> : valor}</b>{extra ? <small className="muted">{extra}</small> : null}{children}</div>
+  );
+};
+
+function PixelNum({ evento, children }) {
+  const abrir = React.useContext(VerCtx);
+  return abrir ? <NumClick onClick={() => abrir(`Evento ${evento}`, `pixel:${evento}`)}>{children}</NumClick> : children;
+}
 
 function Leitura({ itens, vazio = "Sem recomendações por enquanto." }) {
   if (!itens.length) return <p className="muted">{vazio}</p>;
@@ -160,15 +170,15 @@ function Resumo({ d, ir }) {
       <section className="panel">
         <h2>Visão geral do período</h2>
         <div className="mini-kpis">
-          <Kpi titulo="Seguidores novos" valor={ig.seguidores_novos === null ? "–" : `${ig.seguidores_novos >= 0 ? "+" : ""}${ig.seguidores_novos}`} extra={ig.seguidores_fim ? `${n0(ig.seguidores_fim)} no total` : null}><Delta atual={ig.seguidores_novos} ant={ig.seguidores_novos_anterior} /></Kpi>
-          <Kpi titulo="Alcance diário médio" valor={n0(ig.alcance_diario_medio)} extra="pessoas por dia no Instagram" />
-          <Kpi titulo="Visitas ao perfil" valor={n0(ig.visitas_perfil)}><Delta atual={ig.visitas_perfil} ant={ig.visitas_perfil_anterior} /></Kpi>
-          <Kpi titulo="Toques no link da bio" valor={n0(ig.toques_link)}><Delta atual={ig.toques_link} ant={ig.toques_link_anterior} /></Kpi>
-          <Kpi titulo="Posts publicados" valor={ig.posts} extra={ig.alcance_post_medio ? `${n0(ig.alcance_post_medio)} de alcance por post` : null} />
-          <Kpi titulo="Gasto em anúncios" valor={brl(ad.atual.gasto)}><Delta atual={ad.atual.gasto} ant={ad.anterior.gasto} inverso /></Kpi>
-          <Kpi titulo="Leads dos anúncios" valor={n0(ad.atual.leads)}><Delta atual={ad.atual.leads} ant={ad.anterior.leads} /></Kpi>
-          <Kpi titulo="Visitas no site (pixel)" valor={n0(pv?.total ?? null)}>{pv ? <Delta atual={pv.total} ant={pv.anterior} /> : null}</Kpi>
-          <Kpi titulo="Leads no site (pixel)" valor={n0(ld?.total ?? null)}>{ld ? <Delta atual={ld.total} ant={ld.anterior} /> : null}</Kpi>
+          <Kpi titulo="Seguidores novos" ver="instagram:novos" valor={ig.seguidores_novos === null ? "–" : `${ig.seguidores_novos >= 0 ? "+" : ""}${ig.seguidores_novos}`} extra={ig.seguidores_fim ? `${n0(ig.seguidores_fim)} no total` : null}><Delta atual={ig.seguidores_novos} ant={ig.seguidores_novos_anterior} /></Kpi>
+          <Kpi titulo="Alcance diário médio" ver="instagram:alcance" valor={n0(ig.alcance_diario_medio)} extra="pessoas por dia no Instagram" />
+          <Kpi titulo="Visitas ao perfil" ver="instagram:visitas" valor={n0(ig.visitas_perfil)}><Delta atual={ig.visitas_perfil} ant={ig.visitas_perfil_anterior} /></Kpi>
+          <Kpi titulo="Toques no link da bio" ver="instagram:toques" valor={n0(ig.toques_link)}><Delta atual={ig.toques_link} ant={ig.toques_link_anterior} /></Kpi>
+          <Kpi titulo="Posts publicados" ver="posts:posts" valor={ig.posts} extra={ig.alcance_post_medio ? `${n0(ig.alcance_post_medio)} de alcance por post` : null} />
+          <Kpi titulo="Gasto em anúncios" ver="anuncios:gasto" valor={brl(ad.atual.gasto)}><Delta atual={ad.atual.gasto} ant={ad.anterior.gasto} inverso /></Kpi>
+          <Kpi titulo="Leads dos anúncios" ver="anuncios:leads" valor={n0(ad.atual.leads)}><Delta atual={ad.atual.leads} ant={ad.anterior.leads} /></Kpi>
+          <Kpi titulo="Visitas no site (pixel)" ver="pixel:PageView" valor={n0(pv?.total ?? null)}>{pv ? <Delta atual={pv.total} ant={pv.anterior} /> : null}</Kpi>
+          <Kpi titulo="Leads no site (pixel)" ver="pixel:Lead" valor={n0(ld?.total ?? null)}>{ld ? <Delta atual={ld.total} ant={ld.anterior} /> : null}</Kpi>
         </div>
         {ig.toques_link !== null && pv ? <p className="muted">Toques no link da bio ({n0(ig.toques_link)}) e visitas no site ({n0(pv.total)}) são medidos em lugares diferentes e não se encaixam 1 a 1: parte das visitas vem de anúncio, busca e acesso direto. Para saber quanto do Instagram vira visita, coloque um parâmetro (utm_source=instagram) no link da bio.</p> : null}
       </section>
@@ -203,12 +213,12 @@ function AbaInstagram({ d }) {
       <section className="panel">
         <h2>Instagram @synapsa.ai</h2>
         <div className="mini-kpis">
-          <Kpi titulo="Seguidores" valor={n0(ig.seguidores)} extra={p.seguidores_novos !== null ? `${p.seguidores_novos >= 0 ? "+" : ""}${p.seguidores_novos} no período` : null}><Delta atual={p.seguidores_novos} ant={p.seguidores_novos_anterior} /></Kpi>
-          <Kpi titulo="Alcance diário médio" valor={n0(p.alcance_diario_medio)} />
-          <Kpi titulo="Visitas ao perfil" valor={n0(p.visitas_perfil)}><Delta atual={p.visitas_perfil} ant={p.visitas_perfil_anterior} /></Kpi>
-          <Kpi titulo="Toques no link da bio" valor={n0(p.toques_link)}><Delta atual={p.toques_link} ant={p.toques_link_anterior} /></Kpi>
-          <Kpi titulo="Posts no período" valor={p.posts} extra={p.alcance_post_medio !== null ? `${n0(p.alcance_post_medio)} de alcance por post` : "nenhum post publicado"} />
-          <Kpi titulo="Salvos e compartilhados" valor={`${p.salvos} · ${p.compartilhamentos}`} extra="soma dos posts do período" />
+          <Kpi titulo="Seguidores" ver="instagram:novos" valor={n0(ig.seguidores)} extra={p.seguidores_novos !== null ? `${p.seguidores_novos >= 0 ? "+" : ""}${p.seguidores_novos} no período` : null}><Delta atual={p.seguidores_novos} ant={p.seguidores_novos_anterior} /></Kpi>
+          <Kpi titulo="Alcance diário médio" ver="instagram:alcance" valor={n0(p.alcance_diario_medio)} />
+          <Kpi titulo="Visitas ao perfil" ver="instagram:visitas" valor={n0(p.visitas_perfil)}><Delta atual={p.visitas_perfil} ant={p.visitas_perfil_anterior} /></Kpi>
+          <Kpi titulo="Toques no link da bio" ver="instagram:toques" valor={n0(p.toques_link)}><Delta atual={p.toques_link} ant={p.toques_link_anterior} /></Kpi>
+          <Kpi titulo="Posts no período" ver="posts:posts" valor={p.posts} extra={p.alcance_post_medio !== null ? `${n0(p.alcance_post_medio)} de alcance por post` : "nenhum post publicado"} />
+          <Kpi titulo="Salvos e compartilhados" ver="posts:salvos" valor={`${p.salvos} · ${p.compartilhamentos}`} extra="soma dos posts do período" />
           <Kpi titulo="Interação" valor={pct(p.interacao_pct)} extra="do alcance, por post" />
         </div>
         <Leitura itens={ig.leitura} />
@@ -270,14 +280,14 @@ function AbaAnuncios({ d, salvar, ocupado }) {
       <section className="panel">
         <h2>Anúncios (Meta)</h2>
         <div className="mini-kpis">
-          <Kpi titulo="Gasto" valor={brl(ad.atual.gasto)}><Delta atual={ad.atual.gasto} ant={ad.anterior.gasto} inverso /></Kpi>
-          <Kpi titulo="Leads" valor={n0(ad.atual.leads)}><Delta atual={ad.atual.leads} ant={ad.anterior.leads} /></Kpi>
-          <Kpi titulo="Custo por lead" valor={brl(ad.atual.cpl)}><Delta atual={ad.atual.cpl} ant={ad.anterior.cpl} inverso /></Kpi>
-          <Kpi titulo="CTR" valor={pct(ad.atual.ctr_pct)}><Delta atual={ad.atual.ctr_pct} ant={ad.anterior.ctr_pct} /></Kpi>
-          <Kpi titulo="Custo por clique" valor={brl(ad.atual.cpc)}><Delta atual={ad.atual.cpc} ant={ad.anterior.cpc} inverso /></Kpi>
-          <Kpi titulo="Custo por mil impressões" valor={brl(ad.atual.cpm)}><Delta atual={ad.atual.cpm} ant={ad.anterior.cpm} inverso /></Kpi>
-          <Kpi titulo="Impressões" valor={n0(ad.atual.impressoes)}><Delta atual={ad.atual.impressoes} ant={ad.anterior.impressoes} /></Kpi>
-          <Kpi titulo="Cliques" valor={n0(ad.atual.cliques)}><Delta atual={ad.atual.cliques} ant={ad.anterior.cliques} /></Kpi>
+          <Kpi titulo="Gasto" ver="anuncios:gasto" valor={brl(ad.atual.gasto)}><Delta atual={ad.atual.gasto} ant={ad.anterior.gasto} inverso /></Kpi>
+          <Kpi titulo="Leads" ver="anuncios:leads" valor={n0(ad.atual.leads)}><Delta atual={ad.atual.leads} ant={ad.anterior.leads} /></Kpi>
+          <Kpi titulo="Custo por lead" ver="anuncios:gasto" valor={brl(ad.atual.cpl)}><Delta atual={ad.atual.cpl} ant={ad.anterior.cpl} inverso /></Kpi>
+          <Kpi titulo="CTR" ver="anuncios:cliques" valor={pct(ad.atual.ctr_pct)}><Delta atual={ad.atual.ctr_pct} ant={ad.anterior.ctr_pct} /></Kpi>
+          <Kpi titulo="Custo por clique" ver="anuncios:cliques" valor={brl(ad.atual.cpc)}><Delta atual={ad.atual.cpc} ant={ad.anterior.cpc} inverso /></Kpi>
+          <Kpi titulo="Custo por mil impressões" ver="anuncios:impressoes" valor={brl(ad.atual.cpm)}><Delta atual={ad.atual.cpm} ant={ad.anterior.cpm} inverso /></Kpi>
+          <Kpi titulo="Impressões" ver="anuncios:impressoes" valor={n0(ad.atual.impressoes)}><Delta atual={ad.atual.impressoes} ant={ad.anterior.impressoes} /></Kpi>
+          <Kpi titulo="Cliques" ver="anuncios:cliques" valor={n0(ad.atual.cliques)}><Delta atual={ad.atual.cliques} ant={ad.anterior.cliques} /></Kpi>
         </div>
         <Leitura itens={ad.leitura} />
         {ad.por_dia.length >= 2 && ad.atual.gasto > 0 ? (
@@ -396,7 +406,7 @@ function AbaPixel({ d }) {
           <div className="mid-funil">
             {px.funil.map((f) => (
               <div key={f.evento} className="mid-linha">
-                <div className="mid-linha-top"><span>{f.evento}</span><b>{n0(f.total)}</b></div>
+                <div className="mid-linha-top"><span>{f.evento}</span><b><PixelNum evento={f.evento}>{n0(f.total)}</PixelNum></b></div>
                 <div className="mid-barra"><i style={{ width: `${(f.total / maxFunil) * 100}%` }} /></div>
                 {f.do_anterior_pct !== null ? <small className="muted">{pct(f.do_anterior_pct)} da etapa anterior</small> : <small className="muted">entrada do funil</small>}
               </div>
@@ -488,6 +498,16 @@ export function Midia() {
   const [preset, setPreset] = React.useState("30");
   const [custom, setCustom] = React.useState({ de: soma(hojeBrt(), -29), ate: hojeBrt() });
   const iv = intervalo(preset, custom);
+  const insp = useInspetor();
+  const abrirVer = (titulo, ver) => {
+    const [tipo, metrica] = ver.split(":");
+    insp.abrir({
+      titulo,
+      sub: `${dmy(iv.de)} a ${dmy(iv.ate)} · linhas de origem lidas da Meta`,
+      nota: "Cada linha é um registro guardado pelo Brain. A soma bate com o número clicado; se algo estiver fora do esperado, veja a data e o anúncio/post de origem.",
+      carregar: () => chamar(`/api/midia-detalhe?tipo=${tipo}&metrica=${encodeURIComponent(metrica)}&de=${iv.de}&ate=${iv.ate}`).then((r) => ({ formato: r.formato, itens: r.itens })),
+    });
+  };
 
   const carregar = React.useCallback((de, ate) => {
     setCarregando(true);
@@ -542,12 +562,15 @@ export function Midia() {
         {ABAS.map((a) => <button key={a.id} type="button" role="tab" aria-selected={aba === a.id} className={aba === a.id ? "on" : ""} onClick={() => setAba(a.id)}>{a.rotulo}</button>)}
       </div>
 
+      <VerCtx.Provider value={abrirVer}>
       {aba === "resumo" ? <Resumo d={d} /> : null}
       {aba === "instagram" ? <AbaInstagram d={d} /> : null}
       {aba === "anuncios" ? <AbaAnuncios d={d} salvar={salvarPremissas} ocupado={lendo} /> : null}
       {aba === "criativos" ? <AbaCriativos d={d} /> : null}
       {aba === "pixel" ? <AbaPixel d={d} /> : null}
       {aba === "publicos" ? <AbaPublicos d={d} /> : null}
+      </VerCtx.Provider>
+      {insp.painel}
     </div>
   );
 }

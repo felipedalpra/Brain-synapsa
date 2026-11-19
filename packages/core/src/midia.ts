@@ -487,3 +487,51 @@ export async function midiaRotina(brain: Brain, env: Env): Promise<void> {
   await sincronizarMidia(brain, env, { dias: 90 });
   brain.setPolicy("midia_ultima_leitura", hoje);
 }
+
+export interface MidiaDetalheItem { data: string; desc: string; origem: string; valor: number; aviso?: string }
+
+/** Linhas de origem de um número da Mídia, para inspeção. tipo: anuncios | posts | instagram | pixel. */
+export function midiaDetalhe(brain: Brain, tipo: string, metrica: string, de?: unknown, ate?: unknown): { formato: "brl" | "num"; itens: MidiaDetalheItem[]; periodo: { de: string; ate: string } } {
+  const per = periodoDe(brain, de, ate);
+  const periodo = { de: per.de, ate: per.ate };
+  if (tipo === "anuncios") {
+    const r = rows<{ day: string; ad_name: string; campaign_name: string; spend: number; impressions: number; clicks: number; link_clicks: number; leads: number }>(
+      brain.db,
+      "select day, ad_name, campaign_name, spend, impressions, clicks, link_clicks, leads from meta_ad_dia where day >= ? and day <= ? order by day desc, spend desc limit 500",
+      per.de, per.ate,
+    );
+    const campo = (x: (typeof r)[number]) => (metrica === "leads" ? x.leads : metrica === "impressoes" ? x.impressions : metrica === "cliques" ? x.clicks : x.spend);
+    return {
+      formato: metrica === "leads" || metrica === "impressoes" || metrica === "cliques" ? "num" : "brl",
+      periodo,
+      itens: r.map((x) => ({ data: x.day, desc: x.ad_name, origem: `Meta Ads · ${x.campaign_name}`, valor: campo(x), aviso: `gasto R$ ${x.spend.toFixed(2).replace(".", ",")} · ${x.impressions} impr. · ${x.clicks} cliques · ${x.leads} leads` })),
+    };
+  }
+  if (tipo === "posts") {
+    const r = rows<{ publicado: string; tipo: string | null; legenda: string | null; alcance: number | null; curtidas: number | null; comentarios: number | null; salvos: number | null; compartilhados: number | null }>(
+      brain.db,
+      "select publicado, tipo, legenda, alcance, curtidas, comentarios, salvos, compartilhados from ig_post_metricas where substr(publicado,1,10) >= ? and substr(publicado,1,10) <= ? order by publicado desc",
+      per.de, per.ate,
+    );
+    const campo = (x: (typeof r)[number]) => (metrica === "salvos" ? (x.salvos ?? 0) + (x.compartilhados ?? 0) : metrica === "posts" ? 1 : (x.alcance ?? 0));
+    return {
+      formato: "num",
+      periodo,
+      itens: r.map((x) => ({ data: (x.publicado ?? "").slice(0, 10), desc: (x.legenda ?? "(sem legenda)").replace(/\s+/g, " ").slice(0, 90), origem: `Instagram · ${x.tipo ?? "post"}`, valor: campo(x), aviso: `alcance ${x.alcance ?? 0} · ${x.curtidas ?? 0} curtidas · ${x.comentarios ?? 0} coment. · ${x.salvos ?? 0} salvos · ${x.compartilhados ?? 0} compart.` })),
+    };
+  }
+  if (tipo === "instagram") {
+    const r = rows<{ day: string; reach: number | null; profile_views: number | null; link_taps: number | null; novos: number | null }>(
+      brain.db, "select day, reach, profile_views, link_taps, novos from ig_dia where day >= ? and day <= ? order by day desc", per.de, per.ate,
+    );
+    const campo = (x: (typeof r)[number]) => (metrica === "visitas" ? x.profile_views : metrica === "toques" ? x.link_taps : metrica === "novos" ? x.novos : x.reach) ?? 0;
+    return { formato: "num", periodo, itens: r.map((x) => ({ data: x.day, desc: "Instagram, total do dia", origem: "Instagram Insights", valor: campo(x) })) };
+  }
+  if (tipo === "pixel") {
+    const r = rows<{ day: string; total: number }>(
+      brain.db, "select day, sum(total) as total from meta_pixel_dia where evento = ? and day >= ? and day <= ? group by day order by day desc", metrica, per.de, per.ate,
+    );
+    return { formato: "num", periodo, itens: r.map((x) => ({ data: x.day, desc: `Evento ${metrica}`, origem: "Pixel da Meta", valor: x.total })) };
+  }
+  return { formato: "num", periodo, itens: [] };
+}

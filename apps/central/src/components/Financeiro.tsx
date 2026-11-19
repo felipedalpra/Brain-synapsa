@@ -11,7 +11,7 @@ import { useBrain } from "../store";
 import { avisos } from "./Avisos";
 import { FinDre } from "./FinDre";
 import { FinLancar } from "./FinLancar";
-import { useInspetor, NumClick } from "./Inspetor";
+import { useInspetor, NumClick, verAssinaturas } from "./Inspetor";
 
 export const Qt = (e) =>
   `${["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"][Number(e.slice(5, 7)) - 1]}/${e.slice(2, 4)}`;
@@ -255,6 +255,7 @@ export function FinProjecao({ d: e, rodar: a }) {
   );
 }
 export function FinMrr({ d: e }) {
+  const insp = useInspetor();
   const a = e.indicadores,
     t = a.mrrSerie.slice(-90),
     r = (o, s) => (o === null ? "\u2014" : s(o));
@@ -263,7 +264,7 @@ export function FinMrr({ d: e }) {
       <section className="kpis fin-kpis span-3" aria-label="Indicadores">
         <div className="kpi kpi-hero">
           <span>MRR</span>
-          <b>{_(a.mrr)}</b>
+          <b><NumClick onClick={() => verAssinaturas(insp, "efetivo")}>{_(a.mrr)}</NumClick></b>
           <small>
             {"Meta "}
             {_(a.metaMrr.valor)}
@@ -275,15 +276,15 @@ export function FinMrr({ d: e }) {
         </div>
         <div className="kpi">
           <span>ARR</span>
-          <b>{_(a.arr)}</b>
+          <b><NumClick onClick={() => verAssinaturas(insp, "arr")}>{_(a.arr)}</NumClick></b>
           <small>MRR × 12</small>
         </div>
         <div className="kpi">
           <span>Clientes ativos</span>
-          <b>{a.clientesAtivos}</b>
+          <b><NumClick onClick={() => verAssinaturas(insp, "ativos")}>{a.clientesAtivos}</NumClick></b>
           <small>
             {"Ticket m\xE9dio "}
-            {r(a.ticketMedio, _)}
+            {a.ticketMedio === null ? "\u2014" : <NumClick onClick={() => verAssinaturas(insp, "ativos")}>{_(a.ticketMedio)}</NumClick>}
           </small>
         </div>
         <div className="kpi">
@@ -343,6 +344,7 @@ export function FinMrr({ d: e }) {
           ))}
         </ul>
       </section>
+      {insp.painel}
     </div>
   );
 }
@@ -459,8 +461,8 @@ export function FinDreMensal({ d: e }) {
           </table>
         </div>
         <p className="muted">
-          Regime de caixa: receita é o que entrou no Inter (mais recebimentos marcados fora dele); despesa é o
-          que foi pago, inclusive no cartão. Imposto é a guia do Simples paga, não estimativa.
+          Regime de competência: receita e despesa pelo vencimento do lançamento, pagas ou não. O caixa real
+          (Inter e pagamentos fora dele) fica no fluxo de caixa. Imposto é a guia lançada, não estimativa.
         </p>
       </section>
     </div>
@@ -878,26 +880,15 @@ export function Financeiro() {
     }
   };
   const somaDias = (d, n) => new Date(Date.parse(d + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
-  const verDre = (titulo, linha, mes, sub) =>
-    insp.abrir({ titulo, sub, carregar: () => finDetalhe(linha, mes).then((r) => ({ total: r.total, itens: r.itens })) });
+  const verDre = (titulo, linha, mes, sub, base = "caixa") =>
+    insp.abrir({ titulo, sub, nota: base === "caixa" ? "Caixa: o que entrou e saiu de fato (extrato do Inter e pagamentos fora dele)." : undefined, carregar: () => finDetalhe(linha, mes, base).then((r) => ({ total: r.total, itens: r.itens })) });
   const verContas = (titulo, lista, sub) =>
     insp.abrir({
       titulo,
       sub,
       itens: lista.map((c) => ({ data: c.vencimento, desc: `${c.descricao}${c.contraparte ? " · " + c.contraparte : ""}`, origem: c.recorrente ? "Recorrente" : "Conta", valor: c.valor ?? 0, aviso: c.status === "atrasado" ? "atrasada" : "" })),
     });
-  const verMrr = () =>
-    insp.abrir({
-      titulo: "MRR",
-      sub: "Assinaturas ativas (Stripe, Pix e manuais) pelo preço efetivo",
-      nota: "O MRR soma o preço efetivo mensal de cada assinatura ativa. Se um cliente aparece duplicado ou com valor errado, é aqui que aparece.",
-      carregar: () =>
-        chamar("/api/subscriptions").then((r) => ({
-          itens: r.subscriptions
-            .filter((s) => ["active", "trialing", "past_due"].includes(s.status))
-            .map((s) => ({ desc: s.label || s.external_id, origem: `${s.source}${s.origin ? " · " + s.origin : ""} · ${s.status}`, valor: s.effective_price_brl ?? 0, aviso: s.discount_ends_at ? `desconto até ${s.discount_ends_at.slice(0, 10)}` : "" })),
-        })),
-    });
+  const verMrr = () => verAssinaturas(insp, "efetivo");
   if (!e)
     return (
       <div className="page">
@@ -988,10 +979,10 @@ export function Financeiro() {
             </div>
             <div className="kpi">
               <span>
-                {"Resultado de "}
+                {"Caixa de "}
                 {ec(`${a.mesRef}-01`)}
               </span>
-              <b className={j.resultadoMes >= 0 ? "t-ok" : "t-crit"}><NumClick onClick={() => verDre("Resultado do mês", "Resultado", a.mesRef, "Entradas menos saídas, regime de caixa")}>{an(j.resultadoMes)}</NumClick></b>
+              <b className={j.resultadoMes >= 0 ? "t-ok" : "t-crit"}><NumClick onClick={() => verDre("Caixa do mês", "Resultado", a.mesRef, "Entradas menos saídas, regime de caixa")}>{an(j.resultadoMes)}</NumClick></b>
               <small>
                 <NumClick onClick={() => verDre("Entradas do mês", "Receita bruta", a.mesRef, "Tudo que entrou, regime de caixa")}>{_(j.entradasMes)}</NumClick>
                 {" entrou \xB7 "}
