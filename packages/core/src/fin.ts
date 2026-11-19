@@ -391,19 +391,29 @@ interface ExtRow {
   fonte: string;
 }
 
+export const IGNORAR = "Ignorar";
+const ignorado = (e: { categoria: string | null }) => (e.categoria ?? "").trim().toLowerCase() === "ignorar";
+
+/** Marca (ou desmarca) um lançamento do extrato como "fora da DRE e do caixa": movimentação de outro negócio, por exemplo. O saldo do banco continua somando tudo. */
+export function finIgnorarExtrato(db: Db, id: number, ignorar: boolean): void {
+  const e = row<{ categoria: string | null; valor: number }>(db, "select categoria, valor from fin_extrato where id = ?", id);
+  if (!e) throw new BrainError("not_found", "Lançamento não encontrado.");
+  run(db, "update fin_extrato set categoria = ? where id = ?", ignorar ? IGNORAR : e.valor > 0 ? "Outras Receitas" : "Outras Despesas", id);
+}
+
 export type FinMov = { data: string; valor: number; cat: string; desc: string; origem: string; ref: string; conciliado: boolean; situacao?: string };
 
 /** Movimentos que alimentam a DRE (regime de caixa), com a origem de cada um para inspeção. */
 function movimentosFin(ext: ExtRow[], contas: ContaRow[]): { entradas: FinMov[]; despesas: FinMov[] } {
   const entradas: FinMov[] = ext
-    .filter((e) => e.valor > 0)
+    .filter((e) => e.valor > 0 && !ignorado(e))
     .map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
   const despesas: FinMov[] = [
     ...contas
       .filter((c) => c.tipo === "pagar" && c.pago_em && c.valor)
       .map((c) => ({ data: c.pago_em!, valor: c.valor!, cat: categoria(c.categoria, false), desc: c.descricao, origem: c.extrato_id === null ? "Conta paga (fora do Inter)" : "Conta paga", ref: `conta:${c.id}`, conciliado: c.extrato_id !== null })),
     ...ext
-      .filter((e) => e.valor < 0 && e.conta_id === null)
+      .filter((e) => e.valor < 0 && e.conta_id === null && !ignorado(e))
       .map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false })),
   ];
   // Recebimentos marcados como recebidos sem lançamento no extrato (ex.: dinheiro fora do Inter) também são receita.
@@ -425,7 +435,7 @@ function movimentosCompetencia(ext: ExtRow[], contas: ContaRow[], hoje: string):
       .filter((c) => c.tipo === "receber" && c.valor)
       .map((c) => ({ data: c.vencimento, valor: c.valor!, cat: categoria(c.categoria, true), desc: c.descricao, origem: c.grupo ? "Recorrência / venda" : "Conta a receber", ref: `conta:${c.id}`, conciliado: c.extrato_id !== null, situacao: sit(c) })),
     ...ext
-      .filter((e) => e.valor > 0 && e.fonte === "avulso" && e.conta_id === null)
+      .filter((e) => e.valor > 0 && e.fonte === "avulso" && e.conta_id === null && !ignorado(e))
       .map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Lançamento avulso", ref: `extrato:${e.id}`, conciliado: true, situacao: "avulso" })),
   ];
   const despesas: FinMov[] = [
@@ -433,7 +443,7 @@ function movimentosCompetencia(ext: ExtRow[], contas: ContaRow[], hoje: string):
       .filter((c) => c.tipo === "pagar" && c.valor)
       .map((c) => ({ data: c.vencimento, valor: c.valor!, cat: categoria(c.categoria, false), desc: c.descricao, origem: c.grupo ? "Recorrência" : "Conta a pagar", ref: `conta:${c.id}`, conciliado: c.extrato_id !== null, situacao: sit(c) })),
     ...ext
-      .filter((e) => e.valor < 0 && e.conta_id === null)
+      .filter((e) => e.valor < 0 && e.conta_id === null && !ignorado(e))
       .map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: e.fonte === "avulso" ? "Lançamento avulso" : "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false, situacao: "extrato" })),
   ];
   return { entradas, despesas };
@@ -673,7 +683,7 @@ export function finPainel(db: Db, agora: number): FinPainel {
     extratoRecente: [...ext].reverse().slice(0, 15).map((e): FinExtratoItem => ({ id: e.id, data: e.data, descricao: e.descricao, valor: e.valor, categoria: e.categoria, conciliado: e.conta_id !== null, manual: e.fonte === "avulso" })),
     lancamentosManuais: ext.filter((e) => e.fonte === "avulso").reverse().slice(0, 15).map((e): FinExtratoItem => ({ id: e.id, data: e.data, descricao: e.descricao, valor: e.valor, categoria: e.categoria, conciliado: e.conta_id !== null, manual: true })),
     // Só saídas: entrada sem conta é normal (mensalidade que não tem conta a receber cadastrada).
-    semConciliar: ext.filter((e) => e.valor < 0 && e.conta_id === null).length,
+    semConciliar: ext.filter((e) => e.valor < 0 && e.conta_id === null && !ignorado(e)).length,
     alertas,
     config: cfg,
     fluxo,

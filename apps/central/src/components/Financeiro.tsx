@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Check, Clock, Info, Plus, Target, TriangleAlert, Undo2, X } from "lucide-react";
 import { _ } from "../lib";
-import { api, chamar, finDetalhe } from "../api";
+import { api, chamar, finDetalhe, post } from "../api";
 import { GraficoLinhas, Ranking } from "./charts";
 import { jaDigitados } from "./Command";
 import { th } from "../shared-inline";
@@ -880,8 +880,18 @@ export function Financeiro() {
     }
   };
   const somaDias = (d, n) => new Date(Date.parse(d + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+  const ignorarExtrato = (titulo, linha, mes, sub, base) => async (id) => {
+    try {
+      const r = await post("/api/financeiro/extrato/ignorar", { id, ignorar: true });
+      t(r.painel);
+      avisos.push({ kind: "ok", title: "Lançamento fora da DRE e do caixa" });
+      verDre(titulo, linha, mes, sub, base);
+    } catch (e) {
+      avisos.push({ kind: "erro", title: "Não deu certo", text: e instanceof Error ? e.message : "Erro" });
+    }
+  };
   const verDre = (titulo, linha, mes, sub, base = "caixa") =>
-    insp.abrir({ titulo, sub, nota: base === "caixa" ? "Caixa: o que entrou e saiu de fato (extrato do Inter e pagamentos fora dele)." : undefined, carregar: () => finDetalhe(linha, mes, base).then((r) => ({ total: r.total, itens: r.itens })) });
+    insp.abrir({ titulo, sub, ignorar: ignorarExtrato(titulo, linha, mes, sub, base), nota: base === "caixa" ? "Caixa: o que entrou e saiu de fato (extrato do Inter e pagamentos fora dele)." : undefined, carregar: () => finDetalhe(linha, mes, base).then((r) => ({ total: r.total, itens: r.itens })) });
   const verContas = (titulo, lista, sub) =>
     insp.abrir({
       titulo,
@@ -1183,7 +1193,7 @@ export function Financeiro() {
           </section>
         </div>
       ) : null}
-      {u === "dre" ? <FinDre d={a} /> : null}
+      {u === "dre" ? <FinDre d={a} atualizar={t} /> : null}
       {u === "fluxo" ? <FinSaldoInter d={a} /> : null}
       {u === "cadastros" ? (
         <div className="dash-grid">

@@ -47,7 +47,7 @@ export function useInspetor() {
             {dados.itens.length === 0 ? <p className="muted">Nenhum lançamento compõe este número.</p> : (
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Data</th><th>Descrição</th><th>Origem</th><th className="num">Valor</th></tr></thead>
+                  <thead><tr><th>Data</th><th>Descrição</th><th>Origem</th><th className="num">Valor</th>{cfg.ignorar ? <th></th> : null}</tr></thead>
                   <tbody>
                     {dados.itens.map((i, k) => (
                       <tr key={k}>
@@ -55,6 +55,13 @@ export function useInspetor() {
                         <td>{i.desc}{i.aviso ? <small className="t-warn"> · {i.aviso}</small> : null}</td>
                         <td className="muted">{i.origem}{i.conciliado === false ? " · sem conciliar" : ""}</td>
                         <td className={`num ${i.valor < 0 ? "t-crit" : ""}`}>{fmt(i.valor)}</td>
+                        {cfg.ignorar ? (
+                          <td>
+                            {String(i.ref ?? "").startsWith("extrato:") ? (
+                              <button type="button" className="btn-link" title="Tira este lançamento da DRE e do caixa (ex.: movimentação de outro negócio)" onClick={() => cfg.ignorar(Number(i.ref.slice(8)), i)}>Ignorar</button>
+                            ) : null}
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>

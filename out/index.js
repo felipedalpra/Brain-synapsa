@@ -6941,11 +6941,18 @@ function conciliar(db) {
   });
   return n3;
 }
+var IGNORAR = "Ignorar";
+var ignorado = (e) => (e.categoria ?? "").trim().toLowerCase() === "ignorar";
+function finIgnorarExtrato(db, id, ignorar) {
+  const e = row(db, "select categoria, valor from fin_extrato where id = ?", id);
+  if (!e) throw new BrainError("not_found", "Lan\xE7amento n\xE3o encontrado.");
+  run(db, "update fin_extrato set categoria = ? where id = ?", ignorar ? IGNORAR : e.valor > 0 ? "Outras Receitas" : "Outras Despesas", id);
+}
 function movimentosFin(ext, contas) {
-  const entradas = ext.filter((e) => e.valor > 0).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
+  const entradas = ext.filter((e) => e.valor > 0 && !ignorado(e)).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
   const despesas = [
     ...contas.filter((c2) => c2.tipo === "pagar" && c2.pago_em && c2.valor).map((c2) => ({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, false), desc: c2.descricao, origem: c2.extrato_id === null ? "Conta paga (fora do Inter)" : "Conta paga", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null })),
-    ...ext.filter((e) => e.valor < 0 && e.conta_id === null).map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false }))
+    ...ext.filter((e) => e.valor < 0 && e.conta_id === null && !ignorado(e)).map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false }))
   ];
   for (const c2 of contas)
     if (c2.tipo === "receber" && c2.pago_em && c2.valor && c2.extrato_id === null)
@@ -6956,11 +6963,11 @@ function movimentosCompetencia(ext, contas, hoje) {
   const sit = (c2) => c2.pago_em ? "pago" : c2.vencimento < hoje ? "atrasado" : "a vencer";
   const entradas = [
     ...contas.filter((c2) => c2.tipo === "receber" && c2.valor).map((c2) => ({ data: c2.vencimento, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: c2.grupo ? "Recorr\xEAncia / venda" : "Conta a receber", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null, situacao: sit(c2) })),
-    ...ext.filter((e) => e.valor > 0 && e.fonte === "avulso" && e.conta_id === null).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Lan\xE7amento avulso", ref: `extrato:${e.id}`, conciliado: true, situacao: "avulso" }))
+    ...ext.filter((e) => e.valor > 0 && e.fonte === "avulso" && e.conta_id === null && !ignorado(e)).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Lan\xE7amento avulso", ref: `extrato:${e.id}`, conciliado: true, situacao: "avulso" }))
   ];
   const despesas = [
     ...contas.filter((c2) => c2.tipo === "pagar" && c2.valor).map((c2) => ({ data: c2.vencimento, valor: c2.valor, cat: categoria(c2.categoria, false), desc: c2.descricao, origem: c2.grupo ? "Recorr\xEAncia" : "Conta a pagar", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null, situacao: sit(c2) })),
-    ...ext.filter((e) => e.valor < 0 && e.conta_id === null).map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: e.fonte === "avulso" ? "Lan\xE7amento avulso" : "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false, situacao: "extrato" }))
+    ...ext.filter((e) => e.valor < 0 && e.conta_id === null && !ignorado(e)).map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: e.fonte === "avulso" ? "Lan\xE7amento avulso" : "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false, situacao: "extrato" }))
   ];
   return { entradas, despesas };
 }
@@ -7196,7 +7203,7 @@ function finPainel(db, agora) {
     extratoRecente: [...ext].reverse().slice(0, 15).map((e) => ({ id: e.id, data: e.data, descricao: e.descricao, valor: e.valor, categoria: e.categoria, conciliado: e.conta_id !== null, manual: e.fonte === "avulso" })),
     lancamentosManuais: ext.filter((e) => e.fonte === "avulso").reverse().slice(0, 15).map((e) => ({ id: e.id, data: e.data, descricao: e.descricao, valor: e.valor, categoria: e.categoria, conciliado: e.conta_id !== null, manual: true })),
     // Só saídas: entrada sem conta é normal (mensalidade que não tem conta a receber cadastrada).
-    semConciliar: ext.filter((e) => e.valor < 0 && e.conta_id === null).length,
+    semConciliar: ext.filter((e) => e.valor < 0 && e.conta_id === null && !ignorado(e)).length,
     alertas,
     config: cfg,
     fluxo,
@@ -7484,6 +7491,11 @@ function createHandler(svc) {
         if (rota === "lancamento") {
           finAddManual(brain2.db, agora, body.lancamento);
           brain2.audit("voce", "financeiro_lancamento_avulso");
+          return out(200, { painel: finPainel(brain2.db, agora) });
+        }
+        if (rota === "extrato/ignorar") {
+          finIgnorarExtrato(brain2.db, idDe(), body.ignorar !== false);
+          brain2.audit("voce", body.ignorar === false ? "financeiro_extrato_reativado" : "financeiro_extrato_ignorado", String(body.id));
           return out(200, { painel: finPainel(brain2.db, agora) });
         }
         if (rota === "lancamento/remover") {

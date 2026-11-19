@@ -5,14 +5,15 @@ import { _ } from "../lib";
 import { GraficoLinhas } from "./charts";
 import { FinDreMensal } from "./Financeiro";
 import { useInspetor, NumClick } from "./Inspetor";
-import { finDetalhe } from "../api";
+import { finDetalhe, post } from "../api";
+import { avisos } from "./Avisos";
 
 const brl = (n) => (n < 0 ? `(${_(Math.abs(n))})` : _(n));
 const pct = (n, base) => (base > 0 ? `${(Math.round((n / base) * 1000) / 10).toLocaleString("pt-BR")}%` : "—");
 const r2 = (n) => Math.round(n * 100) / 100;
 const OPEX = ["Pessoal", "Marketing e Vendas", "Tecnologia/Ferramentas", "Administrativas"];
 
-export function FinDre({ d }) {
+export function FinDre({ d, atualizar }) {
   const meses = d.dre.meses;
   const [sel, setSel] = React.useState(meses.length - 1);
   const insp = useInspetor();
@@ -39,7 +40,20 @@ export function FinDre({ d }) {
     if (!linha) return;
     const idx = colunas[ci].idx;
     const mes = idx.map(ymDe).join(",");
+    const ignorar = atualizar
+      ? async (id) => {
+          try {
+            const r = await post("/api/financeiro/extrato/ignorar", { id, ignorar: true });
+            atualizar(r.painel);
+            avisos.push({ kind: "ok", title: "Lançamento fora da DRE e do caixa" });
+            abrir(rot, ci);
+          } catch (e) {
+            avisos.push({ kind: "erro", title: "Não deu certo", text: e instanceof Error ? e.message : "Erro" });
+          }
+        }
+      : undefined;
     insp.abrir({
+      ignorar,
       titulo: rot.replace(/^[=(−)\s]+/, "").replace(/^\(−\)\s*/, "") || rot,
       sub: `${colunas[ci].rot} · competência`,
       nota: "Competência: conta pelo vencimento do lançamento (cliente, recorrência, conta a pagar), pago ou não. Entrada do extrato sem lançamento não entra.",
