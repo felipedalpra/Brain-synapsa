@@ -411,6 +411,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (cur.origin !== "informado") throw new BrainError("invalid", "Só assinaturas informadas por você podem ser renomeadas aqui.");
         run(brain.db, "update subscriptions set label = ?, updated_at = ? where source = ? and external_id = ?", label, brain.clock(), source, id);
         if (typeof body.contaDe === "string" && body.contaDe.trim()) run(brain.db, "update fin_contas set descricao = ? where descricao = ?", label, body.contaDe.trim());
+        if (typeof body.contaPrefixo === "string" && body.contaPrefixo.trim()) run(brain.db, "update fin_contas set descricao = ? || substr(descricao, ?) where descricao like ? || '%'", label, body.contaPrefixo.trim().length + 1, body.contaPrefixo.trim());
         brain.audit("voce", "renomear_assinatura", `${source}:${id}`, { label });
         brain.emit("change");
         return out(200, snapshot());

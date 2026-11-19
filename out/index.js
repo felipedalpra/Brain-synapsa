@@ -7813,6 +7813,7 @@ function createHandler(svc) {
         if (cur.origin !== "informado") throw new BrainError("invalid", "S\xF3 assinaturas informadas por voc\xEA podem ser renomeadas aqui.");
         run(brain2.db, "update subscriptions set label = ?, updated_at = ? where source = ? and external_id = ?", label, brain2.clock(), source, id);
         if (typeof body.contaDe === "string" && body.contaDe.trim()) run(brain2.db, "update fin_contas set descricao = ? where descricao = ?", label, body.contaDe.trim());
+        if (typeof body.contaPrefixo === "string" && body.contaPrefixo.trim()) run(brain2.db, "update fin_contas set descricao = ? || substr(descricao, ?) where descricao like ? || '%'", label, body.contaPrefixo.trim().length + 1, body.contaPrefixo.trim());
         brain2.audit("voce", "renomear_assinatura", `${source}:${id}`, { label });
         brain2.emit("change");
         return out(200, snapshot());
