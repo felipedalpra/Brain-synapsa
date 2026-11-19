@@ -7369,7 +7369,7 @@ function finPainel(db, agora) {
       }
       return m;
     };
-    for (const e of ext) if (e.data >= ini && e.data <= hoje) {
+    for (const e of ext) if (e.data >= ini && e.data <= hoje && !ignorado(e)) {
       const m = slot(e.data);
       if (e.valor >= 0) m.e += e.valor;
       else m.s += -e.valor;
@@ -7384,7 +7384,7 @@ function finPainel(db, agora) {
       else m.s += c2.valor;
       m.itens.push({ descricao: `${c2.descricao}${c2.vencimento < hoje ? " (atrasada)" : ""}`, valor: c2.tipo === "receber" ? c2.valor : -c2.valor, data: d, previsto: true });
     }
-    let saldo = r26(ext.filter((e) => e.data < ini).reduce((t, e) => t + e.valor, 0));
+    let saldo = r26(ext.filter((e) => e.data < ini && !ignorado(e)).reduce((t, e) => t + e.valor, 0));
     const dias = [];
     for (let t = Date.parse(`${ini}T12:00:00Z`), f = Date.parse(`${fim}T12:00:00Z`); t <= f; t += DIA2) {
       const d = new Date(t).toISOString().slice(0, 10);

@@ -638,7 +638,7 @@ export function finPainel(db: Db, agora: number): FinPainel {
     const fim = brtDay(agora + 150 * DIA);
     const mov = new Map<string, { e: number; s: number; itens: { descricao: string; valor: number; data: string; previsto: boolean }[] }>();
     const slot = (d: string) => { let m = mov.get(d); if (!m) { m = { e: 0, s: 0, itens: [] }; mov.set(d, m); } return m; };
-    for (const e of ext) if (e.data >= ini && e.data <= hoje) { const m = slot(e.data); if (e.valor >= 0) m.e += e.valor; else m.s += -e.valor; m.itens.push({ descricao: e.descricao, valor: e.valor, data: e.data, previsto: false }); }
+    for (const e of ext) if (e.data >= ini && e.data <= hoje && !ignorado(e)) { const m = slot(e.data); if (e.valor >= 0) m.e += e.valor; else m.s += -e.valor; m.itens.push({ descricao: e.descricao, valor: e.valor, data: e.data, previsto: false }); }
     for (const c of contas) {
       if (c.pago_em || !c.valor) continue;
       // Atrasada ainda vai acontecer: entra hoje, não no passado.
@@ -649,7 +649,7 @@ export function finPainel(db: Db, agora: number): FinPainel {
       m.itens.push({ descricao: `${c.descricao}${c.vencimento < hoje ? " (atrasada)" : ""}`, valor: c.tipo === "receber" ? c.valor : -c.valor, data: d, previsto: true });
     }
     // Saldo do dia ini-1 = soma do extrato até lá.
-    let saldo = r2(ext.filter((e) => e.data < ini).reduce((t, e) => t + e.valor, 0));
+    let saldo = r2(ext.filter((e) => e.data < ini && !ignorado(e)).reduce((t, e) => t + e.valor, 0));
     const dias: FinFluxoDia[] = [];
     for (let t = Date.parse(`${ini}T12:00:00Z`), f = Date.parse(`${fim}T12:00:00Z`); t <= f; t += DIA) {
       const d = new Date(t).toISOString().slice(0, 10);
