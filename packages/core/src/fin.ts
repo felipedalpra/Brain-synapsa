@@ -636,9 +636,9 @@ export function finPainel(db: Db, agora: number): FinPainel {
   const fluxo = ((): FinFluxo => {
     const ini = brtDay(agora - 30 * DIA);
     const fim = brtDay(agora + 150 * DIA);
-    const mov = new Map<string, { e: number; s: number; itens: { descricao: string; valor: number }[] }>();
+    const mov = new Map<string, { e: number; s: number; itens: { descricao: string; valor: number; data: string; previsto: boolean }[] }>();
     const slot = (d: string) => { let m = mov.get(d); if (!m) { m = { e: 0, s: 0, itens: [] }; mov.set(d, m); } return m; };
-    for (const e of ext) if (e.data >= ini && e.data <= hoje) { const m = slot(e.data); if (e.valor >= 0) m.e += e.valor; else m.s += -e.valor; m.itens.push({ descricao: e.descricao, valor: e.valor }); }
+    for (const e of ext) if (e.data >= ini && e.data <= hoje) { const m = slot(e.data); if (e.valor >= 0) m.e += e.valor; else m.s += -e.valor; m.itens.push({ descricao: e.descricao, valor: e.valor, data: e.data, previsto: false }); }
     for (const c of contas) {
       if (c.pago_em || !c.valor) continue;
       // Atrasada ainda vai acontecer: entra hoje, não no passado.
@@ -646,7 +646,7 @@ export function finPainel(db: Db, agora: number): FinPainel {
       if (d > fim) continue;
       const m = slot(d);
       if (c.tipo === "receber") m.e += c.valor; else m.s += c.valor;
-      m.itens.push({ descricao: `${c.descricao}${c.vencimento < hoje ? " (atrasada)" : ""}`, valor: c.tipo === "receber" ? c.valor : -c.valor });
+      m.itens.push({ descricao: `${c.descricao}${c.vencimento < hoje ? " (atrasada)" : ""}`, valor: c.tipo === "receber" ? c.valor : -c.valor, data: d, previsto: true });
     }
     // Saldo do dia ini-1 = soma do extrato até lá.
     let saldo = r2(ext.filter((e) => e.data < ini).reduce((t, e) => t + e.valor, 0));
@@ -655,7 +655,7 @@ export function finPainel(db: Db, agora: number): FinPainel {
       const d = new Date(t).toISOString().slice(0, 10);
       const m = mov.get(d);
       saldo = r2(saldo + (m ? m.e - m.s : 0));
-      dias.push({ data: d, entradas: r2(m?.e ?? 0), saidas: r2(m?.s ?? 0), saldo, projetado: d > hoje, itens: m ? m.itens.slice(0, 8) : [] });
+      dias.push({ data: d, entradas: r2(m?.e ?? 0), saidas: r2(m?.s ?? 0), saldo, projetado: d > hoje, itens: m ? m.itens.slice(0, 60) : [] });
     }
     const fut = dias.filter((x) => x.data >= hoje);
     const menor = fut.length ? fut.reduce((a, b) => (b.saldo < a.saldo ? b : a)) : null;

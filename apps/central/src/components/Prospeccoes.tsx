@@ -366,7 +366,7 @@ export function ProspeccaoPainel() {
             >
               <table>
                 <thead>
-                  <jaDigitados>
+                  <tr>
                     <th>
                       <input
                         type="checkbox"
@@ -385,11 +385,11 @@ export function ProspeccaoPainel() {
                     <th>Para</th>
                     <th>Etapa</th>
                     <th>Texto</th>
-                  </jaDigitados>
+                  </tr>
                 </thead>
                 <tbody>
                   {a.emails.pendentes.map((k) => (
-                    <jaDigitados>
+                    <tr>
                       <td>
                         <input
                           type="checkbox"
@@ -418,7 +418,7 @@ export function ProspeccaoPainel() {
                           </pre>
                         </details>
                       </td>
-                    </jaDigitados>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -564,7 +564,7 @@ export function ProspeccaoPainel() {
           >
             <table>
               <thead>
-                <jaDigitados>
+                <tr>
                   <th>
                     <input
                       type="checkbox"
@@ -588,11 +588,11 @@ export function ProspeccaoPainel() {
                   <th>E-mail público</th>
                   <th>Nota</th>
                   <th />
-                </jaDigitados>
+                </tr>
               </thead>
               <tbody>
                 {S.map((k) => (
-                  <jaDigitados>
+                  <tr>
                     <td>
                       {k.noCrm ? null : (
                         <input
@@ -680,7 +680,7 @@ export function ProspeccaoPainel() {
                         </button>
                       )}
                     </td>
-                  </jaDigitados>
+                  </tr>
                 ))}
               </tbody>
             </table>

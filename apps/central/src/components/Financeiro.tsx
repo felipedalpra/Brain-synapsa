@@ -215,7 +215,7 @@ export function FinProjecao({ d: e, rodar: a }) {
         <div className="table-wrap">
           <table>
             <thead>
-              <jaDigitados>
+              <tr>
                 <th>Cenário</th>
                 <th className="num">Novos/mês</th>
                 <th className="num">Churn</th>
@@ -231,11 +231,11 @@ export function FinProjecao({ d: e, rodar: a }) {
                     {Qt(t.meses[j])}
                   </th>
                 ))}
-              </jaDigitados>
+              </tr>
             </thead>
             <tbody>
               {t.cenarios.map((j) => (
-                <jaDigitados>
+                <tr>
                   <td>{j.label}</td>
                   <td className="num">{j.novosPorMes.toLocaleString("pt-BR")}</td>
                   <td className="num">{Xl(j.churn)}</td>
@@ -245,7 +245,7 @@ export function FinProjecao({ d: e, rodar: a }) {
                   {c.map((m) => (
                     <td className={`num ${j.saldo[m] < 0 ? "t-crit" : ""}`}>{Dh(j.saldo[m])}</td>
                   ))}
-                </jaDigitados>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -419,7 +419,7 @@ export function FinDreMensal({ d: e }) {
         <div className="table-wrap">
           <table className="dre-tab">
             <thead>
-              <jaDigitados>
+              <tr>
                 <th>Linha</th>
                 {i.map((N) => (
                   <th className="num">{N}</th>
@@ -428,14 +428,14 @@ export function FinDreMensal({ d: e }) {
                   {"Total "}
                   {a}m
                 </th>
-              </jaDigitados>
+              </tr>
             </thead>
             <tbody>
               {l.map((N, h) => {
                 const f = v(N.valores),
                   d = N.tipo === "total" && h > 0 ? "dre-sep" : "";
                 return (
-                  <jaDigitados className={`${N.tipo === "total" ? "dre-total" : ""} ${d}`}>
+                  <tr className={`${N.tipo === "total" ? "dre-total" : ""} ${d}`}>
                     <td>{N.label}</td>
                     {N.valores.map((p, S) => (
                       <td className={`num ${N.tipo === "total" && p < 0 ? "t-crit" : ""}`}>
@@ -445,10 +445,10 @@ export function FinDreMensal({ d: e }) {
                     <td className={`num dre-soma ${N.tipo === "total" && f < 0 ? "t-crit" : ""}`}>
                       {f === 0 ? "\u2014" : r ? x(f, g) : Jl(f)}
                     </td>
-                  </jaDigitados>
+                  </tr>
                 );
               })}
-              <jaDigitados className="dre-margem">
+              <tr className="dre-margem">
                 <td>Margem do resultado</td>
                 {j.map((N, h) => (
                   <td className={`num ${N < 0 ? "t-crit" : ""}`}>
@@ -456,7 +456,7 @@ export function FinDreMensal({ d: e }) {
                   </td>
                 ))}
                 <td className="num dre-soma">{x(v(u.valores), g)}</td>
-              </jaDigitados>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -481,6 +481,7 @@ export function Vh(e) {
     t = (a.getUTCDay() + 6) % 7;
   return (a.setUTCDate(a.getUTCDate() - t), a.toISOString().slice(0, 10));
 }
+const r2 = (n) => Math.round(n * 100) / 100;
 export function Hh(e, a) {
   if (a === "dia")
     return e.map((r) => ({
@@ -647,6 +648,7 @@ export function Qh({ dias: e, hoje: a }) {
   );
 }
 export function FinSaldoInter({ d: e }) {
+  const insp = useInspetor();
   const a = e.fluxo,
     [t, r] = React.useState("semana"),
     [o, s] = React.useState(60),
@@ -660,7 +662,7 @@ export function FinSaldoInter({ d: e }) {
       [a.dias, e.hoje, o],
     ),
     g = React.useMemo(
-      () => Hh(v, t).filter((h) => t !== "dia" || c || h.entradas || h.saidas || h.chave === e.hoje),
+      () => Hh(v, t).filter((h) => c || h.entradas || h.saidas || h.chave === e.hoje),
       [v, t, c, e.hoje],
     ),
     x = (h) => {
@@ -761,64 +763,58 @@ export function FinSaldoInter({ d: e }) {
             ))}
           </div>
         </div>
-        {t === "dia" ? (
-          <label className="chk">
-            <input type="checkbox" checked={c} onChange={(h) => u(h.target.checked)} />
-            {" Mostrar dias sem movimento"}
-          </label>
-        ) : null}
-        <div className="table-wrap">
-          <table className="fluxo-tab">
-            <thead>
-              <jaDigitados>
-                <th>Período</th>
-                <th className="num">Entradas</th>
-                <th className="num">Saídas</th>
-                <th className="num">Líquido</th>
-                <th className="num">Saldo final</th>
-              </jaDigitados>
-            </thead>
-            <tbody>
-              {g.map((h) => {
-                const f = h.entradas - h.saidas,
-                  d = i === h.chave;
-                return (
-                  <React.Fragment>
-                    <jaDigitados
-                      className={`${h.projetado ? "fx-proj" : ""} ${h.chave === e.hoje ? "fx-hoje" : ""} ${h.itens.length ? "fx-clic" : ""}`}
-                      onClick={() => h.itens.length && l(d ? null : h.chave)}
-                    >
-                      <td>
-                        {h.rotulo}
-                        {h.projetado ? <em className="tag">projetado</em> : null}
-                        {h.chave === e.hoje ? <em className="tag">hoje</em> : null}
-                      </td>
-                      <td className="num t-ok">{h.entradas ? _(h.entradas) : "\u2014"}</td>
-                      <td className="num">{h.saidas ? _(h.saidas) : "\u2014"}</td>
-                      <td className={`num ${f < 0 ? "t-crit" : ""}`}>{f ? ka(f) : "\u2014"}</td>
-                      <td className={`num ${h.saldo < 0 ? "t-crit" : ""}`}>
-                        <b>{ka(h.saldo)}</b>
-                      </td>
-                    </jaDigitados>
-                    {d ? (
-                      <jaDigitados className="fx-itens">
-                        <td colSpan={5}>
-                          <ul className="plain">
-                            {h.itens.slice(0, 20).map((p, S) => (
-                              <li>
-                                <span>{p.descricao}</span>
-                                <b className={p.valor >= 0 ? "t-ok" : ""}>{ka(p.valor)}</b>
-                              </li>
-                            ))}
-                          </ul>
-                        </td>
-                      </jaDigitados>
-                    ) : null}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+        <label className="chk">
+          <input type="checkbox" checked={c} onChange={(h) => u(h.target.checked)} />
+          {" Mostrar períodos sem movimento"}
+        </label>
+        <div className="fx-livro">
+          <div className="fx-livro-cab" aria-hidden>
+            <span>Período</span>
+            <span className="num">Entradas</span>
+            <span className="num">Saídas</span>
+            <span className="num">Líquido</span>
+            <span className="num">Saldo final</span>
+          </div>
+          {g.length === 0 ? <p className="muted">Nada neste horizonte.</p> : null}
+          {g.map((h) => {
+            const liq = r2(h.entradas - h.saidas);
+            const itens = [...h.itens].sort((x, y) => (x.data ?? "") < (y.data ?? "") ? -1 : 1);
+            const abrir = (lado) =>
+              insp.abrir({
+                titulo: `${lado === "entrada" ? "Entradas" : lado === "saida" ? "Saídas" : "Movimentação"} · ${h.rotulo}`,
+                sub: h.projetado ? "Inclui contas em aberto (previsto) no dia do vencimento" : "Do extrato do Inter",
+                itens: itens
+                  .filter((p) => (lado === "entrada" ? p.valor > 0 : lado === "saida" ? p.valor < 0 : true))
+                  .map((p) => ({ data: p.data, desc: p.descricao, origem: p.previsto ? "Previsto (conta em aberto)" : "Extrato Inter", valor: p.valor })),
+              });
+            return (
+              <article key={h.chave} className={`fx-per ${h.projetado ? "fx-proj" : ""} ${h.chave === e.hoje ? "fx-hoje" : ""}`}>
+                <header className="fx-per-cab">
+                  <span className="fx-per-nome">
+                    {h.rotulo}
+                    {h.projetado ? <em className="tag">previsto</em> : <em className="tag tag-ok">realizado</em>}
+                    {h.chave === e.hoje ? <em className="tag">hoje</em> : null}
+                  </span>
+                  <span className="num t-ok">{h.entradas ? <NumClick onClick={() => abrir("entrada")}>{_(h.entradas)}</NumClick> : "\u2014"}</span>
+                  <span className="num">{h.saidas ? <NumClick onClick={() => abrir("saida")}>{_(h.saidas)}</NumClick> : "\u2014"}</span>
+                  <span className={`num ${liq < 0 ? "t-crit" : ""}`}>{liq ? <NumClick onClick={() => abrir("todos")}>{ka(liq)}</NumClick> : "\u2014"}</span>
+                  <span className={`num ${h.saldo < 0 ? "t-crit" : ""}`}><b>{ka(h.saldo)}</b></span>
+                </header>
+                {itens.length ? (
+                  <ul className="fx-itens-l">
+                    {itens.slice(0, 40).map((p, k) => (
+                      <li key={k}>
+                        <span className="fx-data">{p.data ? yt(p.data) : ""}</span>
+                        <span className="fx-desc">{p.descricao}</span>
+                        <span className={`fx-st ${p.previsto ? "fx-st-prev" : ""}`}>{p.previsto ? "previsto" : "realizado"}</span>
+                        <b className={`num ${p.valor >= 0 ? "t-ok" : "t-crit"}`}>{ka(p.valor)}</b>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
         <ul className="plain notas">
           {a.notas.map((h) => (
@@ -826,6 +822,7 @@ export function FinSaldoInter({ d: e }) {
           ))}
         </ul>
       </section>
+      {insp.painel}
     </div>
   );
 }
@@ -1155,17 +1152,17 @@ export function Financeiro() {
             <div className="table-wrap">
               <table>
                 <thead>
-                  <jaDigitados>
+                  <tr>
                     <th>Descrição</th>
                     <th>Categoria</th>
                     <th>Quando</th>
                     <th className="num">Valor</th>
                     <th />
-                  </jaDigitados>
+                  </tr>
                 </thead>
                 <tbody>
                   {a.pagasRecentes.map((h) => (
-                    <jaDigitados>
+                    <tr>
                       <td>
                         {h.descricao}
                         {h.foraDoInter ? <em className="tag">fora do Inter</em> : null}
@@ -1185,7 +1182,7 @@ export function Financeiro() {
                           <Undo2 size={14} aria-hidden />
                         </button>
                       </td>
-                    </jaDigitados>
+                    </tr>
                   ))}
                 </tbody>
               </table>

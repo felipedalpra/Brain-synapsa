@@ -7373,7 +7373,7 @@ function finPainel(db, agora) {
       const m = slot(e.data);
       if (e.valor >= 0) m.e += e.valor;
       else m.s += -e.valor;
-      m.itens.push({ descricao: e.descricao, valor: e.valor });
+      m.itens.push({ descricao: e.descricao, valor: e.valor, data: e.data, previsto: false });
     }
     for (const c2 of contas) {
       if (c2.pago_em || !c2.valor) continue;
@@ -7382,7 +7382,7 @@ function finPainel(db, agora) {
       const m = slot(d);
       if (c2.tipo === "receber") m.e += c2.valor;
       else m.s += c2.valor;
-      m.itens.push({ descricao: `${c2.descricao}${c2.vencimento < hoje ? " (atrasada)" : ""}`, valor: c2.tipo === "receber" ? c2.valor : -c2.valor });
+      m.itens.push({ descricao: `${c2.descricao}${c2.vencimento < hoje ? " (atrasada)" : ""}`, valor: c2.tipo === "receber" ? c2.valor : -c2.valor, data: d, previsto: true });
     }
     let saldo = r26(ext.filter((e) => e.data < ini).reduce((t, e) => t + e.valor, 0));
     const dias = [];
@@ -7390,7 +7390,7 @@ function finPainel(db, agora) {
       const d = new Date(t).toISOString().slice(0, 10);
       const m = mov.get(d);
       saldo = r26(saldo + (m ? m.e - m.s : 0));
-      dias.push({ data: d, entradas: r26(m?.e ?? 0), saidas: r26(m?.s ?? 0), saldo, projetado: d > hoje, itens: m ? m.itens.slice(0, 8) : [] });
+      dias.push({ data: d, entradas: r26(m?.e ?? 0), saidas: r26(m?.s ?? 0), saldo, projetado: d > hoje, itens: m ? m.itens.slice(0, 60) : [] });
     }
     const fut = dias.filter((x) => x.data >= hoje);
     const menor = fut.length ? fut.reduce((a, b) => b.saldo < a.saldo ? b : a) : null;

@@ -239,18 +239,18 @@ export function Dashboard({ midia = false }) {
           <div className="table-wrap">
             <table>
               <thead>
-                <jaDigitados>
+                <tr>
                   <th>Cliente</th>
                   <th>Fonte</th>
                   <th>Status</th>
                   <th className="num">Paga</th>
                   <th className="num">Tabela</th>
                   <th>Desconto até</th>
-                </jaDigitados>
+                </tr>
               </thead>
               <tbody>
                 {[...h, ...f].map((y) => (
-                  <jaDigitados className={h.includes(y) ? "" : "dim"}>
+                  <tr className={h.includes(y) ? "" : "dim"}>
                     <td>{y.nome ?? y.id}</td>
                     <td>
                       {$h[y.fonte] ?? y.fonte}
@@ -264,7 +264,7 @@ export function Dashboard({ midia = false }) {
                         ? new Date(y.desconto_acaba_em).toLocaleDateString("pt-BR")
                         : "\u2014"}
                     </td>
-                  </jaDigitados>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -316,21 +316,21 @@ export function Dashboard({ midia = false }) {
             <div className="table-wrap">
               <table>
                 <thead>
-                  <jaDigitados>
+                  <tr>
                     <th>Campanha</th>
                     <th className="num">Gasto</th>
                     <th className="num">Cliques</th>
                     <th className="num">Leads</th>
-                  </jaDigitados>
+                  </tr>
                 </thead>
                 <tbody>
                   {p.campanhas.map((y) => (
-                    <jaDigitados>
+                    <tr>
                       <td>{y.nome}</td>
                       <td className="num">{_(y.gasto)}</td>
                       <td className="num">{y.cliques}</td>
                       <td className="num">{y.leads}</td>
-                    </jaDigitados>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -438,15 +438,15 @@ export function Dashboard({ midia = false }) {
             <div className="table-wrap">
               <table>
                 <thead>
-                  <jaDigitados>
+                  <tr>
                     <th>Post</th>
                     <th className="num">Curtidas</th>
                     <th className="num">Coment.</th>
-                  </jaDigitados>
+                  </tr>
                 </thead>
                 <tbody>
                   {(S.ultimos_posts ?? []).slice(0, 8).map((y) => (
-                    <jaDigitados>
+                    <tr>
                       <td>
                         {y.data ? (
                           <span className="muted">
@@ -465,7 +465,7 @@ export function Dashboard({ midia = false }) {
                       </td>
                       <td className="num">{y.curtidas ?? "\u2014"}</td>
                       <td className="num">{y.comentarios ?? "\u2014"}</td>
-                    </jaDigitados>
+                    </tr>
                   ))}
                 </tbody>
               </table>

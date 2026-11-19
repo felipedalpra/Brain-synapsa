@@ -294,17 +294,17 @@ export function CrmPainel() {
           <div className="table-wrap">
             <table>
               <thead>
-                <jaDigitados>
+                <tr>
                   <th>Origem</th>
                   <th className="num">Leads</th>
                   <th className="num">Clientes</th>
                   <th className="num">Perdidos</th>
                   <th className="num">Conversão</th>
-                </jaDigitados>
+                </tr>
               </thead>
               <tbody>
                 {a.origem.map((m) => (
-                  <jaDigitados>
+                  <tr>
                     <td>{m.origem}</td>
                     <td className="num">{m.total}</td>
                     <td className="num">{m.clientes}</td>
@@ -314,7 +314,7 @@ export function CrmPainel() {
                         {Lo(m.conversaoPct)}
                       </b>
                     </td>
-                  </jaDigitados>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -445,21 +445,21 @@ export function CrmPainel() {
               <div className="table-wrap">
                 <table>
                   <thead>
-                    <jaDigitados>
+                    <tr>
                       <th>Lead</th>
                       <th>Tarefa</th>
                       <th>Quando</th>
                       <th>Status</th>
-                    </jaDigitados>
+                    </tr>
                   </thead>
                   <tbody>
                     {a.atividades.lista.map((m) => (
-                      <jaDigitados>
+                      <tr>
                         <td>{m.lead}</td>
                         <td>{Rh[m.tipo] ?? m.tipo}</td>
                         <td>{m.quando}</td>
                         <td>{m.status}</td>
-                      </jaDigitados>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
@@ -480,19 +480,19 @@ export function CrmPainel() {
           <div className="table-wrap">
             <table>
               <thead>
-                <jaDigitados>
+                <tr>
                   <th>Cliente</th>
                   <th>Plano de interesse</th>
                   <th>Atualizado</th>
-                </jaDigitados>
+                </tr>
               </thead>
               <tbody>
                 {a.clientesAtivos.map((m) => (
-                  <jaDigitados>
+                  <tr>
                     <td>{m.nome}</td>
                     <td>{m.plano ?? "\u2014"}</td>
                     <td>{m.desde ? new Date(m.desde).toLocaleDateString("pt-BR") : "\u2014"}</td>
-                  </jaDigitados>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -522,18 +522,18 @@ export function ListaLeads({ itens: e, vazio: a, legenda: t }) {
       <div className="table-wrap">
         <table>
           <thead>
-            <jaDigitados>
+            <tr>
               <th>Lead</th>
               <th>Etapa</th>
               <th>Temperatura</th>
               <th className="num">Sem contato</th>
               <th>Próxima ação</th>
               <th>Plano</th>
-            </jaDigitados>
+            </tr>
           </thead>
           <tbody>
             {e.map((r) => (
-              <jaDigitados>
+              <tr>
                 <td>
                   {r.nome}
                   <em className="tag">{_u[r.tipo ?? ""] ?? r.tipo ?? "\u2014"}</em>
@@ -557,7 +557,7 @@ export function ListaLeads({ itens: e, vazio: a, legenda: t }) {
                   {r.plano ?? "\u2014"}
                   {r.profissionais ? ` \xB7 ${r.profissionais} prof.` : ""}
                 </td>
-              </jaDigitados>
+              </tr>
             ))}
           </tbody>
         </table>
