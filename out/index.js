@@ -1228,8 +1228,8 @@ function respond(input, v) {
     return { text: `${by("conectado").length} integra\xE7\xF5es ligadas, ${by("pronto").length} com credencial pronta esperando o Worker, ${by("manual").length} manual e ${by("pendente").length} pendentes${pendentes ? ` (${pendentes})` : ""}. As que travam mais agentes s\xE3o Plataforma e Supabase.` };
   }
   if (/(custo|gasto|token|\bia\b)/.test(q)) {
-    const dia4 = Object.values(v.runtime).reduce((n3, r) => n3 + r.costBrl, 0);
-    return { text: `Hoje os agentes custaram ${brl(dia4)}. No m\xEAs: ${brl(M.llmSpentMonthBrl)} de ${brl(M.llmCapMonthlyBrl)} de teto, ${Math.round(M.llmSpentMonthBrl / M.llmCapMonthlyBrl * 100)}% usado.` };
+    const dia5 = Object.values(v.runtime).reduce((n3, r) => n3 + r.costBrl, 0);
+    return { text: `Hoje os agentes custaram ${brl(dia5)}. No m\xEAs: ${brl(M.llmSpentMonthBrl)} de ${brl(M.llmCapMonthlyBrl)} de teto, ${Math.round(M.llmSpentMonthBrl / M.llmCapMonthlyBrl * 100)}% usado.` };
   }
   if (/(fila|aprova|pendente|propost|decis)/.test(q)) {
     if (pending.length === 0) return { text: "Fila vazia. Nada espera por voc\xEA." };
@@ -1486,8 +1486,8 @@ function stripeToRow(sub) {
     status: sub.status
   };
 }
-function isActive(row2) {
-  return ACTIVE.has(row2.status);
+function isActive(row3) {
+  return ACTIVE.has(row3.status);
 }
 function mrrBySource(rows2) {
   const bySource = {
@@ -1681,6 +1681,24 @@ create table if not exists instagram_daily (
   day text not null, ig_id text not null, followers integer, reach integer, profile_views integer,
   updated_at integer not null, primary key (day, ig_id)
 );
+create table if not exists ig_post_metricas (
+  media_id text primary key, tipo text, publicado text, permalink text, legenda text,
+  curtidas integer, comentarios integer, alcance integer, salvos integer, compartilhados integer, views integer, interacoes integer,
+  atualizado_em integer not null
+);
+create table if not exists meta_ad_dia (
+  day text not null, ad_id text not null, ad_name text not null, adset_id text not null, adset_name text not null, campaign_id text not null, campaign_name text not null,
+  spend real not null, impressions integer not null, reach integer not null, clicks integer not null, link_clicks integer not null, leads integer not null,
+  updated_at integer not null, primary key (day, ad_id)
+);
+create table if not exists meta_criativo (
+  ad_id text primary key, nome text not null, status text not null, criado text, campanha text, conjunto text,
+  miniatura text, imagem text, texto text, titulo text, cta text, link_ig text, atualizado_em integer not null
+);
+create table if not exists meta_pixel (pixel_id text primary key, nome text not null, ultimo_disparo text, indisponivel integer not null default 0, atualizado_em integer not null);
+create table if not exists meta_pixel_dia (day text not null, pixel_id text not null, evento text not null, total integer not null, primary key (day, pixel_id, evento));
+create table if not exists meta_quebra_dia (day text not null, tipo text not null, chave text not null, spend real not null, impressions integer not null, clicks integer not null, leads integer not null, primary key (day, tipo, chave));
+create table if not exists ig_dia (day text primary key, reach integer, profile_views integer, link_taps integer, interacoes integer, novos integer, updated_at integer not null);
 create table if not exists deliverables (
   id integer primary key autoincrement,
   run_id integer,
@@ -1747,6 +1765,8 @@ create table if not exists gsc_agg (site text not null, tipo text not null, peri
 create table if not exists gsc_pagina_dia (site text not null, pagina text not null, dia text not null, clicks integer not null, impressions integer not null, position real not null, primary key (site, pagina, dia));
 create table if not exists ga_dia (site text not null, dia text not null, sessoes integer not null, usuarios integer not null, novos integer not null, engajadas integer not null, views integer not null, seg real not null, eventos integer not null, primary key (site, dia));
 create table if not exists ga_agg (site text not null, tipo text not null, periodo text not null, chave text not null, chave2 text not null default '', sessoes integer not null, usuarios integer not null, novos integer not null, engajadas integer not null, views integer not null, seg real not null, eventos integer not null, primary key (site, tipo, periodo, chave, chave2));
+create table if not exists li_posts (id text primary key, chave text unique, status text not null, categoria text not null, texto text not null, criado_em integer not null, decidido_em integer, publicado_em integer, manual integer not null default 0, urn text, permalink text, erro text);
+create table if not exists li_token (id integer primary key check (id = 1), access_token text not null, refresh_token text, expira_em integer not null, atualizado_em integer not null);
 create table if not exists ig_posts (id text primary key, chave text unique, status text not null, tema text not null, pilar text not null default '', maturidade text not null default 'educativo', legenda text not null, textos text not null default '', creditos text not null default '', agendado_para integer not null, criado_em integer not null, decidido_em integer, publicado_em integer, media_id text, permalink text, erro text);
 create table if not exists ig_midia (id text primary key, post_id text not null, ordem integer not null, b64 text not null);
 create index if not exists ig_midia_post on ig_midia (post_id, ordem);
@@ -2746,7 +2766,7 @@ var CrmClient = class {
         if (res.ok) return { body, rate, etag: res.headers.get("etag") ?? void 0 };
         const requestId = typeof body.request_id === "string" ? body.request_id : void 0;
         const code = String(body.error?.code ?? `http_${res.status}`);
-        const msg = String(body.error?.message ?? "");
+        const msg2 = String(body.error?.message ?? "");
         const campos = Array.isArray(body.error?.details) ? body.error.details.map((d) => String(d?.field ?? d?.path ?? "")).filter(Boolean).slice(0, 8).join(", ") : "";
         if (res.status === 429) {
           const wait = num(res.headers.get("retry-after")) ?? 1;
@@ -2762,7 +2782,7 @@ var CrmClient = class {
           await this.sleep(250 * 3 ** (attempt - 1) + Math.floor(Math.random() * 100));
           continue;
         }
-        throw new CrmError(res.status, code, explain(res.status, msg, campos), requestId);
+        throw new CrmError(res.status, code, explain(res.status, msg2, campos), requestId);
       }
       if (netErr && attempt < this.maxRetries) {
         attempt++;
@@ -2855,8 +2875,8 @@ var CrmClient = class {
   }
   deleteMeeting = (id, o) => this.excluir(`/meetings/${encodeURIComponent(id)}`, "delete-meeting", o);
 };
-function explain(status, msg, campos = "") {
-  const m = msg ? ` (${msg.slice(0, 160)})` : "";
+function explain(status, msg2, campos = "") {
+  const m = msg2 ? ` (${msg2.slice(0, 160)})` : "";
   const c2 = campos ? ` Campos: ${campos}.` : "";
   switch (status) {
     case 400:
@@ -3068,10 +3088,10 @@ async function sendApproved(brain2, env, proposalId, f = fetch) {
     const hoje = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and e.at > ? and pr.kind like 'prospeccao%'", brain2.clock() - DAY)?.n ?? 0;
     if (hoje >= cap2) throw new BrainError("invalid", `Limite de ${cap2} e-mails de prospec\xE7\xE3o por dia atingido. Ele sobe aos poucos para proteger o dom\xEDnio novo.`);
   }
-  const msg = e.tipo === "email" ? await sendEmail(brain2, env, { id: p.id, to: e.para ?? "", subject: e.assunto ?? "", body: p.draft, prospeccao: prosp }, f) : await publishInstagram(brain2, env, { id: p.id, imageUrl: e.imagemUrl ?? "", caption: p.draft }, f);
+  const msg2 = e.tipo === "email" ? await sendEmail(brain2, env, { id: p.id, to: e.para ?? "", subject: e.assunto ?? "", body: p.draft, prospeccao: prosp }, f) : await publishInstagram(brain2, env, { id: p.id, imageUrl: e.imagemUrl ?? "", caption: p.draft }, f);
   brain2.audit("voce", "enviou", `${e.tipo}:${p.id}`);
   brain2.emit("change");
-  return msg;
+  return msg2;
 }
 
 // packages/core/src/integrations.ts
@@ -3198,7 +3218,7 @@ async function fetchAdsInsights(version, adAccountId, token, days = 7) {
   const first = await graphGet(
     version,
     `${acct}/insights`,
-    { level: "campaign", time_increment: "1", date_preset: days <= 7 ? "last_7d" : "last_30d", fields: "campaign_id,campaign_name,account_currency,spend,impressions,clicks,actions", limit: "200" },
+    { level: "campaign", time_increment: "1", ...days > 30 ? { time_range: JSON.stringify({ since: new Date(Date.now() - days * 864e5).toISOString().slice(0, 10), until: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) }) } : { date_preset: days <= 7 ? "last_7d" : "last_30d" }, fields: "campaign_id,campaign_name,account_currency,spend,impressions,clicks,actions", limit: "200" },
     token
   );
   rows2.push(...parseAdsInsights(acct, first.data));
@@ -3238,6 +3258,147 @@ async function fetchIgFollowerSeries(version, igId, token, days = 14, now = /* @
   const r = await graphGet(version, `${igId}/insights`, { metric: "follower_count", period: "day", since: String(since2), until: String(until) }, token);
   const m = r.data.find((x) => x.name === "follower_count");
   return (m?.values ?? []).map((v) => ({ day: v.end_time.slice(0, 10), novos: v.value }));
+}
+async function fetchIgPostMetricas(version, igId, token, limit = 30) {
+  const base = await fetchIgPosts(version, igId, token, limit);
+  const erros = [];
+  const posts = [];
+  for (const p of base) {
+    let m = {};
+    for (const metricas of ["reach,saved,shares,total_interactions,views", "reach,saved,shares,total_interactions", "reach,saved"]) {
+      try {
+        const r = await graphGet(version, `${p.id}/insights`, { metric: metricas }, token);
+        m = Object.fromEntries(r.data.map((d) => [d.name, d.values?.[0]?.value ?? d.total_value?.value ?? 0]));
+        break;
+      } catch (e) {
+        if (metricas === "reach,saved") erros.push(`${p.id}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    posts.push({ id: p.id, tipo: p.tipo, publicado: p.data, link: p.link, legenda: p.legenda, curtidas: p.curtidas, comentarios: p.comentarios, alcance: m.reach ?? null, salvos: m.saved ?? null, compartilhados: m.shares ?? null, views: m.views ?? null, interacoes: m.total_interactions ?? null });
+  }
+  return { posts, erros };
+}
+var ACT = (id) => id.startsWith("act_") ? id : `act_${id}`;
+var dia = (ms2) => new Date(ms2 - 3 * 36e5).toISOString().slice(0, 10);
+var leadsDe = (actions) => Math.max(0, ...(actions ?? []).filter((a) => LEAD_TYPES.has(a.action_type)).map((a) => Number(a.value) || 0));
+async function paginar(primeira, token, max = 40) {
+  const out = [...primeira.data];
+  let next = primeira.paging?.next ?? null;
+  for (let i = 0; next && i < max; i++) {
+    const res = await fetch(next, { headers: { authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`meta pagina\xE7\xE3o: ${res.status}`);
+    const p = await res.json();
+    out.push(...p.data);
+    next = p.paging?.next ?? null;
+  }
+  return out;
+}
+async function fetchAdDia(version, adAccountId, token, de, ate) {
+  const primeira = await graphGet(
+    version,
+    `${ACT(adAccountId)}/insights`,
+    { level: "ad", time_increment: "1", time_range: JSON.stringify({ since: de, until: ate }), fields: "ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,spend,impressions,reach,clicks,inline_link_clicks,actions", limit: "500" },
+    token
+  );
+  const todos = await paginar(primeira, token);
+  return todos.map((r) => ({
+    day: String(r.date_start),
+    ad_id: String(r.ad_id),
+    ad_name: String(r.ad_name ?? ""),
+    adset_id: String(r.adset_id ?? ""),
+    adset_name: String(r.adset_name ?? ""),
+    campaign_id: String(r.campaign_id ?? ""),
+    campaign_name: String(r.campaign_name ?? ""),
+    spend: Number(r.spend ?? 0),
+    impressions: Number(r.impressions ?? 0),
+    reach: Number(r.reach ?? 0),
+    clicks: Number(r.clicks ?? 0),
+    link_clicks: Number(r.inline_link_clicks ?? 0),
+    leads: leadsDe(r.actions)
+  }));
+}
+async function fetchCriativos(version, adAccountId, token) {
+  const primeira = await graphGet(
+    version,
+    `${ACT(adAccountId)}/ads`,
+    { fields: "id,name,effective_status,created_time,campaign{name},adset{name},creative.thumbnail_width(480).thumbnail_height(480){thumbnail_url,image_url,body,title,call_to_action_type,instagram_permalink_url}", limit: "100" },
+    token
+  );
+  const todos = await paginar(primeira, token, 10);
+  return todos.map((a) => ({
+    ad_id: String(a.id),
+    nome: String(a.name ?? ""),
+    status: String(a.effective_status ?? ""),
+    criado: a.created_time ?? null,
+    campanha: String(a.campaign?.name ?? ""),
+    conjunto: String(a.adset?.name ?? ""),
+    miniatura: a.creative?.thumbnail_url ?? null,
+    imagem: a.creative?.image_url ?? null,
+    texto: a.creative?.body ? String(a.creative.body).slice(0, 600) : null,
+    titulo: a.creative?.title ?? null,
+    cta: a.creative?.call_to_action_type ?? null,
+    link_ig: a.creative?.instagram_permalink_url ?? null
+  }));
+}
+async function fetchPixels(version, adAccountId, token) {
+  const r = await graphGet(version, `${ACT(adAccountId)}/adspixels`, { fields: "id,name,last_fired_time,is_unavailable", limit: "25" }, token);
+  return r.data.map((p) => ({ pixel_id: p.id, nome: p.name ?? p.id, ultimo_disparo: p.last_fired_time ?? null, indisponivel: p.is_unavailable === true }));
+}
+async function fetchPixelEventos(version, pixelId, token, deMs, ateMs) {
+  const soma2 = /* @__PURE__ */ new Map();
+  for (let ini = deMs; ini < ateMs; ini += 7 * 864e5) {
+    const fim = Math.min(ateMs, ini + 7 * 864e5);
+    const r = await graphGet(
+      version,
+      `${pixelId}/stats`,
+      { aggregation: "event", start_time: String(Math.floor(ini / 1e3)), end_time: String(Math.floor(fim / 1e3)) },
+      token
+    );
+    for (const b of r.data ?? []) for (const e of b.data ?? []) {
+      const k = `${dia(Date.parse(b.start_time))}|${e.value}`;
+      soma2.set(k, (soma2.get(k) ?? 0) + (Number(e.count) || 0));
+    }
+  }
+  return [...soma2.entries()].map(([k, total]) => {
+    const [day, evento] = k.split("|");
+    return { day, evento, total };
+  });
+}
+var QUEBRAS = [
+  { tipo: "posicionamento", breakdowns: "publisher_platform,platform_position", chave: (r) => `${r.publisher_platform ?? "?"} \xB7 ${r.platform_position ?? "?"}` },
+  { tipo: "idade_genero", breakdowns: "age,gender", chave: (r) => `${r.age ?? "?"} \xB7 ${r.gender === "female" ? "mulheres" : r.gender === "male" ? "homens" : "n/i"}` },
+  { tipo: "dispositivo", breakdowns: "device_platform", chave: (r) => r.device_platform ?? "?" }
+];
+async function fetchQuebras(version, adAccountId, token, de, ate) {
+  const linhas = [];
+  const erros = [];
+  for (const q of QUEBRAS) {
+    try {
+      const primeira = await graphGet(
+        version,
+        `${ACT(adAccountId)}/insights`,
+        { level: "account", time_increment: "1", breakdowns: q.breakdowns, time_range: JSON.stringify({ since: de, until: ate }), fields: "spend,impressions,clicks,actions", limit: "500" },
+        token
+      );
+      for (const r of await paginar(primeira, token, 20)) linhas.push({ day: String(r.date_start), tipo: q.tipo, chave: q.chave(r), spend: Number(r.spend ?? 0), impressions: Number(r.impressions ?? 0), clicks: Number(r.clicks ?? 0), leads: leadsDe(r.actions) });
+    } catch (e) {
+      erros.push(`${q.tipo}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { linhas, erros };
+}
+async function fetchIgDia(version, igId, token, day) {
+  const ini = Math.floor(Date.parse(`${day}T00:00:00-03:00`) / 1e3);
+  const get2 = async (metric) => {
+    try {
+      const r = await graphGet(version, `${igId}/insights`, { metric, period: "day", metric_type: "total_value", since: String(ini), until: String(ini + 86400) }, token);
+      return r.data[0]?.total_value?.value ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const [reach, profile_views, link_taps, interacoes] = await Promise.all([get2("reach"), get2("profile_views"), get2("profile_links_taps"), get2("total_interactions")]);
+  return { day, reach, profile_views, link_taps, interacoes };
 }
 
 // packages/core/src/data.ts
@@ -3353,6 +3514,29 @@ async function refreshInstagram(brain2, env, dias = 30) {
   await syncIg(brain2, env, now).catch((e) => avisos.push(`Seguidores: ${e instanceof Error ? e.message : String(e)}`));
   const posts = await fetchIgPosts(version, igId, token, 12).catch((e) => (avisos.push(`Posts: ${e instanceof Error ? e.message : String(e)}`), null));
   if (posts) brain2.setPolicy("cache_ig_posts", { at: now, posts });
+  const met = await fetchIgPostMetricas(version, igId, token, 30).catch((e) => (avisos.push(`M\xE9tricas por post: ${e instanceof Error ? e.message : String(e)}`), null));
+  if (met) {
+    for (const p of met.posts)
+      run(
+        brain2.db,
+        `insert into ig_post_metricas (media_id, tipo, publicado, permalink, legenda, curtidas, comentarios, alcance, salvos, compartilhados, views, interacoes, atualizado_em) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        on conflict(media_id) do update set tipo = excluded.tipo, permalink = excluded.permalink, legenda = excluded.legenda, curtidas = excluded.curtidas, comentarios = excluded.comentarios, alcance = excluded.alcance, salvos = excluded.salvos, compartilhados = excluded.compartilhados, views = excluded.views, interacoes = excluded.interacoes, atualizado_em = excluded.atualizado_em`,
+        p.id,
+        p.tipo,
+        p.publicado,
+        p.link,
+        p.legenda,
+        p.curtidas,
+        p.comentarios,
+        p.alcance,
+        p.salvos,
+        p.compartilhados,
+        p.views,
+        p.interacoes,
+        now
+      );
+    if (met.erros.length) avisos.push(`M\xE9tricas de ${met.erros.length} post(s) indispon\xEDveis: ${met.erros[0]}`);
+  }
   const novos = await fetchIgFollowerSeries(version, igId, token, Math.min(dias, 30), new Date(now)).catch((e) => (avisos.push(`Seguidores por dia: ${e instanceof Error ? e.message : String(e)}`), null));
   if (novos) brain2.setPolicy("cache_ig_novos", { at: now, novos });
   return avisos;
@@ -3481,10 +3665,605 @@ function dashboardData(brain2) {
 }
 async function refreshDados(brain2, env) {
   const avisos = [];
-  await syncAds(brain2, env, brain2.clock(), 30).catch((e) => avisos.push(`An\xFAncios: ${e instanceof Error ? e.message : String(e)}`));
+  await syncAds(brain2, env, brain2.clock(), 60).catch((e) => avisos.push(`An\xFAncios: ${e instanceof Error ? e.message : String(e)}`));
   avisos.push(...await refreshInstagram(brain2, env, 30));
   brain2.emit("change");
   return avisos;
+}
+
+// packages/core/src/midia-sync.ts
+var msg = (e) => e instanceof Error ? e.message : String(e);
+function explicar(parte, e) {
+  const m = msg(e);
+  if (/: 4(00|03)\b|permission|OAuth/i.test(m)) return `${m}. O token da Meta provavelmente n\xE3o tem a permiss\xE3o necess\xE1ria para ${parte}: confira ads_read (an\xFAncios e pixel) e instagram_manage_insights (Instagram) no usu\xE1rio de sistema.`;
+  return m;
+}
+async function sincronizarMidia(brain2, env, opts = {}) {
+  const out = [];
+  const token = env.META_SYSTEM_USER_TOKEN;
+  if (!token) return [{ parte: "Meta", ok: false, erro: "Falta META_SYSTEM_USER_TOKEN nos secrets." }];
+  const version = env.META_GRAPH_VERSION ?? "v23.0";
+  const acct = env.META_AD_ACCOUNT_ID;
+  const igId = env.META_IG_ID;
+  const now = brain2.clock();
+  const dias = Math.min(Math.max(opts.dias ?? 90, 7), 400);
+  const de = brtDay(now - dias * 864e5), ate = brtDay(now);
+  const parte = async (nome, fn) => {
+    try {
+      out.push({ parte: nome, ok: true, linhas: await fn() });
+    } catch (e) {
+      out.push({ parte: nome, ok: false, erro: explicar(nome.toLowerCase(), e) });
+    }
+  };
+  if (acct) {
+    await parte("An\xFAncios por criativo", async () => {
+      const ads = await fetchAdDia(version, acct, token, de, ate);
+      for (const r of ads)
+        run(
+          brain2.db,
+          `insert into meta_ad_dia (day, ad_id, ad_name, adset_id, adset_name, campaign_id, campaign_name, spend, impressions, reach, clicks, link_clicks, leads, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          on conflict(day, ad_id) do update set ad_name = excluded.ad_name, adset_name = excluded.adset_name, campaign_name = excluded.campaign_name, spend = excluded.spend, impressions = excluded.impressions, reach = excluded.reach, clicks = excluded.clicks, link_clicks = excluded.link_clicks, leads = excluded.leads, updated_at = excluded.updated_at`,
+          r.day,
+          r.ad_id,
+          r.ad_name,
+          r.adset_id,
+          r.adset_name,
+          r.campaign_id,
+          r.campaign_name,
+          r.spend,
+          r.impressions,
+          r.reach,
+          r.clicks,
+          r.link_clicks,
+          r.leads,
+          now
+        );
+      return ads.length;
+    });
+    await parte("Criativos", async () => {
+      const cs = await fetchCriativos(version, acct, token);
+      for (const c2 of cs)
+        run(
+          brain2.db,
+          `insert into meta_criativo (ad_id, nome, status, criado, campanha, conjunto, miniatura, imagem, texto, titulo, cta, link_ig, atualizado_em) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          on conflict(ad_id) do update set nome = excluded.nome, status = excluded.status, campanha = excluded.campanha, conjunto = excluded.conjunto, miniatura = excluded.miniatura, imagem = excluded.imagem, texto = excluded.texto, titulo = excluded.titulo, cta = excluded.cta, link_ig = excluded.link_ig, atualizado_em = excluded.atualizado_em`,
+          c2.ad_id,
+          c2.nome,
+          c2.status,
+          c2.criado,
+          c2.campanha,
+          c2.conjunto,
+          c2.miniatura,
+          c2.imagem,
+          c2.texto,
+          c2.titulo,
+          c2.cta,
+          c2.link_ig,
+          now
+        );
+      return cs.length;
+    });
+    await parte("Pixel", async () => {
+      const px = await fetchPixels(version, acct, token);
+      let n3 = 0;
+      for (const p of px.slice(0, 5)) {
+        run(brain2.db, `insert into meta_pixel (pixel_id, nome, ultimo_disparo, indisponivel, atualizado_em) values (?, ?, ?, ?, ?) on conflict(pixel_id) do update set nome = excluded.nome, ultimo_disparo = excluded.ultimo_disparo, indisponivel = excluded.indisponivel, atualizado_em = excluded.atualizado_em`, p.pixel_id, p.nome, p.ultimo_disparo, p.indisponivel ? 1 : 0, now);
+        const ev = await fetchPixelEventos(version, p.pixel_id, token, now - Math.min(dias, 90) * 864e5, now).catch((e) => {
+          throw new Error(`eventos do pixel ${p.nome}: ${msg(e)}`);
+        });
+        for (const e of ev) {
+          run(brain2.db, "insert into meta_pixel_dia (day, pixel_id, evento, total) values (?, ?, ?, ?) on conflict(day, pixel_id, evento) do update set total = excluded.total", e.day, p.pixel_id, e.evento, e.total);
+          n3++;
+        }
+      }
+      return px.length;
+    });
+    await parte("P\xFAblicos e posicionamentos", async () => {
+      const q = await fetchQuebras(version, acct, token, de, ate);
+      for (const r of q.linhas) run(brain2.db, "insert into meta_quebra_dia (day, tipo, chave, spend, impressions, clicks, leads) values (?, ?, ?, ?, ?, ?, ?) on conflict(day, tipo, chave) do update set spend = excluded.spend, impressions = excluded.impressions, clicks = excluded.clicks, leads = excluded.leads", r.day, r.tipo, r.chave, r.spend, r.impressions, r.clicks, r.leads);
+      if (q.erros.length && !q.linhas.length) throw new Error(q.erros[0]);
+      return q.linhas.length;
+    });
+  } else out.push({ parte: "An\xFAncios", ok: false, erro: "Falta META_AD_ACCOUNT_ID nos secrets." });
+  if (igId) {
+    await parte("Instagram por dia", async () => {
+      const tem = new Set(rows(brain2.db, "select day from ig_dia where reach is not null").map((r) => r.day));
+      let n3 = 0;
+      for (let i = 1; i <= 30; i++) {
+        const d = brtDay(now - i * 864e5);
+        if (i > 3 && tem.has(d)) continue;
+        const r = await fetchIgDia(version, igId, token, d);
+        run(brain2.db, "insert into ig_dia (day, reach, profile_views, link_taps, interacoes, novos, updated_at) values (?, ?, ?, ?, ?, null, ?) on conflict(day) do update set reach = excluded.reach, profile_views = excluded.profile_views, link_taps = excluded.link_taps, interacoes = excluded.interacoes, updated_at = excluded.updated_at", r.day, r.reach, r.profile_views, r.link_taps, r.interacoes, now);
+        n3++;
+      }
+      const novos = brain2.policy("cache_ig_novos", null)?.novos ?? [];
+      for (const v of novos) run(brain2.db, "insert into ig_dia (day, novos, updated_at) values (?, ?, ?) on conflict(day) do update set novos = excluded.novos", v.day, v.novos, now);
+      return n3;
+    });
+  }
+  brain2.setPolicy("midia_diagnostico", { at: now, itens: out });
+  brain2.emit("change");
+  return out;
+}
+
+// packages/core/src/midia.ts
+var r22 = (n3) => Math.round(n3 * 100) / 100;
+var r1 = (n3) => Math.round(n3 * 10) / 10;
+var mediana = (xs) => {
+  const o = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(o.length / 2);
+  return o.length ? o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2 : 0;
+};
+var media = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+var DIAS = ["domingo", "segunda", "ter\xE7a", "quarta", "quinta", "sexta", "s\xE1bado"];
+var brl2 = (n3) => `R$ ${n3.toFixed(2).replace(".", ",")}`;
+var AMOSTRA_MIN = 3;
+var PREMISSAS_PADRAO = { conversaoLeadCliente: 0.1, retencaoMeses: 12, razaoLtvCac: 3 };
+function lerPremissas(brain2) {
+  const p = brain2.policy("midia_premissas", {});
+  return {
+    conversaoLeadCliente: num2(p.conversaoLeadCliente, PREMISSAS_PADRAO.conversaoLeadCliente, 5e-3, 1),
+    retencaoMeses: num2(p.retencaoMeses, PREMISSAS_PADRAO.retencaoMeses, 1, 120),
+    razaoLtvCac: num2(p.razaoLtvCac, PREMISSAS_PADRAO.razaoLtvCac, 1, 20)
+  };
+}
+var num2 = (v, padrao, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max ? v : padrao;
+function salvarPremissas(brain2, entrada) {
+  const atual = lerPremissas(brain2);
+  const novo = {
+    conversaoLeadCliente: num2(entrada.conversaoLeadCliente, atual.conversaoLeadCliente, 5e-3, 1),
+    retencaoMeses: num2(entrada.retencaoMeses, atual.retencaoMeses, 1, 120),
+    razaoLtvCac: num2(entrada.razaoLtvCac, atual.razaoLtvCac, 1, 20)
+  };
+  brain2.setPolicy("midia_premissas", novo);
+  brain2.audit("voce", "midia_premissas", "premissas de an\xFAncio", novo);
+  return novo;
+}
+var somaDias = (d, n3) => new Date(Date.parse(`${d}T12:00:00Z`) + n3 * 864e5).toISOString().slice(0, 10);
+var difDias = (a, b) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 864e5);
+var dataValida = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+function periodoDe(brain2, de, ate) {
+  const hoje = brtDay(brain2.clock());
+  let fim = dataValida(ate) ? ate > hoje ? hoje : ate : hoje;
+  let ini = dataValida(de) ? de : somaDias(fim, -29);
+  if (ini > fim) [ini, fim] = [fim, ini];
+  if (difDias(ini, fim) > 400) ini = somaDias(fim, -400);
+  const dias = difDias(ini, fim) + 1;
+  return { de: ini, ate: fim, dias, anterior: { de: somaDias(ini, -dias), ate: somaDias(ini, -1) } };
+}
+var formato = (t) => t === "CAROUSEL_ALBUM" ? "Carrossel" : t === "VIDEO" || t === "REELS" ? "Reel" : t === "IMAGE" ? "Imagem" : t ?? "Outro";
+function grupo(posts, chave2) {
+  const m = /* @__PURE__ */ new Map();
+  for (const p of posts) m.set(chave2(p), [...m.get(chave2(p)) ?? [], p]);
+  return [...m.entries()].map(([nome, ps]) => ({
+    nome,
+    posts: ps.length,
+    alcance_medio: Math.round(media(ps.map((p) => p.alcance)) ?? 0),
+    salvos_medio: r1(media(ps.map((p) => p.salvos)) ?? 0),
+    compartilhados_medio: r1(media(ps.map((p) => p.compartilhados)) ?? 0),
+    interacao_pct: r1((media(ps.map((p) => p.taxaInteracao)) ?? 0) * 100)
+  })).sort((a, b) => b.alcance_medio - a.alcance_medio);
+}
+function analiseInstagram(brain2, per = periodoDe(brain2)) {
+  const now = brain2.clock();
+  const seg = rows(brain2.db, "select day, followers from instagram_daily order by day");
+  const seguidores = seg.at(-1)?.followers ?? null;
+  const brutos = rows(
+    brain2.db,
+    `select m.media_id, m.tipo, m.publicado, m.permalink, m.legenda, m.curtidas, m.comentarios, m.alcance, m.salvos, m.compartilhados, m.views, m.interacoes, p.tema, p.pilar
+     from ig_post_metricas m left join ig_posts p on p.media_id = m.media_id order by m.publicado desc`
+  );
+  const comMetrica = brutos.filter((p) => p.alcance !== null);
+  const posts = comMetrica.map((p) => {
+    const alcance = p.alcance ?? 0;
+    const interacoesN = p.interacoes ?? (p.curtidas ?? 0) + (p.comentarios ?? 0) + (p.salvos ?? 0) + (p.compartilhados ?? 0);
+    const dia5 = p.publicado ? brtDay(Date.parse(p.publicado)) : "";
+    return {
+      ...p,
+      alcance,
+      salvos: p.salvos ?? 0,
+      compartilhados: p.compartilhados ?? 0,
+      interacoesN,
+      taxaInteracao: alcance ? interacoesN / alcance : 0,
+      taxaSalvo: alcance ? (p.salvos ?? 0) / alcance : 0,
+      dia: dia5,
+      diaSemana: dia5 ? (/* @__PURE__ */ new Date(`${dia5}T12:00:00-03:00`)).getDay() : 0,
+      formato: formato(p.tipo),
+      tituloCurto: (p.legenda ?? "").replace(/\s+/g, " ").slice(0, 70)
+    };
+  });
+  const noPeriodo = posts.filter((p) => p.dia >= per.de && p.dia <= per.ate);
+  const leitura = [];
+  const dias14 = brtDay(now - 14 * 864e5);
+  const recentes14 = posts.filter((p) => p.dia >= dias14).length;
+  const dd = rows(
+    brain2.db,
+    "select day, reach, profile_views, link_taps, interacoes, novos from ig_dia where day >= ? and day <= ? order by day",
+    per.de,
+    per.ate
+  );
+  const ddAnt = rows(
+    brain2.db,
+    "select day, reach, profile_views, link_taps, novos from ig_dia where day >= ? and day <= ?",
+    per.anterior.de,
+    per.anterior.ate
+  );
+  const soma2 = (xs) => xs.reduce((n3, v) => n3 + (v ?? 0), 0);
+  const temDia = (k) => dd.some((r) => r[k] !== null);
+  const segPeriodo = seg.filter((r) => r.day >= per.de && r.day <= per.ate && r.followers !== null);
+  const segIni = segPeriodo[0]?.followers ?? null, segFim = segPeriodo.at(-1)?.followers ?? null;
+  const visitas = temDia("profile_views") ? soma2(dd.map((r) => r.profile_views)) : null;
+  const toques = temDia("link_taps") ? soma2(dd.map((r) => r.link_taps)) : null;
+  const liquido = (de, ate) => {
+    const ls = seg.filter((r) => r.day >= de && r.day <= ate && r.followers !== null);
+    return ls.length >= 2 ? ls.at(-1).followers - ls[0].followers : null;
+  };
+  const novos = temDia("novos") ? soma2(dd.map((r) => r.novos)) : liquido(per.de, per.ate);
+  const novosAnt = ddAnt.some((r) => r.novos !== null) ? soma2(ddAnt.map((r) => r.novos)) : liquido(per.anterior.de, per.anterior.ate);
+  if (!posts.length) {
+    leitura.push({ nivel: "atencao", titulo: "Ainda n\xE3o tenho m\xE9tricas por post", detalhe: "Toque em \u201CAtualizar dados\u201D. Se continuar vazio, o token da Meta precisa da permiss\xE3o instagram_manage_insights." });
+  } else {
+    const porFormato = grupo(posts, (p) => p.formato);
+    const validos = porFormato.filter((g) => g.posts >= AMOSTRA_MIN);
+    if (validos.length >= 2) {
+      const melhor = validos[0], resto = validos.slice(1);
+      const pior = resto.at(-1);
+      if (pior.alcance_medio > 0 && melhor.alcance_medio / pior.alcance_medio >= 1.3)
+        leitura.push({ nivel: "fazer", titulo: `Priorize ${melhor.nome.toLowerCase()}`, detalhe: `Alcan\xE7a ${Math.round(melhor.alcance_medio)} pessoas por post, ${r1(melhor.alcance_medio / pior.alcance_medio)}\xD7 mais que ${pior.nome.toLowerCase()} (${pior.alcance_medio}). Base: ${melhor.posts} e ${pior.posts} posts.` });
+    } else if (porFormato.length >= 2) {
+      leitura.push({ nivel: "ok", titulo: "Formatos ainda sem amostra para comparar", detalhe: `Preciso de pelo menos ${AMOSTRA_MIN} posts de cada formato. Hoje: ${porFormato.map((g) => `${g.nome} ${g.posts}`).join(", ")}.` });
+    }
+    const porTema = grupo(posts.filter((p) => p.pilar), (p) => p.pilar).filter((g) => g.posts >= 2);
+    if (porTema.length >= 2) {
+      const t1 = porTema[0], resto = porTema.slice(1);
+      const tn = resto.at(-1);
+      if (t1.salvos_medio > tn.salvos_medio)
+        leitura.push({ nivel: "fazer", titulo: `Pilar que mais salva: ${t1.nome}`, detalhe: `${t1.salvos_medio} salvamentos por post contra ${tn.salvos_medio} em \u201C${tn.nome}\u201D. Salvar \xE9 o sinal mais forte de conte\xFAdo \xFAtil: repita o \xE2ngulo.` });
+    }
+    const porDia = grupo(posts.filter((p) => p.dia), (p) => DIAS[p.diaSemana] ?? "").filter((g) => g.posts >= 2);
+    if (porDia.length >= 3) {
+      const melhorDia = porDia[0], piorDia = porDia.at(-1);
+      if (piorDia.alcance_medio > 0 && melhorDia.alcance_medio / piorDia.alcance_medio >= 1.4)
+        leitura.push({ nivel: "fazer", titulo: `Poste mais na ${melhorDia.nome}`, detalhe: `Alcance m\xE9dio de ${melhorDia.alcance_medio} contra ${piorDia.alcance_medio} na ${piorDia.nome}.` });
+    }
+    const tipico = mediana(posts.map((p) => p.alcance));
+    const fracos = posts.filter((p) => p.alcance < tipico * 0.5 && p.dia >= brtDay(now - 30 * 864e5));
+    if (fracos.length >= 3)
+      leitura.push({ nivel: "atencao", titulo: `${fracos.length} posts recentes com menos da metade do alcance t\xEDpico`, detalhe: `Alcance t\xEDpico (mediana): ${Math.round(tipico)}. Veja o que eles t\xEAm em comum antes do pr\xF3ximo post: ${fracos.slice(0, 2).map((p) => `\u201C${p.tituloCurto.slice(0, 40)}\u2026\u201D`).join(" e ")}.` });
+    const salvosMed = media(posts.map((p) => p.salvos)) ?? 0, compartMed = media(posts.map((p) => p.compartilhados)) ?? 0;
+    if (posts.length >= 8 && salvosMed < 1 && compartMed < 1)
+      leitura.push({ nivel: "fazer", titulo: "Quase ningu\xE9m salva ou compartilha seus posts", detalhe: `M\xE9dia de ${r1(salvosMed)} salvamentos e ${r1(compartMed)} compartilhamentos por post. A curtida mostra que gostaram, mas o Instagram s\xF3 empurra para quem n\xE3o te segue o que \xE9 salvo e enviado. Termine o post com algo para guardar (checklist, modelo, passo a passo) e pe\xE7a o envio para uma colega.` });
+    if (seguidores) {
+      const alcanceSeg = tipico / seguidores;
+      if (alcanceSeg < 0.5)
+        leitura.push({ nivel: "atencao", titulo: "Seu conte\xFAdo quase s\xF3 alcan\xE7a quem j\xE1 te segue", detalhe: `O alcance t\xEDpico (${Math.round(tipico)}) equivale a ${Math.round(alcanceSeg * 100)}% dos ${seguidores} seguidores. Para crescer, fa\xE7a conte\xFAdo para ser compartilhado e salvo, com gancho para quem ainda n\xE3o te conhece.` });
+    }
+  }
+  if (visitas !== null && toques !== null && visitas >= 50) {
+    const taxa3 = toques / visitas * 100;
+    if (taxa3 < 8)
+      leitura.push({ nivel: "fazer", titulo: `S\xF3 ${r1(taxa3)}% de quem visita o perfil toca no link da bio`, detalhe: `${visitas} visitas ao perfil e ${toques} toques no link no per\xEDodo. Reescreva a bio com uma frase de benef\xEDcio para o psic\xF3logo e uma chamada clara antes do link: \xE9 o passo entre o Instagram e o seu site.` });
+    else leitura.push({ nivel: "ok", titulo: `${r1(taxa3)}% das visitas ao perfil viram toque no link`, detalhe: `${visitas} visitas e ${toques} toques no per\xEDodo.` });
+  }
+  if (recentes14 < 6)
+    leitura.push({ nivel: recentes14 < 3 ? "atencao" : "ok", titulo: `${recentes14} posts nos \xFAltimos 14 dias`, detalhe: recentes14 < 6 ? "Abaixo de 3 por semana. Const\xE2ncia pesa mais no alcance do que acertar o formato perfeito." : "" });
+  if (novos !== null)
+    leitura.push({ nivel: novosAnt !== null && novos < novosAnt ? "atencao" : "ok", titulo: `${novos >= 0 ? "+" : ""}${novos} seguidores no per\xEDodo`, detalhe: novosAnt !== null ? `No per\xEDodo anterior: ${novosAnt >= 0 ? "+" : ""}${novosAnt}.` : "" });
+  const top = [...noPeriodo.length ? noPeriodo : posts].sort((a, b) => b.alcance - a.alcance).slice(0, 3);
+  const fundo = [...noPeriodo.length ? noPeriodo : posts].sort((a, b) => a.alcance - b.alcance).slice(0, 3);
+  const slim = (p) => ({ id: p.media_id, titulo: p.tituloCurto, formato: p.formato, tema: p.tema, pilar: p.pilar, dia: p.dia, link: p.permalink, alcance: p.alcance, salvos: p.salvos, compartilhados: p.compartilhados, curtidas: p.curtidas ?? 0, comentarios: p.comentarios ?? 0, views: p.views, interacao_pct: r1(p.taxaInteracao * 100), salvo_pct: r1(p.taxaSalvo * 100) });
+  const atualizadoEm = row(brain2.db, "select max(atualizado_em) as u from ig_post_metricas")?.u ?? null;
+  return {
+    seguidores,
+    atualizado_em: atualizadoEm ? new Date(atualizadoEm).toISOString() : null,
+    posts_analisados: posts.length,
+    periodo: {
+      posts: noPeriodo.length,
+      alcance_post_medio: noPeriodo.length ? Math.round(media(noPeriodo.map((p) => p.alcance)) ?? 0) : null,
+      salvos: noPeriodo.reduce((n3, p) => n3 + p.salvos, 0),
+      compartilhamentos: noPeriodo.reduce((n3, p) => n3 + p.compartilhados, 0),
+      interacao_pct: noPeriodo.length ? r1((media(noPeriodo.map((p) => p.taxaInteracao)) ?? 0) * 100) : null,
+      seguidores_inicio: segIni,
+      seguidores_fim: segFim,
+      seguidores_novos: novos,
+      seguidores_novos_anterior: novosAnt,
+      visitas_perfil: visitas,
+      visitas_perfil_anterior: ddAnt.some((r) => r.profile_views !== null) ? soma2(ddAnt.map((r) => r.profile_views)) : null,
+      toques_link: toques,
+      toques_link_anterior: ddAnt.some((r) => r.link_taps !== null) ? soma2(ddAnt.map((r) => r.link_taps)) : null,
+      alcance_diario_medio: temDia("reach") ? Math.round(soma2(dd.map((r) => r.reach)) / Math.max(1, dd.filter((r) => r.reach !== null).length)) : null,
+      posts_14d: recentes14
+    },
+    serie: dd.map((r) => ({ day: r.day, alcance: r.reach, visitas: r.profile_views, toques: r.link_taps, novos: r.novos })),
+    seguidores_serie: segPeriodo.map((r) => ({ day: r.day, seguidores: r.followers })),
+    por_formato: grupo(noPeriodo.length >= 3 ? noPeriodo : posts, (p) => p.formato),
+    por_tema: grupo((noPeriodo.length >= 3 ? noPeriodo : posts).filter((p) => p.pilar), (p) => p.pilar),
+    por_dia: grupo((noPeriodo.length >= 3 ? noPeriodo : posts).filter((p) => p.dia), (p) => DIAS[p.diaSemana] ?? ""),
+    melhores: top.map(slim),
+    piores: fundo.map(slim),
+    posts: posts.slice(0, 30).map(slim),
+    leitura
+  };
+}
+function totais(cs) {
+  const t = cs.reduce((a, c2) => ({ spend: a.spend + c2.spend, impressions: a.impressions + c2.impressions, clicks: a.clicks + c2.clicks, leads: a.leads + c2.leads }), { spend: 0, impressions: 0, clicks: 0, leads: 0 });
+  return { gasto: r22(t.spend), impressoes: t.impressions, cliques: t.clicks, leads: t.leads, ctr_pct: t.impressions ? r22(t.clicks / t.impressions * 100) : null, cpc: t.clicks ? r22(t.spend / t.clicks) : null, cpl: t.leads ? r22(t.spend / t.leads) : null, cpm: t.impressions ? r22(t.spend / t.impressions * 1e3) : null };
+}
+var delta = (a, b) => a === null || b === null || b === 0 ? null : r1((a - b) / b * 100);
+function campanhasEm(brain2, de, ate) {
+  const porAnuncio = row(brain2.db, "select count(*) as n from meta_ad_dia").n > 0;
+  if (porAnuncio)
+    return rows(brain2.db, `select campaign_id, campaign_name, sum(spend) as spend, sum(impressions) as impressions, sum(reach) as reach, sum(clicks) as clicks, sum(link_clicks) as link_clicks, sum(leads) as leads, max(case when spend > 0 then day end) as ultimo_dia from meta_ad_dia where day >= ? and day <= ? group by campaign_id, campaign_name order by spend desc`, de, ate);
+  return rows(brain2.db, `select campaign_id, campaign_name, sum(spend) as spend, sum(impressions) as impressions, 0 as reach, sum(clicks) as clicks, sum(clicks) as link_clicks, sum(leads) as leads, max(case when spend > 0 then day end) as ultimo_dia from meta_ads_daily where day >= ? and day <= ? group by campaign_id, campaign_name order by spend desc`, de, ate);
+}
+function economiaDe(brain2) {
+  const premissas = lerPremissas(brain2);
+  const ativos = rows(brain2.db, "select effective_price_brl as preco from subscriptions where status in ('active','trialing','past_due')");
+  const ticket = ativos.length ? ativos.reduce((n3, a) => n3 + a.preco, 0) / ativos.length : null;
+  const ltv = ticket ? ticket * premissas.retencaoMeses : null;
+  const cacMax = ltv ? ltv / premissas.razaoLtvCac : null;
+  const cplMax = cacMax ? cacMax * premissas.conversaoLeadCliente : null;
+  return { premissas, ticket, cplMax, economia: { ticket_medio: ticket ? r22(ticket) : null, ltv: ltv ? r22(ltv) : null, cac_maximo: cacMax ? r22(cacMax) : null, cpl_maximo: cplMax ? r22(cplMax) : null, payback_meses_no_limite: ticket && cacMax ? r1(cacMax / ticket) : null } };
+}
+function veredito(spend, leads, cplMax) {
+  const cpl = leads ? spend / leads : null;
+  if (leads === 0 && spend >= 30) return { veredito: "pausar", motivo: `${brl2(spend)} gastos sem nenhum lead.` };
+  if (cpl !== null && cplMax && leads >= 3) {
+    if (cpl > cplMax) return { veredito: "pausar", motivo: `Lead a ${brl2(cpl)}, acima do limite de ${brl2(cplMax)}.` };
+    if (cpl <= cplMax * 0.6) return { veredito: "escalar", motivo: `Lead a ${brl2(cpl)}, bem abaixo do limite de ${brl2(cplMax)}.` };
+    return { veredito: "manter", motivo: `Lead a ${brl2(cpl)}, dentro do limite de ${brl2(cplMax)}.` };
+  }
+  if (leads > 0 && leads < 3) return { veredito: "cedo", motivo: `${leads} lead(s): poucos para decidir. Deixe chegar a 3.` };
+  return { veredito: "cedo", motivo: "Pouco gasto para concluir algo." };
+}
+function analiseAnuncios(brain2, per = periodoDe(brain2)) {
+  const now = brain2.clock();
+  const atual = campanhasEm(brain2, per.de, per.ate);
+  const anterior = campanhasEm(brain2, per.anterior.de, per.anterior.ate);
+  const tAtual = totais(atual), tAnt = totais(anterior);
+  const { premissas, ticket, cplMax, economia } = economiaDe(brain2);
+  const campanhas = atual.map((c2) => {
+    const v = veredito(c2.spend, c2.leads, cplMax);
+    return {
+      id: c2.campaign_id,
+      nome: c2.campaign_name,
+      gasto: r22(c2.spend),
+      impressoes: c2.impressions,
+      cliques: c2.clicks,
+      leads: c2.leads,
+      ctr_pct: c2.impressions ? r22(c2.clicks / c2.impressions * 100) : null,
+      cpc: c2.clicks ? r22(c2.spend / c2.clicks) : null,
+      cpl: c2.leads ? r22(c2.spend / c2.leads) : null,
+      ultimo_gasto: c2.ultimo_dia,
+      ...v
+    };
+  });
+  const ultimoGasto = row(brain2.db, "select max(d) as d from (select max(day) as d from meta_ads_daily where spend > 0 union all select max(day) from meta_ad_dia where spend > 0)")?.d ?? null;
+  const diasParado = ultimoGasto ? Math.max(0, difDias(ultimoGasto, brtDay(now))) : null;
+  const leitura = [];
+  if (tAtual.gasto === 0) {
+    leitura.push({ nivel: "atencao", titulo: ultimoGasto ? `Sem an\xFAncio rodando h\xE1 ${diasParado} dias` : "Nenhum gasto em an\xFAncios nos dados lidos", detalhe: ultimoGasto ? `\xDAltimo gasto em ${ultimoGasto.slice(8, 10)}/${ultimoGasto.slice(5, 7)}. Todo o crescimento hoje vem do org\xE2nico.` : "Todo o crescimento recente vem do org\xE2nico." });
+    if (cplMax)
+      leitura.push({
+        nivel: "fazer",
+        titulo: `Se for testar an\xFAncio, o teto \xE9 ${brl2(cplMax)} por lead`,
+        detalhe: `Com ticket de ${brl2(ticket)}, ${premissas.retencaoMeses} meses de reten\xE7\xE3o, LTV:CAC de ${premissas.razaoLtvCac}:1 e ${Math.round(premissas.conversaoLeadCliente * 100)}% dos leads virando cliente. Para validar o canal, junte uns 10 leads: no limite isso custa at\xE9 ${brl2(cplMax * 10)}.`
+      });
+  } else {
+    const dgasto = delta(tAtual.gasto, tAnt.gasto), dleads = delta(tAtual.leads, tAnt.leads);
+    if (tAnt.gasto > 0 && dgasto !== null)
+      leitura.push({ nivel: "ok", titulo: `Gasto ${dgasto >= 0 ? "subiu" : "caiu"} ${Math.abs(dgasto)}% e leads ${dleads === null ? "sem base de compara\xE7\xE3o" : `${dleads >= 0 ? "subiram" : "ca\xEDram"} ${Math.abs(dleads)}%`}`, detalhe: "Contra o per\xEDodo anterior de mesmo tamanho." });
+    if (tAtual.cpl && cplMax)
+      leitura.push({ nivel: tAtual.cpl > cplMax ? "atencao" : "ok", titulo: `Custo por lead ${brl2(tAtual.cpl)} (limite ${brl2(cplMax)})`, detalhe: tAtual.cpl > cplMax ? "Acima do limite: cada cliente custa mais do que o que ele devolve. Corte as campanhas piores primeiro." : "Dentro do limite que se paga no tempo de vida do cliente." });
+    for (const c2 of campanhas.filter((x) => x.veredito === "pausar").slice(0, 3)) leitura.push({ nivel: "fazer", titulo: `Pausar \u201C${c2.nome}\u201D`, detalhe: c2.motivo });
+    for (const c2 of campanhas.filter((x) => x.veredito === "escalar").slice(0, 2)) leitura.push({ nivel: "fazer", titulo: `Aumentar verba de \u201C${c2.nome}\u201D`, detalhe: c2.motivo });
+    if (tAtual.leads > 0 && tAtual.cliques > 0) {
+      const cvr = tAtual.leads / tAtual.cliques * 100;
+      if (cvr < 5) leitura.push({ nivel: "atencao", titulo: `S\xF3 ${r1(cvr)}% dos cliques viram lead`, detalhe: "O problema provavelmente est\xE1 depois do an\xFAncio: p\xE1gina de destino ou formul\xE1rio. Mudar o criativo n\xE3o resolve." });
+    }
+  }
+  const porAnuncio = row(brain2.db, "select count(*) as n from meta_ad_dia").n > 0;
+  const porDia = rows(
+    brain2.db,
+    porAnuncio ? "select day, sum(spend) as gasto, sum(clicks) as cliques, sum(leads) as leads, sum(impressions) as impressoes from meta_ad_dia where day >= ? and day <= ? group by day order by day" : "select day, sum(spend) as gasto, sum(clicks) as cliques, sum(leads) as leads, sum(impressions) as impressoes from meta_ads_daily where day >= ? and day <= ? group by day order by day",
+    per.de,
+    per.ate
+  );
+  const atualizado = row(brain2.db, "select max(u) as u from (select max(updated_at) as u from meta_ads_daily union all select max(updated_at) from meta_ad_dia)")?.u ?? null;
+  return {
+    atualizado_em: atualizado ? new Date(atualizado).toISOString() : null,
+    atual: tAtual,
+    anterior: tAnt,
+    variacao: { gasto: delta(tAtual.gasto, tAnt.gasto), leads: delta(tAtual.leads, tAnt.leads), cpl: delta(tAtual.cpl, tAnt.cpl), ctr: delta(tAtual.ctr_pct, tAnt.ctr_pct), cliques: delta(tAtual.cliques, tAnt.cliques) },
+    premissas,
+    economia,
+    campanhas,
+    por_dia: porDia,
+    ultimo_gasto: ultimoGasto,
+    dias_parado: diasParado,
+    leitura
+  };
+}
+function analiseCriativos(brain2, per = periodoDe(brain2)) {
+  const { cplMax } = economiaDe(brain2);
+  const meio = somaDias(per.de, Math.floor(per.dias / 2));
+  const linhas = rows(
+    brain2.db,
+    "select ad_id, max(ad_name) as ad_name, max(campaign_name) as campanha, max(adset_name) as conjunto, sum(spend) as spend, sum(impressions) as impressions, sum(reach) as reach, sum(clicks) as clicks, sum(link_clicks) as link_clicks, sum(leads) as leads, count(case when spend > 0 then 1 end) as dias, max(case when spend > 0 then day end) as ultimo from meta_ad_dia where day >= ? and day <= ? group by ad_id order by spend desc",
+    per.de,
+    per.ate
+  );
+  const ctrMetade = (id, de, ate) => {
+    const r = row(brain2.db, "select sum(impressions) as i, sum(clicks) as c from meta_ad_dia where ad_id = ? and day >= ? and day <= ?", id, de, ate);
+    return r && r.i >= 500 ? r.c / r.i * 100 : null;
+  };
+  const cri = new Map(rows(brain2.db, "select * from meta_criativo").map((c2) => [c2.ad_id, c2]));
+  const vistos = /* @__PURE__ */ new Set();
+  const itens2 = linhas.map((l) => {
+    vistos.add(l.ad_id);
+    const c2 = cri.get(l.ad_id);
+    const v = veredito(l.spend, l.leads, cplMax);
+    const freq = l.reach ? l.impressions / l.reach : null;
+    const ctr1 = ctrMetade(l.ad_id, per.de, somaDias(meio, -1)), ctr2 = ctrMetade(l.ad_id, meio, per.ate);
+    const cansado = freq !== null && freq >= 2.5 && ctr1 !== null && ctr2 !== null && ctr2 < ctr1 * 0.75;
+    return {
+      id: l.ad_id,
+      nome: c2?.nome ?? l.ad_name,
+      campanha: l.campanha,
+      conjunto: l.conjunto,
+      status: c2?.status ?? "",
+      miniatura: c2?.miniatura ?? null,
+      imagem: c2?.imagem ?? null,
+      texto: c2?.texto ?? null,
+      titulo: c2?.titulo ?? null,
+      cta: c2?.cta ?? null,
+      link_ig: c2?.link_ig ?? null,
+      gasto: r22(l.spend),
+      impressoes: l.impressions,
+      alcance: l.reach,
+      frequencia: freq ? r22(freq) : null,
+      cliques: l.clicks,
+      cliques_link: l.link_clicks,
+      ctr_pct: l.impressions ? r22(l.clicks / l.impressions * 100) : null,
+      cpc: l.clicks ? r22(l.spend / l.clicks) : null,
+      leads: l.leads,
+      cpl: l.leads ? r22(l.spend / l.leads) : null,
+      dias_veiculando: l.dias,
+      ultimo_gasto: l.ultimo,
+      cansado,
+      ...v
+    };
+  });
+  const parados = [...cri.values()].filter((c2) => !vistos.has(c2.ad_id)).map((c2) => ({
+    id: c2.ad_id,
+    nome: c2.nome,
+    campanha: c2.campanha ?? "",
+    conjunto: c2.conjunto ?? "",
+    status: c2.status,
+    miniatura: c2.miniatura,
+    imagem: c2.imagem,
+    texto: c2.texto,
+    titulo: c2.titulo,
+    cta: c2.cta,
+    link_ig: c2.link_ig,
+    gasto: 0,
+    impressoes: 0,
+    alcance: 0,
+    frequencia: null,
+    cliques: 0,
+    cliques_link: 0,
+    ctr_pct: null,
+    cpc: null,
+    leads: 0,
+    cpl: null,
+    dias_veiculando: 0,
+    ultimo_gasto: null,
+    cansado: false,
+    veredito: "cedo",
+    motivo: "N\xE3o veiculou no per\xEDodo."
+  }));
+  const leitura = [];
+  const comLead = itens2.filter((i) => i.leads >= 3 && i.cpl !== null).sort((a, b) => a.cpl - b.cpl);
+  if (comLead.length >= 2) {
+    const m = comLead[0], p = comLead.at(-1);
+    if (p.cpl / m.cpl >= 1.5) leitura.push({ nivel: "fazer", titulo: `Fa\xE7a mais como \u201C${m.nome}\u201D`, detalhe: `Lead a ${brl2(m.cpl)} contra ${brl2(p.cpl)} em \u201C${p.nome}\u201D (${r1(p.cpl / m.cpl)}\xD7 mais caro). Copie o \xE2ngulo do primeiro no pr\xF3ximo teste.` });
+  }
+  for (const i of itens2.filter((x) => x.cansado).slice(0, 3)) leitura.push({ nivel: "atencao", titulo: `\u201C${i.nome}\u201D est\xE1 cansando`, detalhe: `Frequ\xEAncia ${i.frequencia} e o CTR caiu mais de 25% na segunda metade do per\xEDodo. Troque o criativo antes de pagar mais por menos clique.` });
+  for (const i of itens2.filter((x) => x.veredito === "pausar").slice(0, 3)) leitura.push({ nivel: "fazer", titulo: `Pausar \u201C${i.nome}\u201D`, detalhe: i.motivo });
+  if (!itens2.length && !parados.length) leitura.push({ nivel: "ok", titulo: "Nenhum criativo encontrado", detalhe: "A conta n\xE3o tem an\xFAncios, ou a leitura ainda n\xE3o rodou. Toque em \u201CAtualizar dados\u201D." });
+  return { itens: itens2, parados, leitura };
+}
+var FUNIL = ["PageView", "ViewContent", "Scroll50", "CTA_Click", "OpenForm", "InitiateCheckout", "Lead", "CompleteRegistration", "Subscribe", "Purchase"];
+function analisePixel(brain2, per = periodoDe(brain2)) {
+  const now = brain2.clock();
+  const pixels = rows(brain2.db, "select pixel_id, nome, ultimo_disparo, indisponivel from meta_pixel order by nome");
+  const soma2 = (de, ate) => Object.fromEntries(rows(brain2.db, "select evento, sum(total) as t from meta_pixel_dia where day >= ? and day <= ? group by evento", de, ate).map((r) => [r.evento, r.t]));
+  const atual = soma2(per.de, per.ate);
+  const ant = soma2(per.anterior.de, per.anterior.ate);
+  const eventos = Object.keys({ ...atual, ...ant }).map((e) => ({ evento: e, total: atual[e] ?? 0, anterior: ant[e] ?? 0, variacao: delta(atual[e] ?? 0, ant[e] ?? 0) })).sort((a, b) => b.total - a.total);
+  const ordemFunil = FUNIL.filter((e) => atual[e] !== void 0);
+  const funil = ordemFunil.map((e, i) => ({ evento: e, total: atual[e], do_anterior_pct: i === 0 ? null : atual[ordemFunil[i - 1]] > 0 ? r1(atual[e] / atual[ordemFunil[i - 1]] * 100) : null }));
+  const topo = eventos.filter((e) => e.total > 0).slice(0, 4).map((e) => e.evento);
+  const serie = rows(brain2.db, "select day, evento, sum(total) as total from meta_pixel_dia where day >= ? and day <= ? group by day, evento order by day", per.de, per.ate).filter((r) => topo.includes(r.evento));
+  const ads = totais(campanhasEm(brain2, per.de, per.ate));
+  const cliquesLink = campanhasEm(brain2, per.de, per.ate).reduce((n3, c2) => n3 + c2.link_clicks, 0);
+  const leitura = [];
+  if (!pixels.length) {
+    leitura.push({ nivel: "atencao", titulo: "Nenhum pixel encontrado na conta de an\xFAncios", detalhe: "Sem pixel, a Meta n\xE3o enxerga o que acontece no seu site: n\xE3o d\xE1 para medir lead, nem otimizar an\xFAncio para convers\xE3o. Se voc\xEA j\xE1 instalou um, o token precisa de ads_read, ou o pixel est\xE1 em outra conta." });
+  } else {
+    for (const p of pixels) {
+      const horas = p.ultimo_disparo ? (now - Date.parse(p.ultimo_disparo)) / 36e5 : null;
+      if (p.indisponivel) leitura.push({ nivel: "atencao", titulo: `Pixel \u201C${p.nome}\u201D indispon\xEDvel`, detalhe: "A Meta marcou o pixel como indispon\xEDvel. Abra o Gerenciador de Eventos para ver o motivo." });
+      else if (horas === null) leitura.push({ nivel: "atencao", titulo: `Pixel \u201C${p.nome}\u201D nunca disparou`, detalhe: "O c\xF3digo n\xE3o est\xE1 no site, ou est\xE1 num lugar que n\xE3o carrega. Instale e teste com a extens\xE3o Meta Pixel Helper." });
+      else if (horas > 48) leitura.push({ nivel: "atencao", titulo: `Pixel \u201C${p.nome}\u201D parado h\xE1 ${Math.round(horas / 24)} dias`, detalhe: "O \xFAltimo disparo foi h\xE1 mais de 48 horas. Se o site recebe visita todo dia, o c\xF3digo saiu do ar: confira a p\xE1gina inicial e a de agradecimento." });
+      else leitura.push({ nivel: "ok", titulo: `Pixel \u201C${p.nome}\u201D ativo`, detalhe: `\xDAltimo disparo h\xE1 ${horas < 1 ? "menos de 1 hora" : `${Math.round(horas)} horas`}.` });
+    }
+    const pv = atual.PageView ?? 0, ld = atual.Lead ?? 0, form = atual.OpenForm ?? 0;
+    if (pv > 0 && ld === 0 && !atual.CompleteRegistration && !atual.Subscribe && !atual.Purchase)
+      leitura.push({ nivel: "fazer", titulo: "O pixel v\xEA visitas, mas nenhuma convers\xE3o", detalhe: `${pv} visitas e nenhum evento de Lead, cadastro ou compra no per\xEDodo. Sem isso, os an\xFAncios n\xE3o aprendem quem vira cliente. Configure o evento Lead na p\xE1gina de agradecimento ou no clique de \u201CAgendar demonstra\xE7\xE3o\u201D.` });
+    if (pv >= 200 && ld > 0) {
+      const taxa3 = ld / pv * 100;
+      leitura.push({
+        nivel: taxa3 < 1 ? "fazer" : "ok",
+        titulo: `${taxa3 < 0.1 ? "Menos de 0,1" : r1(taxa3)}% das visitas viram lead`,
+        detalhe: `${ld} leads em ${pv} visitas no per\xEDodo.${taxa3 < 1 ? " Um site de capta\xE7\xE3o costuma converter de 1% a 5%. Com esse volume de visita, o problema \xE9 a p\xE1gina (promessa, chamada, formul\xE1rio) ou a qualidade do tr\xE1fego, n\xE3o a falta de gente." : ""}`
+      });
+    } else if (pv > 0 && ld > 0) leitura.push({ nivel: "ok", titulo: `${r1(ld / pv * 100)}% das visitas viram lead`, detalhe: `${ld} leads em ${pv} visitas no per\xEDodo.` });
+    if (pv >= 200 && form > 0 && form / pv < 0.01)
+      leitura.push({ nivel: "fazer", titulo: `S\xF3 ${r1(form / pv * 100)}% das visitas chegam a abrir o formul\xE1rio`, detalhe: `${form} aberturas em ${pv} visitas. A chamada para agir est\xE1 fraca ou escondida: deixe o bot\xE3o vis\xEDvel sem rolar a p\xE1gina e com uma promessa concreta.` });
+    if (form >= 10 && ld / form < 0.25)
+      leitura.push({ nivel: "fazer", titulo: `S\xF3 ${Math.round(ld / form * 100)}% de quem abre o formul\xE1rio envia`, detalhe: `${form} aberturas e ${ld} envios. Corte campos (pe\xE7a s\xF3 nome e WhatsApp) e confira se o bot\xE3o de enviar funciona no celular.` });
+    if (pv >= 1e3 && !atual.ViewContent && !atual.Scroll50)
+      leitura.push({ nivel: "atencao", titulo: "N\xE3o d\xE1 para saber se a visita l\xEA a p\xE1gina", detalhe: "Sem evento de rolagem ou de conte\xFAdo visto, n\xE3o separo visita real de acesso que sai na hora." });
+    if (ads.gasto > 0 && ads.leads > 0 && ld < ads.leads * 0.5)
+      leitura.push({ nivel: "atencao", titulo: `A Meta conta ${ads.leads} leads e o pixel s\xF3 ${ld}`, detalhe: "Parte dos leads vem de formul\xE1rio da pr\xF3pria Meta e n\xE3o passa pelo seu site, ou o evento do site est\xE1 falhando. Confira qual formul\xE1rio cada an\xFAncio usa." });
+    if (ads.gasto > 0 && cliquesLink >= 30 && pv < cliquesLink * 0.6)
+      leitura.push({ nivel: "fazer", titulo: `Perdendo ${Math.round((1 - pv / cliquesLink) * 100)}% dos cliques antes da p\xE1gina carregar`, detalhe: `${cliquesLink} cliques no link e ${pv} visitas no pixel. P\xE1gina lenta, bloqueador de rastreio ou link quebrado. Teste a velocidade da p\xE1gina de destino no celular.` });
+  }
+  return { pixels: pixels.map((p) => ({ ...p, indisponivel: !!p.indisponivel })), eventos, funil, serie, ads_leads: ads.leads, cliques_link: cliquesLink, leitura };
+}
+function analisePublicos(brain2, per = periodoDe(brain2)) {
+  const { cplMax } = economiaDe(brain2);
+  const linhas = rows(brain2.db, "select tipo, chave, sum(spend) as spend, sum(impressions) as impressions, sum(clicks) as clicks, sum(leads) as leads from meta_quebra_dia where day >= ? and day <= ? group by tipo, chave order by spend desc", per.de, per.ate);
+  const porTipo = (t) => {
+    const ls = linhas.filter((l) => l.tipo === t);
+    const total = ls.reduce((n3, l) => n3 + l.spend, 0);
+    return ls.map((l) => ({ chave: l.chave, gasto: r22(l.spend), parte_pct: total ? r1(l.spend / total * 100) : 0, impressoes: l.impressions, cliques: l.clicks, ctr_pct: l.impressions ? r22(l.clicks / l.impressions * 100) : null, leads: l.leads, cpl: l.leads ? r22(l.spend / l.leads) : null }));
+  };
+  const out = { posicionamento: porTipo("posicionamento"), idade_genero: porTipo("idade_genero"), dispositivo: porTipo("dispositivo") };
+  const leitura = [];
+  const rotulo = { posicionamento: "posicionamento", idade_genero: "p\xFAblico", dispositivo: "dispositivo" };
+  for (const [tipo, ls] of Object.entries(out)) {
+    const gastoTotal = ls.reduce((n3, l) => n3 + l.gasto, 0);
+    for (const l of ls.filter((x) => x.leads === 0 && x.parte_pct >= 15 && x.gasto >= 30).slice(0, 2))
+      leitura.push({ nivel: "fazer", titulo: `Tire ${rotulo[tipo]} \u201C${l.chave}\u201D`, detalhe: `${l.parte_pct}% da verba (${brl2(l.gasto)}) e nenhum lead.` });
+    const comLead = ls.filter((x) => x.leads >= 3 && x.cpl !== null).sort((a, b) => a.cpl - b.cpl);
+    if (comLead.length >= 2 && gastoTotal > 0) {
+      const m = comLead[0], p = comLead.at(-1);
+      if (p.cpl / m.cpl >= 1.5) leitura.push({ nivel: "fazer", titulo: `Concentre verba em ${rotulo[tipo]} \u201C${m.chave}\u201D`, detalhe: `Lead a ${brl2(m.cpl)} contra ${brl2(p.cpl)} em \u201C${p.chave}\u201D${cplMax ? ` (limite ${brl2(cplMax)})` : ""}.` });
+    }
+  }
+  return { ...out, leitura };
+}
+function midiaPainel(brain2, de, ate) {
+  const per = periodoDe(brain2, de, ate);
+  return {
+    periodo: per,
+    instagram: analiseInstagram(brain2, per),
+    anuncios: analiseAnuncios(brain2, per),
+    criativos: analiseCriativos(brain2, per),
+    pixel: analisePixel(brain2, per),
+    publicos: analisePublicos(brain2, per),
+    diagnostico: brain2.policy("midia_diagnostico", null)
+  };
+}
+async function midiaRotina(brain2, env) {
+  const hoje = brtDay(brain2.clock());
+  if (brain2.policy("midia_ultima_leitura", "") === hoje) return;
+  if (!env.META_SYSTEM_USER_TOKEN) return;
+  await refreshDados(brain2, env);
+  await sincronizarMidia(brain2, env, { dias: 90 });
+  brain2.setPolicy("midia_ultima_leitura", hoje);
 }
 
 // packages/core/src/crm-painel.ts
@@ -3501,7 +4280,7 @@ var ms = (iso) => {
 };
 var str = (v) => typeof v === "string" && v ? v : null;
 var numOrNull = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
-var r1 = (n3) => Math.round(n3 * 10) / 10;
+var r12 = (n3) => Math.round(n3 * 10) / 10;
 function semanaDe(t) {
   const d = /* @__PURE__ */ new Date(`${brtDay(t)}T12:00:00-03:00`);
   const dow = (d.getUTCDay() + 6) % 7;
@@ -3608,7 +4387,7 @@ function montar(e) {
     if (l.status === "perdido") o.perdidos++;
     origemMap.set(k, o);
   }
-  const origem = [...origemMap].map(([k, o]) => ({ origem: ROTULO_ORIGEM[k] ?? k, ...o, conversaoPct: o.total ? r1(o.clientes / o.total * 100) : 0 })).sort((a, b) => b.total - a.total);
+  const origem = [...origemMap].map(([k, o]) => ({ origem: ROTULO_ORIGEM[k] ?? k, ...o, conversaoPct: o.total ? r12(o.clientes / o.total * 100) : 0 })).sort((a, b) => b.total - a.total);
   const conta = (campo) => {
     const m = /* @__PURE__ */ new Map();
     for (const l of e.leads) {
@@ -3639,7 +4418,7 @@ function montar(e) {
   for (const x of reunioes) statusMap.set(x.m.status, (statusMap.get(x.m.status) ?? 0) + 1);
   const realizadas = statusMap.get("realizada") ?? 0;
   const faltas = statusMap.get("nao_compareceu") ?? 0;
-  const comparecimentoPct = realizadas + faltas > 0 ? r1(realizadas / (realizadas + faltas) * 100) : null;
+  const comparecimentoPct = realizadas + faltas > 0 ? r12(realizadas / (realizadas + faltas) * 100) : null;
   const semanas = [];
   for (let i = 7; i >= 0; i--) semanas.push(semanaDe(agora - i * 7 * DIA));
   const leadsPorSemana = semanas.map((s2) => ({ semana: s2, novos: e.leads.filter((l) => {
@@ -3656,7 +4435,7 @@ function montar(e) {
   const ativProx = ativ.filter((a) => a.status !== "concluida" && typeof a.scheduled_date === "string" && a.scheduled_date > hoje && a.scheduled_date <= brtDay(agora + 7 * DIA));
   const listaAtiv = [...atrasadas, ...ativHoje, ...ativProx].slice(0, 12).map((a) => ({ id: a.id, lead: nomeLead.get(String(a.lead_id)) ?? "Lead", tipo: String(a.type ?? ""), quando: `${a.scheduled_date ?? ""} ${a.scheduled_time ?? ""}`.trim(), status: String(a.status ?? "") }));
   const mot = Array.isArray(e.funnel.loss_reasons) ? e.funnel.loss_reasons.map((x) => ({ motivo: x.reason, total: x.count })).sort((a, b) => b.total - a.total) : [];
-  const tempo = Array.isArray(e.funnel.average_completed_time_in_stage) ? e.funnel.average_completed_time_in_stage.map((x) => ({ etapa: rotuloEtapa(x.status), dias: r1(x.average_seconds / 86400), amostra: x.sample_size })) : [];
+  const tempo = Array.isArray(e.funnel.average_completed_time_in_stage) ? e.funnel.average_completed_time_in_stage.map((x) => ({ etapa: rotuloEtapa(x.status), dias: r12(x.average_seconds / 86400), amostra: x.sample_size })) : [];
   const ov = e.overview;
   const novos30d = e.leads.filter((l) => {
     const t = ms(l.created_at);
@@ -3716,7 +4495,7 @@ function montar(e) {
 
 // packages/core/src/fin-import.ts
 var MESES = ["janeiro", "fevereiro", "mar\xE7o", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-var r22 = (n3) => Math.round(n3 * 100) / 100;
+var r23 = (n3) => Math.round(n3 * 100) / 100;
 var brNum = (t) => {
   const neg = /-/.test(t);
   const n3 = Number(t.replace(/[^\d,]/g, "").replace(",", "."));
@@ -3728,7 +4507,7 @@ function limpa(tipo, resto) {
 }
 function lerExtratoInterTexto(texto2) {
   const itens2 = [];
-  let dia4 = null;
+  let dia5 = null;
   const saldo = /Saldo total\s*\n?\s*(?:.*\n)?\s*R\$\s*([\d.]+,\d{2})/.exec(texto2);
   const per = /Per[ií]odo:\s*(\d{2})\/(\d{2})\/(\d{4})\s*a\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(texto2);
   for (const bruta of texto2.split(/\r?\n/)) {
@@ -3738,15 +4517,15 @@ function lerExtratoInterTexto(texto2) {
     if (d) {
       const m = MESES.indexOf(d[2].toLowerCase());
       if (m < 0) throw new BrainError("invalid", `M\xEAs n\xE3o reconhecido no extrato: "${d[2]}".`);
-      dia4 = `${d[3]}-${String(m + 1).padStart(2, "0")}-${d[1].padStart(2, "0")}`;
+      dia5 = `${d[3]}-${String(m + 1).padStart(2, "0")}-${d[1].padStart(2, "0")}`;
       continue;
     }
     const t = /^(.*?)\s+(-?)R\$\s*([\d.]+,\d{2})\s+(-?)R\$\s*([\d.]+,\d{2})\s*$/.exec(l);
-    if (!t || !dia4) continue;
-    const valor = r22((t[2] ? -1 : 1) * brNum(t[3]));
+    if (!t || !dia5) continue;
+    const valor = r23((t[2] ? -1 : 1) * brNum(t[3]));
     const corpo2 = t[1].trim();
     const q = /^([^":]+?):?\s*"(.*)"$/.exec(corpo2);
-    itens2.push({ data: dia4, descricao: q ? limpa(q[1].trim(), q[2]) : limpa(corpo2, ""), valor });
+    itens2.push({ data: dia5, descricao: q ? limpa(q[1].trim(), q[2]) : limpa(corpo2, ""), valor });
   }
   return {
     itens: itens2,
@@ -3765,7 +4544,7 @@ function lerExtratoInterCsv(texto2) {
     if (!/\d/.test(valorTxt)) continue;
     const hist = c2[1] ?? "";
     const desc = c2.length >= 5 ? c2.slice(2, c2.length - 2).join(" ") : "";
-    itens2.push({ data: `${m[3]}-${m[2]}-${m[1]}`, descricao: limpa(hist || "Lan\xE7amento", desc), valor: r22(brNum(valorTxt)) });
+    itens2.push({ data: `${m[3]}-${m[2]}-${m[1]}`, descricao: limpa(hist || "Lan\xE7amento", desc), valor: r23(brNum(valorTxt)) });
   }
   return { itens: itens2, saldoFinal: null, periodo: null };
 }
@@ -3778,17 +4557,17 @@ function lerExtratoInter(texto2) {
 function finImportarExtrato(db, agora, lido, adicionar) {
   const existentes = rows(db, "select data, valor from fin_extrato");
   const usados = /* @__PURE__ */ new Map();
-  for (const e of existentes) usados.set(`${e.data}|${r22(e.valor)}`, (usados.get(`${e.data}|${r22(e.valor)}`) ?? 0) + 1);
+  for (const e of existentes) usados.set(`${e.data}|${r23(e.valor)}`, (usados.get(`${e.data}|${r23(e.valor)}`) ?? 0) + 1);
   const novos = [];
   for (const it of lido.itens) {
-    const k = `${it.data}|${r22(it.valor)}`;
+    const k = `${it.data}|${r23(it.valor)}`;
     const n3 = usados.get(k) ?? 0;
     if (n3 > 0) usados.set(k, n3 - 1);
     else novos.push(it);
   }
   if (novos.length) adicionar(novos);
   const s2 = row(db, "select sum(valor) as s from fin_extrato");
-  const saldo = r22(s2?.s ?? 0);
+  const saldo = r23(s2?.s ?? 0);
   return { lidos: lido.itens.length, novos: novos.length, jaExistiam: lido.itens.length - novos.length, saldoDoExtrato: lido.saldoFinal, saldoNoBrain: saldo, confere: lido.saldoFinal === null ? null : Math.abs(saldo - lido.saldoFinal) < 5e-3 };
 }
 
@@ -3983,8 +4762,8 @@ function mensagemWhatsapp(nome, etapa) {
 var linkWhatsapp = (numero, texto2) => `https://wa.me/${numero}?text=${encodeURIComponent(texto2)}`;
 var capDia = (brain2) => Math.max(1, Math.min(30, Number(brain2.policy("prospect_whatsapp_daily", 10)) || 10));
 function enviadosHoje(brain2) {
-  const dia4 = brtDay(brain2.clock());
-  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY3).filter((r) => brtDay(r.enviado_em) === dia4).length;
+  const dia5 = brtDay(brain2.clock());
+  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY3).filter((r) => brtDay(r.enviado_em) === dia5).length;
 }
 function painelWhatsapp(brain2) {
   const cap2 = capDia(brain2);
@@ -4233,7 +5012,7 @@ async function consultar(token, site, body, f) {
   }
   return todas;
 }
-var dia = (ms2) => brtDay(ms2);
+var dia2 = (ms2) => brtDay(ms2);
 var SEM_FILTRO_PAGINA = "";
 async function lerSitemap(url, f, nivel = 0) {
   const r = await f(url, { headers: { "user-agent": "SynapsaBrain/1.0" } });
@@ -4247,21 +5026,21 @@ async function sincronizarGsc(brain2, env, f = fetch, opt = {}) {
   const chave2 = lerChave(env);
   if (!chave2) return "Search Console n\xE3o configurado (falta o segredo GSC_SERVICE_ACCOUNT).";
   const agora = brain2.clock();
-  const hoje = dia(agora);
+  const hoje = dia2(agora);
   if (!opt.forcar && brain2.policy("gsc_ultima_sync", "") === hoje) return "Search Console j\xE1 sincronizado hoje.";
   const token = await tokenGoogle(chave2, agora, f);
-  const fim = dia(agora - 2 * DAY4);
+  const fim = dia2(agora - 2 * DAY4);
   const fimMs = Date.parse(`${fim}T12:00:00Z`);
-  const janela = { atual: [dia(fimMs - 27 * DAY4), fim], anterior: [dia(fimMs - 55 * DAY4), dia(fimMs - 28 * DAY4)] };
+  const janela = { atual: [dia2(fimMs - 27 * DAY4), fim], anterior: [dia2(fimMs - 55 * DAY4), dia2(fimMs - 28 * DAY4)] };
   const falhas = [];
   let linhas = 0;
   for (const s2 of sitesGsc(brain2)) {
     try {
       const ult = row(brain2.db, "select max(dia) as d from gsc_dia where site = ?", s2.id)?.d;
-      const ini = ult ? dia(Date.parse(`${ult}T12:00:00Z`) - 4 * DAY4) : dia(agora - 90 * DAY4);
+      const ini = ult ? dia2(Date.parse(`${ult}T12:00:00Z`) - 4 * DAY4) : dia2(agora - 90 * DAY4);
       const diario = await consultar(token, s2, { startDate: ini, endDate: fim, dimensions: ["date"], rowLimit: 500 }, f);
       const ultP = row(brain2.db, "select max(dia) as d from gsc_pagina_dia where site = ?", s2.id)?.d;
-      const iniP = ultP ? dia(Date.parse(`${ultP}T12:00:00Z`) - 4 * DAY4) : dia(agora - 90 * DAY4);
+      const iniP = ultP ? dia2(Date.parse(`${ultP}T12:00:00Z`) - 4 * DAY4) : dia2(agora - 90 * DAY4);
       const porPagina = await consultar(token, s2, { startDate: iniP, endDate: fim, dimensions: ["date", "page"] }, f);
       const agg = [];
       for (const periodo of ["atual", "anterior"]) {
@@ -4319,13 +5098,13 @@ function gscPainel(brain2, env) {
     const cob = cobertura(qAtual);
     const ops = oportunidades(qAtual, paginaDaBusca);
     const serieP = /* @__PURE__ */ new Map();
-    const iniSerie = dias.length ? dia(Date.parse(`${dias[dias.length - 1].dia}T12:00:00Z`) - 27 * DAY4) : "0000-00-00";
+    const iniSerie = dias.length ? dia2(Date.parse(`${dias[dias.length - 1].dia}T12:00:00Z`) - 27 * DAY4) : "0000-00-00";
     for (const r of rows(brain2.db, "select pagina, dia, clicks, impressions from gsc_pagina_dia where site = ? and dia >= ?", s2.id, iniSerie)) {
       const m = serieP.get(r.pagina) ?? /* @__PURE__ */ new Map();
       m.set(r.dia, { clicks: r.clicks, impressions: r.impressions });
       serieP.set(r.pagina, m);
     }
-    const diasJanela = dias.length ? Array.from({ length: 28 }, (_, i) => dia(Date.parse(`${iniSerie}T12:00:00Z`) + i * DAY4)) : [];
+    const diasJanela = dias.length ? Array.from({ length: 28 }, (_, i) => dia2(Date.parse(`${iniSerie}T12:00:00Z`) + i * DAY4)) : [];
     const buscasPorPagina = /* @__PURE__ */ new Map();
     for (const a of pq) buscasPorPagina.set(a.chave, [...buscasPorPagina.get(a.chave) ?? [], { busca: a.chave2, clicks: a.clicks, impressions: a.impressions, position: a.position }]);
     const paginas = de("page", "atual").sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 400).map((a) => {
@@ -4401,7 +5180,7 @@ async function gscPainelCompleto(brain2, env, f = fetch) {
       return t >= ini && t <= fim;
     });
     p.funil = {
-      periodo: `${dia(ini)} a ${site.ultimoDia}`,
+      periodo: `${dia2(ini)} a ${site.ultimoDia}`,
       cliquesGoogle: site.atual.clicks,
       leads: leads.length,
       leadsGoogle: leads.filter((l) => ["google", "landing_page"].includes(String(l.origin))).length,
@@ -4417,7 +5196,7 @@ var DAY5 = 864e5;
 var ESCOPO2 = "https://www.googleapis.com/auth/analytics.readonly";
 var DATA = "https://analyticsdata.googleapis.com/v1beta";
 var ADMIN = "https://analyticsadmin.googleapis.com/v1beta";
-var dia2 = (ms2) => brtDay(ms2);
+var dia3 = (ms2) => brtDay(ms2);
 var METRICAS = ["sessions", "totalUsers", "newUsers", "engagedSessions", "screenPageViews", "userEngagementDuration", "keyEvents"];
 var ZERO = { sessoes: 0, usuarios: 0, novos: 0, engajadas: 0, views: 0, seg: 0, eventos: 0 };
 var daLinha = (v) => ({ sessoes: +(v[0]?.value ?? 0), usuarios: +(v[1]?.value ?? 0), novos: +(v[2]?.value ?? 0), engajadas: +(v[3]?.value ?? 0), views: +(v[4]?.value ?? 0), seg: +(v[5]?.value ?? 0), eventos: +(v[6]?.value ?? 0) });
@@ -4436,12 +5215,12 @@ async function chamar(f, token, url, init = {}) {
   if (!r.ok) throw new BrainError("integration", traduzir(r.status, j2?.error?.message ?? txt.slice(0, 200), url));
   return j2;
 }
-function traduzir(status, msg, url = "") {
+function traduzir(status, msg2, url = "") {
   const api = /analyticsadmin/.test(url) ? "Google Analytics Admin API" : "Google Analytics Data API";
-  if (/has not been used|is disabled|SERVICE_DISABLED/i.test(msg)) return `Ative a "${api}" no projeto do Google Cloud (APIs e servi\xE7os > Biblioteca) e tente de novo em alguns minutos.`;
-  if (status === 403 || /permission|does not have sufficient/i.test(msg)) return "A conta de servi\xE7o n\xE3o tem acesso a essa propriedade do GA4: adicione o e-mail dela como Leitor em Administrador > Acesso \xE0 propriedade.";
-  if (status === 404 || /not found/i.test(msg)) return "Propriedade do GA4 n\xE3o encontrada: confira o n\xFAmero em Administrador > Detalhes da propriedade.";
-  return `GA4 respondeu ${status}: ${msg.slice(0, 160)}`;
+  if (/has not been used|is disabled|SERVICE_DISABLED/i.test(msg2)) return `Ative a "${api}" no projeto do Google Cloud (APIs e servi\xE7os > Biblioteca) e tente de novo em alguns minutos.`;
+  if (status === 403 || /permission|does not have sufficient/i.test(msg2)) return "A conta de servi\xE7o n\xE3o tem acesso a essa propriedade do GA4: adicione o e-mail dela como Leitor em Administrador > Acesso \xE0 propriedade.";
+  if (status === 404 || /not found/i.test(msg2)) return "Propriedade do GA4 n\xE3o encontrada: confira o n\xFAmero em Administrador > Detalhes da propriedade.";
+  return `GA4 respondeu ${status}: ${msg2.slice(0, 160)}`;
 }
 async function relatorio(f, token, prop, ini, fim, dims, metricas = METRICAS, limite = 1e3) {
   const j2 = await chamar(f, token, `${DATA}/properties/${prop}:runReport`, {
@@ -4473,7 +5252,7 @@ async function sincronizarGa(brain2, env, f = fetch, opt = {}) {
   const chave2 = lerChave(env);
   if (!chave2) return "GA4 n\xE3o configurado (falta o segredo GSC_SERVICE_ACCOUNT).";
   const agora = brain2.clock();
-  const hoje = dia2(agora);
+  const hoje = dia3(agora);
   if (!opt.forcar && brain2.policy("ga_ultima_sync", "") === hoje) return "GA4 j\xE1 sincronizado hoje.";
   let props = propriedadesGa(brain2);
   const falhas = [];
@@ -4494,16 +5273,16 @@ async function sincronizarGa(brain2, env, f = fetch, opt = {}) {
     }
   }
   const token = await tokenGoogle(chave2, agora, f, ESCOPO2);
-  const fim = dia2(agora - DAY5);
+  const fim = dia3(agora - DAY5);
   const fimMs = Date.parse(`${fim}T12:00:00Z`);
-  const janela = { atual: [dia2(fimMs - 27 * DAY5), fim], anterior: [dia2(fimMs - 55 * DAY5), dia2(fimMs - 28 * DAY5)] };
+  const janela = { atual: [dia3(fimMs - 27 * DAY5), fim], anterior: [dia3(fimMs - 55 * DAY5), dia3(fimMs - 28 * DAY5)] };
   let dias = 0;
   for (const s2 of sitesGsc(brain2)) {
     const prop = props[s2.id];
     if (!prop) continue;
     try {
       const ult = row(brain2.db, "select max(dia) as d from ga_dia where site = ?", s2.id)?.d;
-      const ini = ult ? dia2(Date.parse(`${ult}T12:00:00Z`) - 3 * DAY5) : dia2(agora - 90 * DAY5);
+      const ini = ult ? dia3(Date.parse(`${ult}T12:00:00Z`) - 3 * DAY5) : dia3(agora - 90 * DAY5);
       const diario = await relatorio(f, token, prop, ini, fim, ["date"], METRICAS, 500);
       const agg = [];
       for (const periodo of ["atual", "anterior"]) {
@@ -4574,14 +5353,14 @@ function gaPainel(brain2, env) {
 var RESPONSAVEIS_PADRAO = ["Felipe Dalpra", "Cassio", "Felipe Augusto"];
 var STATUS = /* @__PURE__ */ new Set(["pendente", "andamento", "concluida"]);
 var DAY6 = 864e5;
-function segundaDe(dia4) {
-  const d = /* @__PURE__ */ new Date(`${dia4}T12:00:00Z`);
+function segundaDe(dia5) {
+  const d = /* @__PURE__ */ new Date(`${dia5}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) throw new BrainError("invalid", "Semana inv\xE1lida.");
   const dow = (d.getUTCDay() + 6) % 7;
   return new Date(d.getTime() - dow * DAY6).toISOString().slice(0, 10);
 }
 var semanaAtual = (brain2) => segundaDe(brtDay(brain2.clock()));
-var somaDias = (dia4, n3) => new Date(Date.parse(`${dia4}T12:00:00Z`) + n3 * DAY6).toISOString().slice(0, 10);
+var somaDias2 = (dia5, n3) => new Date(Date.parse(`${dia5}T12:00:00Z`) + n3 * DAY6).toISOString().slice(0, 10);
 var responsaveis = (brain2) => brain2.policy("plan_responsaveis", RESPONSAVEIS_PADRAO);
 var ver = (l) => ({ id: l.id, semana: l.semana, tipo: l.tipo, titulo: l.titulo, dia: l.dia, formato: l.formato, responsavel: l.responsavel, status: l.status, pai: l.pai, ordem: l.ordem, notas: l.notas, criadoEm: l.criado_em, concluidoEm: l.concluido_em, veioDe: l.veio_de, subtarefas: [] });
 function itensDa(brain2, semana) {
@@ -4617,11 +5396,11 @@ function planPainel(brain2, semanaPedida) {
     return { semana: s2, ...taxa2(l), posts: taxa2(l.filter((i) => i.tipo === "post")), tarefas: taxa2(l.filter((i) => i.tipo === "tarefa")) };
   }).reverse();
   const tudo = semanas.filter((s2) => s2 <= atual).flatMap((s2) => itensDa(brain2, s2));
-  const anterior = itensDa(brain2, somaDias(semana, -7));
+  const anterior = itensDa(brain2, somaDias2(semana, -7));
   const jaTrazidos = new Set(itens2.map((i) => i.veioDe).filter(Boolean));
   return {
     semana,
-    fim: somaDias(semana, 6),
+    fim: somaDias2(semana, 6),
     atual,
     ehAtual: semana === atual,
     responsaveis: responsaveis(brain2),
@@ -4657,18 +5436,18 @@ function planAcao(brain2, body) {
     if (pai?.pai) throw new BrainError("invalid", "Subtarefa n\xE3o pode ter subtarefa.");
     const tipo = pai ? pai.tipo : body.tipo === "post" ? "post" : "tarefa";
     if (pai) semana = pai.semana;
-    const dia4 = tipo === "post" && body.dia != null && body.dia !== "" ? Math.min(6, Math.max(0, Number(body.dia) | 0)) : null;
+    const dia5 = tipo === "post" && body.dia != null && body.dia !== "" ? Math.min(6, Math.max(0, Number(body.dia) | 0)) : null;
     const resp = texto(body.responsavel, 60) || pai?.responsavel || "";
     const ordem = (row(brain2.db, "select max(ordem) as m from plan_itens where semana = ?", semana)?.m ?? 0) + 1;
-    run(brain2.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em) values (?, ?, ?, ?, ?, ?, ?, 'pendente', ?, ?, '', ?)", crypto.randomUUID(), semana, tipo, titulo2, dia4, texto(body.formato, 30), resp, pai?.id ?? null, ordem, agora);
+    run(brain2.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em) values (?, ?, ?, ?, ?, ?, ?, 'pendente', ?, ?, '', ?)", crypto.randomUUID(), semana, tipo, titulo2, dia5, texto(body.formato, 30), resp, pai?.id ?? null, ordem, agora);
     sincronizarPai(brain2, pai?.id ?? null);
   } else if (acao === "editar") {
     const l = pegar(brain2, body.id);
     semana = l.semana;
     const titulo2 = body.titulo !== void 0 ? texto(body.titulo, 300) : l.titulo;
     if (!titulo2) throw new BrainError("invalid", "O t\xEDtulo n\xE3o pode ficar vazio.");
-    const dia4 = body.dia !== void 0 ? body.dia === null || body.dia === "" ? null : Math.min(6, Math.max(0, Number(body.dia) | 0)) : l.dia;
-    run(brain2.db, "update plan_itens set titulo = ?, dia = ?, formato = ?, responsavel = ?, notas = ? where id = ?", titulo2, dia4, body.formato !== void 0 ? texto(body.formato, 30) : l.formato, body.responsavel !== void 0 ? texto(body.responsavel, 60) : l.responsavel, body.notas !== void 0 ? texto(body.notas, 2e3) : l.notas, l.id);
+    const dia5 = body.dia !== void 0 ? body.dia === null || body.dia === "" ? null : Math.min(6, Math.max(0, Number(body.dia) | 0)) : l.dia;
+    run(brain2.db, "update plan_itens set titulo = ?, dia = ?, formato = ?, responsavel = ?, notas = ? where id = ?", titulo2, dia5, body.formato !== void 0 ? texto(body.formato, 30) : l.formato, body.responsavel !== void 0 ? texto(body.responsavel, 60) : l.responsavel, body.notas !== void 0 ? texto(body.notas, 2e3) : l.notas, l.id);
   } else if (acao === "status") {
     const l = pegar(brain2, body.id);
     semana = l.semana;
@@ -4685,7 +5464,7 @@ function planAcao(brain2, body) {
   } else if (acao === "trazer_pendentes") {
     const ja = new Set(rows(brain2.db, "select veio_de as v from plan_itens where semana = ?", semana).map((r) => r.v));
     let ordem = row(brain2.db, "select max(ordem) as m from plan_itens where semana = ?", semana)?.m ?? 0;
-    for (const i of itensDa(brain2, somaDias(semana, -7))) {
+    for (const i of itensDa(brain2, somaDias2(semana, -7))) {
       if (i.status === "concluida" || ja.has(i.id)) continue;
       const novo = crypto.randomUUID();
       run(brain2.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em, veio_de) values (?, ?, ?, ?, ?, ?, ?, 'pendente', null, ?, ?, ?, ?)", novo, semana, i.tipo, i.titulo, i.dia, i.formato, i.responsavel, ++ordem, i.notas, agora, i.id);
@@ -4891,8 +5670,8 @@ async function publicarPost(brain2, env, id, f = fetch, espera = (ms2) => new Pr
     brain2.emit("change");
     return "Publicado no Instagram.";
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    run(brain2.db, "update ig_posts set status = 'falhou', erro = ? where id = ?", msg.slice(0, 300), id);
+    const msg2 = e instanceof Error ? e.message : String(e);
+    run(brain2.db, "update ig_posts set status = 'falhou', erro = ? where id = ?", msg2.slice(0, 300), id);
     brain2.emit("change");
     throw e;
   }
@@ -4913,6 +5692,289 @@ async function publicarDevidos(brain2, env, f = fetch) {
   if (!prox) return null;
   try {
     return await publicarPost(brain2, env, prox.id, f);
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
+// packages/core/src/llm.ts
+function llmConfig(env, kind) {
+  const forced = env.LLM_PROVIDER;
+  const provider = forced === "openai" || forced === "anthropic" ? forced : env.OPENAI_API_KEY ? "openai" : env.ANTHROPIC_API_KEY ? "anthropic" : null;
+  if (!provider) return null;
+  const apiKey = provider === "openai" ? env.OPENAI_API_KEY : env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  const override = kind === "jarvis" ? env.JARVIS_MODEL : env.AGENT_MODEL;
+  const model = override ?? env.JARVIS_MODEL ?? (provider === "openai" ? env.OPENAI_MODEL ?? "gpt-4.1" : "claude-sonnet-5-5");
+  return {
+    provider,
+    apiKey,
+    model,
+    // Estimativa. Confira os preços do seu modelo e ajuste no .env.local.
+    priceInUsd: Number(env.LLM_PRICE_IN_USD_PER_MTOK ?? (provider === "openai" ? 2 : 3)),
+    priceOutUsd: Number(env.LLM_PRICE_OUT_USD_PER_MTOK ?? (provider === "openai" ? 8 : 15)),
+    usdBrl: Number(env.USD_BRL ?? 5.5)
+  };
+}
+var costBrl = (c2, u) => Math.round((u.input_tokens * c2.priceInUsd + u.output_tokens * c2.priceOutUsd) / 1e6 * c2.usdBrl * 1e4) / 1e4;
+async function callAnthropic(c2, req, fetchFn) {
+  const res = await fetchFn("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": c2.apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({ model: c2.model, max_tokens: req.maxTokens ?? 1024, system: req.system, messages: req.messages, ...req.tools?.length ? { tools: req.tools } : {} })
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Anthropic ${res.status}${body ? `: ${body.slice(0, 160)}` : ""}`);
+  }
+  return await res.json();
+}
+function toOpenAi(system, messages) {
+  const out = [{ role: "system", content: system }];
+  for (const m of messages) {
+    if (typeof m.content === "string") {
+      out.push(m.role === "user" ? { role: "user", content: m.content } : { role: "assistant", content: m.content });
+      continue;
+    }
+    if (m.role === "assistant") {
+      const calls = m.content.filter((b) => b.type === "tool_use");
+      out.push({ role: "assistant", content: textOf(m.content) || null, ...calls.length ? { tool_calls: calls.map((b) => ({ id: b.id, type: "function", function: { name: b.name, arguments: JSON.stringify(b.input) } })) } : {} });
+    } else {
+      for (const b of m.content) if (b.type === "tool_result") out.push({ role: "tool", tool_call_id: b.tool_use_id, content: b.is_error ? `Erro: ${b.content}` : b.content });
+    }
+  }
+  return out;
+}
+async function callOpenAi(c2, req, fetchFn) {
+  const res = await fetchFn("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { authorization: `Bearer ${c2.apiKey}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      model: c2.model,
+      max_completion_tokens: req.maxTokens ?? 1024,
+      messages: toOpenAi(req.system, req.messages),
+      ...req.tools?.length ? { tools: req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })) } : {}
+    })
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenAI ${res.status}${body ? `: ${body.slice(0, 160)}` : ""}`);
+  }
+  const j2 = await res.json();
+  const msg2 = j2.choices[0]?.message;
+  const content = [];
+  if (msg2?.content) content.push({ type: "text", text: msg2.content });
+  for (const t of msg2?.tool_calls ?? []) {
+    let input = {};
+    try {
+      input = JSON.parse(t.function.arguments || "{}");
+    } catch {
+    }
+    content.push({ type: "tool_use", id: t.id, name: t.function.name, input });
+  }
+  return { content, stop_reason: j2.choices[0]?.finish_reason ?? "stop", usage: { input_tokens: j2.usage?.prompt_tokens ?? 0, output_tokens: j2.usage?.completion_tokens ?? 0 } };
+}
+var callLlm = (c2, req, fetchFn = fetch) => c2.provider === "openai" ? callOpenAi(c2, req, fetchFn) : callAnthropic(c2, req, fetchFn);
+var textOf = (blocks) => blocks.flatMap((b) => b.type === "text" ? [b.text] : []).join("\n").trim();
+async function toolLoop(c2, req, runTool, fetchFn = fetch) {
+  const messages = [...req.messages];
+  let cost = 0;
+  for (let round = 0; round < (req.maxRounds ?? 6); round++) {
+    const r = await callLlm(c2, { ...req, messages }, fetchFn);
+    cost += costBrl(c2, r.usage);
+    const uses = r.content.filter((b) => b.type === "tool_use");
+    if (uses.length === 0) return { text: textOf(r.content), cost };
+    messages.push({ role: "assistant", content: r.content });
+    const results = [];
+    for (const u of uses) {
+      try {
+        results.push({ type: "tool_result", tool_use_id: u.id, content: await runTool(u.name, u.input) });
+      } catch (e) {
+        results.push({ type: "tool_result", tool_use_id: u.id, content: e instanceof Error ? e.message : "erro", is_error: true });
+      }
+    }
+    messages.push({ role: "user", content: results });
+  }
+  return { text: "N\xE3o consegui concluir dentro do limite de passos. Tente pedir de forma mais direta.", cost };
+}
+
+// packages/core/src/linkedin.ts
+var ORG_PADRAO = "134663896";
+var MAX = 3e3;
+var TEMAS2 = [
+  { categoria: "Urg\xEAncia de Mercado", prompt: "Escreva um post para LinkedIn voltado para psic\xF3logos brasileiros sobre a transforma\xE7\xE3o digital na sa\xFAde: prontu\xE1rio \xFAnico, Datasus, RDNS. O argumento central: os psic\xF3logos que n\xE3o tiverem dados organizados e tecnologia no processo v\xE3o ficar para tr\xE1s. Tom: direto, urgente mas n\xE3o alarmista, posicionamento de futuro. N\xE3o mencione a Synapsa diretamente. Termine com uma pergunta para engajar." },
+  { categoria: "Qualidade Cl\xEDnica", prompt: "Escreva um post para LinkedIn voltado para psic\xF3logos brasileiros sobre a lacuna entre sess\xF5es de terapia: o que acontece com o paciente nos outros 6 dias da semana. Argumento: a terapia acontece al\xE9m da sess\xE3o. Fale sobre di\xE1rio emocional, escalas cl\xEDnicas, acompanhamento de evolu\xE7\xE3o. Tom: cl\xEDnico, reflexivo, humanizado. N\xE3o mencione a Synapsa diretamente." },
+  { categoria: "Tempo e Produtividade", prompt: "Escreva um post para LinkedIn voltado para psic\xF3logos brasileiros sobre o tempo perdido com tarefas administrativas: agendamento, cobran\xE7a, WhatsApp, reagendamentos. Argumento: o psic\xF3logo n\xE3o estudou anos para virar assistente administrativo de si mesmo. Tom: direto, provocativo mas construtivo. Pode mencionar a Synapsa no final como solu\xE7\xE3o." },
+  { categoria: "IA na Psicologia", prompt: "Escreva um post para LinkedIn voltado para psic\xF3logos brasileiros sobre intelig\xEAncia artificial na pr\xE1tica cl\xEDnica. Argumento central: a IA n\xE3o substitui o psic\xF3logo, ela \xE9 a assistente de pesquisa que o psic\xF3logo nunca teve. Fale sobre escalas autom\xE1ticas, an\xE1lise de evolu\xE7\xE3o, Lyra (apoio ao paciente entre sess\xF5es). Tom: equilibrado, desmistificador, humanizado. Pode mencionar a Synapsa." },
+  { categoria: "Abandono de Pacientes", prompt: "Escreva um post para LinkedIn voltado para psic\xF3logos brasileiros sobre abandono de pacientes na terapia. Argumento: uma parcela relevante dos pacientes abandona antes de atingir seus objetivos, e a maioria dos psic\xF3logos n\xE3o recebe nenhum sinal antes. Fale sobre engajamento, acompanhamento, sinais de risco. N\xE3o cite porcentagem se n\xE3o for citar a fonte. Tom: cl\xEDnico, emp\xE1tico, reflexivo. N\xE3o mencione a Synapsa diretamente. Termine com uma pergunta." }
+];
+var SISTEMA = `Voc\xEA \xE9 Felipe Dalpra, fundador da Synapsa, plataforma para psic\xF3logos. Escreve posts aut\xEAnticos, diretos e humanos para o LinkedIn. Sua voz \xE9 de quem entende o mercado de psicologia e sa\xFAde mental, fala com clareza sobre tecnologia e nunca usa linguagem corporativa. Tagline: Cl\xEDnica + tecnol\xF3gica + humana. Miss\xE3o: fazer a terapia acontecer al\xE9m da sess\xE3o. Sempre em portugu\xEAs do Brasil.
+Regras: m\xE1ximo 1200 caracteres; 3 a 5 hashtags no final; frases curtas; nada de "voc\xEA sabia?"; sem emoji em excesso (no m\xE1ximo 2).
+Proibido: prometer resultado cl\xEDnico, cura ou garantia; desconto, promo\xE7\xE3o ou urg\xEAncia artificial; dado ou caso cl\xEDnico de paciente; estat\xEDstica ou n\xFAmero inventado (s\xF3 use n\xFAmero se for citar quem publicou e o ano); citar concorrente; dizer que a Synapsa garante conformidade com a NR 1.
+Responda s\xF3 com o texto do post, sem t\xEDtulo nem explica\xE7\xE3o.`;
+var row2 = (l) => ({ id: l.id, status: l.status, categoria: l.categoria, texto: l.texto, criadoEm: l.criado_em, publicadoEm: l.publicado_em, permalink: l.permalink, erro: l.erro, manual: l.manual === 1 });
+var diaDePostar = (agora) => [1, 3, 5].includes((/* @__PURE__ */ new Date(`${brtDay(agora)}T12:00:00Z`)).getUTCDay());
+function proximoTema(brain2) {
+  const ult = new Map(rows(brain2.db, "select categoria, max(criado_em) as u from li_posts group by categoria").map((r) => [r.categoria, r.u]));
+  return [...TEMAS2].sort((a, b) => (ult.get(a.categoria) ?? 0) - (ult.get(b.categoria) ?? 0))[0];
+}
+var lerToken = (brain2) => row(brain2.db, "select access_token, refresh_token, expira_em from li_token where id = 1");
+function liConfigurado(brain2, env) {
+  const t = lerToken(brain2);
+  return !!env.LINKEDIN_ACCESS_TOKEN || !!t && (t.expira_em > brain2.clock() || !!t.refresh_token);
+}
+var REDIRECT = (origin) => `${origin}/api/linkedin/callback`;
+var ESCOPO3 = { pessoa: "openid profile w_member_social", organizacao: "w_organization_social" };
+var lerAutor = (brain2) => brain2.policy("li_autor", { alvo: "organizacao", urn: null, nome: null });
+function liUrlAutorizar(brain2, env, origin, alvo = "pessoa") {
+  if (!env.LINKEDIN_CLIENT_ID || !env.LINKEDIN_CLIENT_SECRET) throw new BrainError("invalid", "Faltam LINKEDIN_CLIENT_ID e LINKEDIN_CLIENT_SECRET nos secrets do Brain.");
+  const state = crypto.randomUUID().replace(/-/g, "");
+  brain2.setPolicy("li_state", { s: state, exp: brain2.clock() + 6e5, alvo });
+  const q = new URLSearchParams({ response_type: "code", client_id: env.LINKEDIN_CLIENT_ID, redirect_uri: REDIRECT(origin), state, scope: ESCOPO3[alvo] });
+  return `https://www.linkedin.com/oauth/v2/authorization?${q}`;
+}
+async function pedirToken(env, f, params) {
+  const res = await f("https://www.linkedin.com/oauth/v2/accessToken", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ ...params, client_id: env.LINKEDIN_CLIENT_ID ?? "", client_secret: env.LINKEDIN_CLIENT_SECRET ?? "" }) });
+  const b = await res.json().catch(() => ({}));
+  if (!res.ok || !b.access_token) throw new BrainError("invalid", `LinkedIn recusou o login (${res.status}): ${b.error_description ?? b.error ?? "erro"}`);
+  return { access_token: b.access_token, refresh_token: b.refresh_token, expires_in: b.expires_in ?? 5184e3 };
+}
+var guardar = (brain2, t) => run(brain2.db, "insert into li_token (id, access_token, refresh_token, expira_em, atualizado_em) values (1, ?, ?, ?, ?) on conflict(id) do update set access_token = excluded.access_token, refresh_token = coalesce(excluded.refresh_token, li_token.refresh_token), expira_em = excluded.expira_em, atualizado_em = excluded.atualizado_em", t.access_token, t.refresh_token ?? null, brain2.clock() + t.expires_in * 1e3 - 6e4, brain2.clock());
+async function liCallback(brain2, env, f, origin, code, state) {
+  const st = brain2.policy("li_state", null);
+  brain2.setPolicy("li_state", null);
+  if (!st || !code || st.s !== state || st.exp < brain2.clock()) throw new BrainError("invalid", "O login expirou ou n\xE3o foi iniciado por aqui. Toque em Conectar LinkedIn de novo.");
+  const tok = await pedirToken(env, f, { grant_type: "authorization_code", code, redirect_uri: REDIRECT(origin) });
+  const alvo = st.alvo === "organizacao" ? "organizacao" : "pessoa";
+  let autor = { alvo, urn: null, nome: null };
+  if (alvo === "pessoa") {
+    const u = await f("https://api.linkedin.com/v2/userinfo", { headers: { authorization: `Bearer ${tok.access_token}` } });
+    const j2 = await u.json().catch(() => ({}));
+    if (!u.ok || !j2.sub) throw new BrainError("invalid", "O LinkedIn n\xE3o informou quem \xE9 voc\xEA. Adicione ao app o produto Sign In with LinkedIn using OpenID Connect e conecte de novo.");
+    autor = { alvo, urn: `urn:li:person:${j2.sub}`, nome: j2.name ?? null };
+  }
+  guardar(brain2, tok);
+  brain2.setPolicy("li_autor", autor);
+  brain2.audit("voce", "li_conectou", alvo === "pessoa" ? "perfil pessoal" : "p\xE1gina da empresa");
+  brain2.emit("change");
+}
+async function tokenAtual(brain2, env, f) {
+  const t = lerToken(brain2);
+  if (t && t.expira_em > brain2.clock()) return t.access_token;
+  if (t?.refresh_token && env.LINKEDIN_CLIENT_ID) {
+    try {
+      guardar(brain2, await pedirToken(env, f, { grant_type: "refresh_token", refresh_token: t.refresh_token }));
+      return lerToken(brain2).access_token;
+    } catch {
+    }
+  }
+  return env.LINKEDIN_ACCESS_TOKEN ?? null;
+}
+function liPainel(brain2, env) {
+  const ls = rows(brain2.db, "select * from li_posts order by case status when 'pendente' then 0 when 'falhou' then 1 when 'aprovado' then 2 else 3 end, criado_em desc limit 40");
+  const au = lerAutor(brain2);
+  const doToken = !!lerToken(brain2);
+  return { configurado: liConfigurado(brain2, env), alvo: doToken ? au.alvo : "organizacao", destino: doToken && au.alvo === "pessoa" ? `perfil de ${au.nome ?? "voc\xEA"}` : `p\xE1gina da empresa (${env.LINKEDIN_ORG_ID ?? ORG_PADRAO})`, appPronto: !!(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET), expiraEm: lerToken(brain2)?.expira_em ?? null, organizacao: env.LINKEDIN_ORG_ID ?? ORG_PADRAO, llm: !!llmConfig(env, "agent"), diasDePostar: "segunda, quarta e sexta", posts: ls.map(row2) };
+}
+async function liGerar(brain2, env, f = fetch, opts = {}) {
+  if (brain2.killed()) return null;
+  const agora = brain2.clock();
+  const dia5 = brtDay(agora);
+  if (!opts.forcar && row(brain2.db, "select id from li_posts where chave = ?", dia5)) return null;
+  const cfg = llmConfig(env, "agent");
+  if (!cfg) throw new BrainError("invalid", "Falta a chave do modelo (OPENAI_API_KEY ou ANTHROPIC_API_KEY) nos secrets do Brain.");
+  const tema = proximoTema(brain2);
+  let texto2 = "";
+  let aviso = "";
+  for (let t = 0; t < 2; t++) {
+    const r = await callLlm(cfg, { system: SISTEMA, messages: [{ role: "user", content: `${tema.prompt}${aviso}` }], maxTokens: 900 }, f);
+    texto2 = textOf(r.content).trim().slice(0, MAX);
+    const motivo = texto2 ? revisarTexto(texto2) : "texto vazio";
+    if (!motivo) {
+      aviso = "";
+      break;
+    }
+    aviso = `
+
+A vers\xE3o anterior foi barrada: ${motivo}. Reescreva sem isso.`;
+    texto2 = "";
+  }
+  if (!texto2) throw new BrainError("invalid", "O modelo n\xE3o entregou um texto aprovado pela conformidade. Tente gerar de novo.");
+  const id = crypto.randomUUID();
+  run(brain2.db, "insert into li_posts (id, chave, status, categoria, texto, criado_em) values (?, ?, 'pendente', ?, ?, ?)", id, opts.forcar ? `${dia5}#${id.slice(0, 6)}` : dia5, tema.categoria, texto2, agora);
+  brain2.audit("sistema", "li_gerou", tema.categoria);
+  brain2.emit("change");
+  return { id, categoria: tema.categoria };
+}
+function liDecidir(brain2, id, acao, motivo = "") {
+  const p = row(brain2.db, "select * from li_posts where id = ?", id);
+  if (!p) throw new BrainError("not_found", "Post n\xE3o encontrado.");
+  if (p.status === "publicado") throw new BrainError("already_decided", "Esse post j\xE1 foi publicado.");
+  if (acao === "aprovar" && brain2.killed()) throw new BrainError("kill_switch", "Bot\xE3o de emerg\xEAncia ligado: aprova\xE7\xF5es bloqueadas.");
+  run(brain2.db, "update li_posts set status = ?, erro = ?, decidido_em = ? where id = ?", acao === "aprovar" ? "aprovado" : "rejeitado", acao === "rejeitar" ? motivo.slice(0, 300) || null : null, brain2.clock(), id);
+  brain2.audit("voce", acao === "aprovar" ? "li_aprovou" : "li_rejeitou", p.categoria);
+  brain2.emit("change");
+}
+function liEditar(brain2, id, texto2) {
+  const p = row(brain2.db, "select * from li_posts where id = ?", id);
+  if (!p) throw new BrainError("not_found", "Post n\xE3o encontrado.");
+  if (p.status === "publicado") throw new BrainError("already_decided", "Esse post j\xE1 foi publicado.");
+  const t = texto2.trim().slice(0, MAX);
+  if (!t) throw new BrainError("invalid", "O texto n\xE3o pode ficar vazio.");
+  const motivo = revisarTexto(t);
+  if (motivo) throw new BrainError("invalid", `A conformidade barrou esse texto: ${motivo}.`);
+  run(brain2.db, "update li_posts set texto = ? where id = ?", t, id);
+  brain2.emit("change");
+}
+function liMarcarPublicado(brain2, id) {
+  const p = row(brain2.db, "select * from li_posts where id = ?", id);
+  if (!p) throw new BrainError("not_found", "Post n\xE3o encontrado.");
+  if (p.status === "publicado") return;
+  run(brain2.db, "update li_posts set status = 'publicado', manual = 1, publicado_em = ?, erro = null where id = ?", brain2.clock(), id);
+  brain2.audit("voce", "li_marcou_publicado", p.categoria);
+  brain2.emit("change");
+}
+var escaparLinkedIn = (t) => t.replace(/([\\|{}@\[\]()<>*_~])/g, "\\$1");
+async function liPublicar(brain2, env, id, f = fetch) {
+  if (brain2.killed()) throw new BrainError("kill_switch", "Bot\xE3o de emerg\xEAncia ligado.");
+  const p = row(brain2.db, "select * from li_posts where id = ?", id);
+  if (!p) throw new BrainError("not_found", "Post n\xE3o encontrado.");
+  if (p.status === "publicado") throw new BrainError("already_decided", "J\xE1 foi publicado.");
+  if (p.status !== "aprovado" && p.status !== "falhou") throw new BrainError("invalid", "S\xF3 publico o que foi aprovado.");
+  const token = await tokenAtual(brain2, env, f);
+  if (!token) throw new BrainError("invalid", 'O LinkedIn n\xE3o est\xE1 conectado: toque em Conectar LinkedIn na aba. Enquanto isso, copie o texto, poste no LinkedIn e use "J\xE1 postei".');
+  const au = lerAutor(brain2);
+  const doToken = !!lerToken(brain2);
+  const autor = doToken && au.alvo === "pessoa" && au.urn ? au.urn : `urn:li:organization:${env.LINKEDIN_ORG_ID ?? ORG_PADRAO}`;
+  run(brain2.db, "update li_posts set status = 'falhou', erro = 'publica\xE7\xE3o interrompida: confira a p\xE1gina antes de tentar de novo' where id = ?", id);
+  try {
+    const res = await f("https://api.linkedin.com/rest/posts", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "x-restli-protocol-version": "2.0.0", "linkedin-version": env.LINKEDIN_VERSION ?? "202511" },
+      body: JSON.stringify({ author: autor, commentary: escaparLinkedIn(p.texto), visibility: "PUBLIC", distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: "PUBLISHED", isReshareDisabledByAuthor: false })
+    });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      throw new BrainError("invalid", `LinkedIn recusou (${res.status}): ${b.message ?? "erro"}${res.status === 401 ? ". O login venceu: toque em Conectar LinkedIn de novo." : ""}`);
+    }
+    const urn = res.headers.get("x-restli-id") ?? "";
+    const link = urn ? `https://www.linkedin.com/feed/update/${urn}/` : null;
+    run(brain2.db, "update li_posts set status = 'publicado', publicado_em = ?, urn = ?, permalink = ?, erro = null where id = ?", brain2.clock(), urn || null, link, id);
+    brain2.audit("sistema", "li_publicou", p.categoria, { urn });
+    brain2.emit("change");
+    return "Publicado no LinkedIn.";
+  } catch (e) {
+    const msg2 = e instanceof Error ? e.message : String(e);
+    run(brain2.db, "update li_posts set status = 'falhou', erro = ? where id = ?", msg2.slice(0, 300), id);
+    brain2.emit("change");
+    throw e;
+  }
+}
+async function liRotina(brain2, env, f = fetch) {
+  if (brain2.policy("li_gerar", true) === false || !diaDePostar(brain2.clock())) return null;
+  try {
+    const r = await liGerar(brain2, env, f);
+    return r ? `Post do LinkedIn pronto: ${r.categoria}.` : null;
   } catch (e) {
     return e instanceof Error ? e.message : String(e);
   }
@@ -5088,21 +6150,21 @@ async function receberWebhook(brain2, env, req) {
 var API = "https://api.apify.com/v2";
 var ATORES = { maps: "compass~crawler-google-places", site: "apify~website-content-crawler" };
 var REGIOES = ["S\xE3o Paulo, SP", "Rio de Janeiro, RJ", "Belo Horizonte, MG", "Campinas, SP", "Niter\xF3i, RJ", "Santo Andr\xE9, SP", "Uberl\xE2ndia, MG", "Juiz de Fora, MG"];
-var r23 = (n3) => Math.round(n3 * 100) / 100;
+var r24 = (n3) => Math.round(n3 * 100) / 100;
 var mes = (now) => new Date(now - 3 * 36e5).toISOString().slice(0, 7);
 function orcamento(brain2) {
   const mesUsd = Number(brain2.policy("apify_budget_usd_month", 5));
   const porRodadaUsd = Number(brain2.policy("apify_budget_usd_run", 1.5));
   const ini = Date.parse(`${mes(brain2.clock())}-01T00:00:00-03:00`);
   const g = row(brain2.db, "select sum(custo_usd) as s from prospect_runs where criado_em >= ?", ini)?.s ?? 0;
-  return { mesUsd, gastoUsd: r23(g), porRodadaUsd };
+  return { mesUsd, gastoUsd: r24(g), porRodadaUsd };
 }
 function tetoDaRodada(brain2) {
   const o = orcamento(brain2);
   const emAndamento = row(brain2.db, "select count(*) as n from prospect_runs where status = 'rodando'")?.n ?? 0;
   const livre = o.mesUsd - o.gastoUsd - emAndamento * o.porRodadaUsd;
   if (livre <= 0.05) throw new BrainError("invalid", `Or\xE7amento do Apify do m\xEAs esgotado (US$ ${o.mesUsd}). Aumente a pol\xEDtica apify_budget_usd_month se quiser continuar.`);
-  return r23(Math.min(o.porRodadaUsd, livre));
+  return r24(Math.min(o.porRodadaUsd, livre));
 }
 async function apify(env, f, path, init = {}) {
   const token = env.APIFY_TOKEN?.trim();
@@ -5270,7 +6332,7 @@ async function avancar(brain2, env, f = fetch) {
     }
     if (["READY", "RUNNING", "ABORTING", "TIMING-OUT"].includes(info.status)) continue;
     const agora = brain2.clock();
-    const custo = r23(info.usageTotalUsd ?? 0);
+    const custo = r24(info.usageTotalUsd ?? 0);
     if (info.status !== "SUCCEEDED") {
       run(brain2.db, "update prospect_runs set status = 'falhou', custo_usd = ?, detalhe = ?, finalizado_em = ? where id = ?", custo, `Apify: ${info.status}${info.statusMessage ? ` \xB7 ${info.statusMessage.slice(0, 120)}` : ""}`, agora, r.id);
       if (r.tipo === "enriquecimento") for (const id of JSON.parse(r.prospect_ids ?? "[]")) run(brain2.db, "update prospects set status = 'novo' where id = ? and status = 'enriquecendo'", id);
@@ -5481,7 +6543,7 @@ function prospeccaoPainel(brain2, env) {
 }
 
 // packages/core/src/fin-proj.ts
-var r24 = (n3) => Math.round(n3 * 100) / 100;
+var r25 = (n3) => Math.round(n3 * 100) / 100;
 var HORIZONTE_MESES = 36;
 function mesMais(ref, n3) {
   const [y, m] = ref.split("-").map(Number);
@@ -5501,44 +6563,44 @@ function projetar(mrrAtual, saldoInicial, mesRef, p, meta) {
     const churn = Math.min(0.99, p.churn * c2.churn);
     let mrr = mrrAtual;
     let saldo = saldoInicial;
-    const out = { id: c2.id, label: c2.label, novosPorMes: r24(novos), churn, mrr: [], entradas: [], saidas: [], saldo: [], mesDaMeta: null };
+    const out = { id: c2.id, label: c2.label, novosPorMes: r25(novos), churn, mrr: [], entradas: [], saidas: [], saldo: [], mesDaMeta: null };
     meses.forEach((mes2, i) => {
       mrr = mrr - mrr * churn + novos * p.precoNovo;
       const entradas = mrr;
       const saidas = custo + mrr * p.aliquotaImpostos;
       saldo += entradas - saidas;
-      out.mrr.push(r24(mrr));
-      out.entradas.push(r24(entradas));
-      out.saidas.push(r24(saidas));
-      out.saldo.push(r24(saldo));
+      out.mrr.push(r25(mrr));
+      out.entradas.push(r25(entradas));
+      out.saidas.push(r25(saidas));
+      out.saldo.push(r25(saldo));
       if (out.mesDaMeta === null && mrr >= meta) out.mesDaMeta = meses[i];
     });
     return out;
   });
-  return { meses, saldoInicial: r24(saldoInicial), cenarios };
+  return { meses, saldoInicial: r25(saldoInicial), cenarios };
 }
 function diaMenos(hoje, n3) {
   return new Date(Date.parse(`${hoje}T12:00:00Z`) - n3 * 864e5).toISOString().slice(0, 10);
 }
 function indicadores(i) {
   const notas = [];
-  const ticket = i.clientes ? r24(i.mrr / i.clientes) : null;
+  const ticket = i.clientes ? r25(i.mrr / i.clientes) : null;
   const alvo = diaMenos(i.hoje, 30);
   const base = [...i.mrrSerie].reverse().find((p) => p.day <= alvo);
   let cresc = null;
   if (base && base.total > 0) cresc = Math.round((i.mrr - base.total) / base.total * 1e3) / 10;
   else notas.push("Crescimento de 30 dias aparece quando o hist\xF3rico de MRR tiver 30 dias.");
   const margem = i.entradasMes > 0 ? Math.round(i.resultadoMes / i.entradasMes * 1e3) / 10 : null;
-  const ltv = ticket !== null && i.churn > 0 ? r24(ticket / i.churn) : null;
+  const ltv = ticket !== null && i.churn > 0 ? r25(ticket / i.churn) : null;
   let cac = null;
-  if (i.gastoMarketing3m > 0 && i.clientesNovos3m && i.clientesNovos3m > 0) cac = r24(i.gastoMarketing3m / i.clientesNovos3m);
+  if (i.gastoMarketing3m > 0 && i.clientesNovos3m && i.clientesNovos3m > 0) cac = r25(i.gastoMarketing3m / i.clientesNovos3m);
   else notas.push("CAC precisa de gasto em Marketing e Vendas pago e de clientes novos contados no per\xEDodo.");
   const ltvCac = ltv !== null && cac ? Math.round(ltv / cac * 10) / 10 : null;
   const payback = cac !== null && ticket ? Math.round(cac / ticket * 10) / 10 : null;
   notas.push(`LTV usa o churn de ${Math.round(i.churn * 1e3) / 10}% ao m\xEAs das premissas, n\xE3o um churn medido.`);
   return {
-    mrr: r24(i.mrr),
-    arr: r24(i.mrr * 12),
+    mrr: r25(i.mrr),
+    arr: r25(i.mrr * 12),
     clientesAtivos: i.clientes,
     ticketMedio: ticket,
     crescimentoMrr30dPct: cresc,
@@ -5548,7 +6610,7 @@ function indicadores(i) {
     ltvCac,
     paybackMeses: payback,
     mrrSerie: i.mrrSerie,
-    metaMrr: { valor: i.meta.valor, data: i.meta.data, falta: r24(Math.max(0, i.meta.valor - i.mrr)) },
+    metaMrr: { valor: i.meta.valor, data: i.meta.data, falta: r25(Math.max(0, i.meta.valor - i.mrr)) },
     notas
   };
 }
@@ -5556,7 +6618,7 @@ function indicadores(i) {
 // packages/core/src/fin.ts
 var CATEGORIAS_RECEITA = ["Recorr\xEAncia (Mensalidade)", "Implementa\xE7\xE3o/Setup", "Outras Receitas"];
 var CATEGORIAS_DESPESA = ["Custos Diretos (CMV)", "Pessoal", "Marketing e Vendas", "Tecnologia/Ferramentas", "Administrativas", "Financeiras", "Impostos e Taxas", "Outras Despesas"];
-var r25 = (n3) => Math.round(n3 * 100) / 100;
+var r26 = (n3) => Math.round(n3 * 100) / 100;
 var DATA2 = /^\d{4}-\d{2}-\d{2}$/;
 var DIA2 = 864e5;
 function categoria(c2, entrada) {
@@ -5568,16 +6630,16 @@ function categoria(c2, entrada) {
 var diaMs = (d) => Date.parse(`${d}T12:00:00-03:00`);
 var mesDe = (d) => d.slice(0, 7);
 function somaMeses(d, n3) {
-  const [y, m, dia4] = d.split("-").map(Number);
+  const [y, m, dia5] = d.split("-").map(Number);
   const alvo = new Date(Date.UTC(y, m - 1 + n3, 1));
   const ult = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
-  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(dia4, ult)).padStart(2, "0")}`;
+  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(dia5, ult)).padStart(2, "0")}`;
 }
 var nomeMes = (ref) => {
   const [y, m] = ref.split("-");
   return `${["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"][Number(m) - 1]}/${y.slice(2)}`;
 };
-var PREMISSAS_PADRAO = { novos_por_mes: 2, preco_novo: 49, churn: 0.05 };
+var PREMISSAS_PADRAO2 = { novos_por_mes: 2, preco_novo: 49, churn: 0.05 };
 function cfgNum(db, chave2) {
   const a = row(db, "select valor from fin_config where chave = ?", chave2);
   if (!a || a.valor === "") return null;
@@ -5597,9 +6659,9 @@ function finPremissas(db, custoMensalAuto) {
   const preco = cfgNum(db, "preco_novo");
   const churn = cfgNum(db, "churn");
   return {
-    novosPorMes: novos !== null && novos >= 0 ? novos : PREMISSAS_PADRAO.novos_por_mes,
-    precoNovo: preco !== null && preco > 0 ? preco : PREMISSAS_PADRAO.preco_novo,
-    churn: churn !== null && churn >= 0 && churn < 1 ? churn : PREMISSAS_PADRAO.churn,
+    novosPorMes: novos !== null && novos >= 0 ? novos : PREMISSAS_PADRAO2.novos_por_mes,
+    precoNovo: preco !== null && preco > 0 ? preco : PREMISSAS_PADRAO2.preco_novo,
+    churn: churn !== null && churn >= 0 && churn < 1 ? churn : PREMISSAS_PADRAO2.churn,
     custoMensal: cfgNum(db, "custo_mensal"),
     custoMensalAuto,
     aliquotaImpostos: finConfig(db).aliquotaImpostos
@@ -5633,7 +6695,7 @@ function finAddCobranca(db, agora, c2) {
   if (!nome || nome.length > 120) throw new BrainError("invalid", "D\xEA um nome para a cobran\xE7a (at\xE9 120 caracteres).");
   if (!(c2.valor > 0 && c2.valor <= 1e6)) throw new BrainError("invalid", "O valor da cobran\xE7a \xE9 positivo.");
   if (!Number.isInteger(c2.dia) || c2.dia < 1 || c2.dia > 31) throw new BrainError("invalid", "O dia da cobran\xE7a vai de 1 a 31 (em m\xEAs curto vale o \xFAltimo dia).");
-  run(db, "insert into fin_cobrancas (nome, valor, dia, forma, ativa, criado_em) values (?, ?, ?, ?, 1, ?)", nome, r25(c2.valor), c2.dia, (c2.forma ?? "pix").slice(0, 20), agora);
+  run(db, "insert into fin_cobrancas (nome, valor, dia, forma, ativa, criado_em) values (?, ?, ?, ?, 1, ?)", nome, r26(c2.valor), c2.dia, (c2.forma ?? "pix").slice(0, 20), agora);
 }
 function finSetCobranca(db, id, ativa) {
   if (!row(db, "select id from fin_cobrancas where id = ?", id)) throw new BrainError("not_found", "Cobran\xE7a n\xE3o encontrada.");
@@ -5681,7 +6743,7 @@ function validarExtrato(x, i) {
   if (typeof x.valor !== "number" || !Number.isFinite(x.valor) || x.valor === 0) throw new BrainError("invalid", `Extrato linha ${i + 1}: valor inv\xE1lido.`);
   const d = String(x.descricao ?? "").trim().slice(0, 200);
   if (!d) throw new BrainError("invalid", `Extrato linha ${i + 1}: falta a descri\xE7\xE3o.`);
-  return { data: x.data, descricao: d, valor: r25(x.valor), categoria: x.categoria ?? null };
+  return { data: x.data, descricao: d, valor: r26(x.valor), categoria: x.categoria ?? null };
 }
 function validarConta(c2, i) {
   const p = `Conta ${i + 1}`;
@@ -5694,7 +6756,7 @@ function validarConta(c2, i) {
   if (c2.valor != null && (typeof c2.valor !== "number" || !Number.isFinite(c2.valor) || c2.valor <= 0)) throw new BrainError("invalid", `${p}: o valor \xE9 um n\xFAmero positivo (sem sinal).`);
   const n3 = c2.recorrenciaMeses ?? 1;
   if (!Number.isInteger(n3) || n3 < 1 || n3 > 60) throw new BrainError("invalid", `${p}: recorr\xEAncia de 1 a 60 meses.`);
-  return { ...c2, descricao: desc, valor: c2.valor == null ? null : r25(c2.valor), recorrenciaMeses: n3, categoria: categoria(c2.categoria, c2.tipo === "receber") };
+  return { ...c2, descricao: desc, valor: c2.valor == null ? null : r26(c2.valor), recorrenciaMeses: n3, categoria: categoria(c2.categoria, c2.tipo === "receber") };
 }
 function finAddExtrato(db, agora, itens2, fonte = "manual") {
   if (!Array.isArray(itens2) || itens2.length === 0) throw new BrainError("invalid", "Nenhum lan\xE7amento para importar.");
@@ -5718,25 +6780,69 @@ function finAddExtrato(db, agora, itens2, fonte = "manual") {
 function finAddConta(db, agora, entrada) {
   const c2 = validarConta(entrada, 0);
   const n3 = c2.recorrenciaMeses ?? 1;
-  const grupo = n3 > 1 ? crypto.randomUUID() : null;
+  const grupo2 = n3 > 1 ? crypto.randomUUID() : null;
   let criadas = 0;
   tx(db, () => {
     for (let k = 0; k < n3; k++) {
       const venc = somaMeses(c2.vencimento, k);
       const dup = row(db, "select id from fin_contas where tipo = ? and descricao = ? and vencimento = ? and coalesce(valor, -1) = coalesce(?, -1)", c2.tipo, c2.descricao, venc, c2.valor ?? null);
       if (dup) continue;
-      run(db, "insert into fin_contas (tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, grupo, obs, criado_em) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", c2.tipo, c2.descricao, c2.contraparte ?? null, c2.categoria, venc, c2.valor ?? null, k === 0 ? c2.pagoEm ?? null : null, grupo, c2.obs ?? null, agora);
+      run(db, "insert into fin_contas (tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, grupo, obs, criado_em) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", c2.tipo, c2.descricao, c2.contraparte ?? null, c2.categoria, venc, c2.valor ?? null, k === 0 ? c2.pagoEm ?? null : null, grupo2, c2.obs ?? null, agora);
       criadas++;
     }
   });
   return { criadas };
+}
+function finNovaVenda(db, agora, v) {
+  const cliente = String(v.cliente ?? "").trim().slice(0, 80);
+  if (!cliente) throw new BrainError("invalid", "Informe o nome do cliente.");
+  if (typeof v.valorMensal !== "number" || !(v.valorMensal > 0 && v.valorMensal <= 1e5)) throw new BrainError("invalid", "O valor da mensalidade \xE9 um n\xFAmero positivo.");
+  if (!DATA2.test(String(v.inicio))) throw new BrainError("invalid", "A data da venda precisa ser AAAA-MM-DD.");
+  const recorrente = v.recorrente !== false;
+  const meses = v.mesesPrevistos ?? 11;
+  if (!Number.isInteger(meses) || meses < 0 || meses > 59) throw new BrainError("invalid", "Meses previstos: de 0 a 59.");
+  const setup = v.taxaSetup ? r26(Number(v.taxaSetup)) : 0;
+  if (setup < 0 || !Number.isFinite(setup)) throw new BrainError("invalid", "A taxa de implementa\xE7\xE3o \xE9 um n\xFAmero positivo.");
+  const valor = r26(v.valorMensal);
+  const parcelas = v.parcelas && v.parcelas.length ? v.parcelas : [{ valor, pagoEm: null, vencimento: v.inicio }];
+  if (parcelas.length > 12) throw new BrainError("invalid", "No m\xE1ximo 12 parcelas no primeiro m\xEAs.");
+  for (const [i, p] of parcelas.entries()) {
+    if (typeof p.valor !== "number" || !(p.valor > 0)) throw new BrainError("invalid", `Parcela ${i + 1}: valor inv\xE1lido.`);
+    if (p.pagoEm != null && p.pagoEm !== "" && !DATA2.test(String(p.pagoEm))) throw new BrainError("invalid", `Parcela ${i + 1}: data de pagamento inv\xE1lida.`);
+    if (p.vencimento != null && p.vencimento !== "" && !DATA2.test(String(p.vencimento))) throw new BrainError("invalid", `Parcela ${i + 1}: vencimento inv\xE1lido.`);
+  }
+  const somaP = r26(parcelas.reduce((t, p) => t + p.valor, 0));
+  if (Math.abs(somaP - valor) > 9e-3) throw new BrainError("invalid", `As parcelas somam R$ ${somaP.toFixed(2)}, mas o valor \xE9 R$ ${valor.toFixed(2)}.`);
+  if (recorrente && row(db, "select 1 as x from subscriptions where source = 'manual' and lower(label) = lower(?) and status = 'active'", cliente)) throw new BrainError("invalid", `J\xE1 existe um cliente "${cliente}" no MRR. Use outro nome ou remova o anterior.`);
+  let contas = 0;
+  tx(db, () => {
+    const ins = (descricao, cat, venc, val, pago, grupo2, obs) => {
+      run(db, "insert into fin_contas (tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, grupo, obs, criado_em) values ('receber', ?, ?, ?, ?, ?, ?, ?, ?, ?)", descricao, cliente, cat, venc, val, pago, grupo2, obs, agora);
+      contas++;
+    };
+    const n3 = parcelas.length;
+    parcelas.forEach((p, i) => {
+      const pago = p.pagoEm ? String(p.pagoEm) : null;
+      const venc = p.vencimento ? String(p.vencimento) : pago ?? v.inicio;
+      ins(n3 > 1 ? `${cliente}: mensalidade 1 (parcela ${i + 1}/${n3})` : `${cliente}: mensalidade 1`, recorrente ? "Recorr\xEAncia (Mensalidade)" : "Outras Receitas", venc, p.valor, pago, null, p.nota ? String(p.nota).slice(0, 200) : null);
+    });
+    if (setup > 0) ins(`${cliente}: implementa\xE7\xE3o`, "Implementa\xE7\xE3o/Setup", v.inicio, setup, v.taxaSetupPaga ? v.inicio : null, null, null);
+    if (recorrente) {
+      const grupo2 = crypto.randomUUID();
+      for (let k = 1; k <= meses; k++) ins(`${cliente}: mensalidade ${k + 1}`, "Recorr\xEAncia (Mensalidade)", somaMeses(v.inicio, k), valor, null, grupo2, null);
+      const id = `manual-${crypto.randomUUID().slice(0, 8)}`;
+      run(db, "insert into subscriptions (source, external_id, label, list_price_brl, effective_price_brl, discount_ends_at, status, origin, updated_at) values ('manual', ?, ?, ?, ?, null, 'active', 'informado', ?)", id, cliente, valor, valor, agora);
+    }
+  });
+  conciliar(db);
+  return { contas, mrr: recorrente };
 }
 function finPagarConta(db, id, pagoEm, valor) {
   if (!DATA2.test(pagoEm)) throw new BrainError("invalid", "A data precisa ser AAAA-MM-DD.");
   const c2 = row(db, "select id, valor from fin_contas where id = ?", id);
   if (!c2) throw new BrainError("not_found", "Conta n\xE3o encontrada.");
   if (valor !== void 0 && (!Number.isFinite(valor) || valor <= 0)) throw new BrainError("invalid", "O valor \xE9 um n\xFAmero positivo.");
-  run(db, "update fin_contas set pago_em = ?, valor = ? where id = ?", pagoEm, valor !== void 0 ? r25(valor) : c2.valor, id);
+  run(db, "update fin_contas set pago_em = ?, valor = ? where id = ?", pagoEm, valor !== void 0 ? r26(valor) : c2.valor, id);
   conciliar(db);
 }
 function finDesfazerPagamento(db, id) {
@@ -5782,6 +6888,54 @@ function conciliar(db) {
   });
   return n3;
 }
+function movimentosFin(ext, contas) {
+  const entradas = ext.filter((e) => e.valor > 0).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
+  const despesas = [
+    ...contas.filter((c2) => c2.tipo === "pagar" && c2.pago_em && c2.valor).map((c2) => ({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, false), desc: c2.descricao, origem: c2.extrato_id === null ? "Conta paga (fora do Inter)" : "Conta paga", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null })),
+    ...ext.filter((e) => e.valor < 0 && e.conta_id === null).map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false }))
+  ];
+  for (const c2 of contas)
+    if (c2.tipo === "receber" && c2.pago_em && c2.valor && c2.extrato_id === null)
+      entradas.push({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: "Recebido fora do Inter", ref: `conta:${c2.id}`, conciliado: false });
+  return { entradas, despesas };
+}
+function finDetalhe(db, agora, linha, mes2) {
+  const ext = rows(db, "select id, data, descricao, valor, categoria, conta_id, fonte from fin_extrato order by data, id");
+  const contas = rows(db, "select id, tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, extrato_id, grupo, obs from fin_contas order by vencimento, id");
+  const { entradas, despesas } = movimentosFin(ext, contas);
+  const limpo = linha.replace(/^\(-\)\s*/, "");
+  const lista = mes2.split(",").filter(Boolean);
+  const noMes = (l) => l.filter((m) => lista.includes(mesDe(m.data)));
+  let itens2;
+  let lado;
+  if (limpo === "Receita bruta") {
+    itens2 = noMes(entradas);
+    lado = "entrada";
+  } else if (limpo === "Receita l\xEDquida") {
+    itens2 = [...noMes(entradas), ...noMes(despesas).filter((m) => m.cat === "Impostos e Taxas").map((m) => ({ ...m, valor: -m.valor }))];
+    lado = "mista";
+  } else if (limpo === "Despesas") {
+    itens2 = noMes(despesas);
+    lado = "saida";
+  } else if (limpo === "Saldo Inter") {
+    itens2 = ext.map((e) => ({ data: e.data, valor: e.valor, cat: e.categoria ?? "", desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
+    lado = "mista";
+  } else if (limpo === "Fora do Inter") {
+    itens2 = contas.filter((c2) => c2.tipo === "pagar" && c2.pago_em && c2.valor && c2.extrato_id === null).map((c2) => ({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, false), desc: c2.descricao, origem: "Pago fora do Inter", ref: `conta:${c2.id}`, conciliado: false }));
+    lado = "saida";
+  } else if (limpo === "Resultado") {
+    itens2 = [...noMes(entradas), ...noMes(despesas).map((m) => ({ ...m, valor: -m.valor }))];
+    lado = "mista";
+  } else if (CATEGORIAS_RECEITA.includes(limpo)) {
+    itens2 = noMes(entradas).filter((m) => m.cat === limpo);
+    lado = "entrada";
+  } else {
+    itens2 = noMes(despesas).filter((m) => m.cat === limpo);
+    lado = "saida";
+  }
+  itens2.sort((a, b) => a.data < b.data ? 1 : -1);
+  return { linha, mes: mes2, lado, total: r26(itens2.reduce((s2, m) => s2 + m.valor, 0)), itens: itens2 };
+}
 function finPainel(db, agora) {
   const hoje = brtDay(agora);
   const mesRef = mesDe(hoje);
@@ -5804,21 +6958,16 @@ function finPainel(db, agora) {
     cobranca: c2.grupo !== null && c2.grupo.startsWith("cob:"),
     obs: c2.obs
   });
-  const saldoInter = r25(ext.reduce((s2, e) => s2 + e.valor, 0));
+  const saldoInter = r26(ext.reduce((s2, e) => s2 + e.valor, 0));
   const ultimo = ext.length ? ext[ext.length - 1].data : null;
-  const entradas = ext.filter((e) => e.valor > 0).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true) }));
-  const despesas = [
-    ...contas.filter((c2) => c2.tipo === "pagar" && c2.pago_em && c2.valor).map((c2) => ({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, false) })),
-    ...ext.filter((e) => e.valor < 0 && e.conta_id === null).map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false) }))
-  ];
-  for (const c2 of contas) if (c2.tipo === "receber" && c2.pago_em && c2.valor && c2.extrato_id === null) entradas.push({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, true) });
+  const { entradas, despesas } = movimentosFin(ext, contas);
   const meses = (n3) => {
     const out = [];
     for (let i = n3 - 1; i >= 0; i--) out.push(mesDe(somaMeses(`${mesRef}-01`, -i)));
     return out;
   };
-  const soma2 = (l, mes2, cat) => r25(l.filter((m) => mesDe(m.data) === mes2 && (!cat || m.cat === cat)).reduce((s2, m) => s2 + m.valor, 0));
-  const serie = meses(6).map((m) => ({ mes: m, entradas: soma2(entradas, m), saidas: soma2(despesas, m), resultado: r25(soma2(entradas, m) - soma2(despesas, m)) }));
+  const soma2 = (l, mes2, cat) => r26(l.filter((m) => mesDe(m.data) === mes2 && (!cat || m.cat === cat)).reduce((s2, m) => s2 + m.valor, 0));
+  const serie = meses(6).map((m) => ({ mes: m, entradas: soma2(entradas, m), saidas: soma2(despesas, m), resultado: r26(soma2(entradas, m) - soma2(despesas, m)) }));
   const atual = serie[serie.length - 1];
   const mDre = meses(12);
   const linha = (label, tipo, f) => ({ label, tipo, valores: mDre.map(f) });
@@ -5830,13 +6979,13 @@ function finPainel(db, agora) {
       ...CATEGORIAS_RECEITA.map((c2) => linha(c2, "receita", (m) => soma2(entradas, m, c2))),
       linha("Receita bruta", "total", recBruta),
       linha("(-) Impostos e Taxas", "despesa", imp),
-      linha("Receita l\xEDquida", "total", (m) => r25(recBruta(m) - imp(m))),
+      linha("Receita l\xEDquida", "total", (m) => r26(recBruta(m) - imp(m))),
       ...CATEGORIAS_DESPESA.filter((c2) => c2 !== "Impostos e Taxas").map((c2) => linha(`(-) ${c2}`, "despesa", (m) => soma2(despesas, m, c2))),
-      linha("Resultado", "total", (m) => r25(recBruta(m) - soma2(despesas, m)))
+      linha("Resultado", "total", (m) => r26(recBruta(m) - soma2(despesas, m)))
     ]
   };
   const fechados = meses(4).slice(0, 3).filter((m) => soma2(despesas, m) > 0 || soma2(entradas, m) > 0);
-  const despesaMedia = fechados.length ? r25(fechados.reduce((s2, m) => s2 + soma2(despesas, m), 0) / fechados.length) : 0;
+  const despesaMedia = fechados.length ? r26(fechados.reduce((s2, m) => s2 + soma2(despesas, m), 0) / fechados.length) : 0;
   const mesesDeCaixa = despesaMedia > 0 ? Math.round(saldoInter / despesaMedia * 10) / 10 : null;
   const subs = rows(db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
   const { total: mrr } = mrrBySource(subs);
@@ -5845,30 +6994,30 @@ function finPainel(db, agora) {
   const aPagar = pendentes.filter((c2) => c2.tipo === "pagar");
   const aReceber = pendentes.filter((c2) => c2.tipo === "receber");
   const em30 = brtDay(agora + 30 * DIA2);
-  const soma30 = (l) => r25(l.filter((c2) => c2.vencimento <= em30).reduce((s2, c2) => s2 + (c2.valor ?? 0), 0));
+  const soma30 = (l) => r26(l.filter((c2) => c2.vencimento <= em30).reduce((s2, c2) => s2 + (c2.valor ?? 0), 0));
   const foraMes = contas.filter((c2) => c2.tipo === "pagar" && c2.pago_em && c2.extrato_id === null && mesDe(c2.pago_em) === mesRef).reduce((s2, c2) => s2 + (c2.valor ?? 0), 0);
   const foraTotal = contas.filter((c2) => c2.tipo === "pagar" && c2.pago_em && c2.extrato_id === null).reduce((s2, c2) => s2 + (c2.valor ?? 0), 0);
   const alertas = [];
-  const brl3 = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const brl4 = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const atrasPagar = aPagar.filter((c2) => c2.status === "atrasado");
-  if (atrasPagar.length) alertas.push({ id: "pagar-atrasado", tom: "critico", titulo: `${atrasPagar.length} conta${atrasPagar.length > 1 ? "s" : ""} a pagar vencida${atrasPagar.length > 1 ? "s" : ""}`, detalhe: `${brl3(atrasPagar.reduce((s2, c2) => s2 + (c2.valor ?? 0), 0))} em aberto: ${atrasPagar.slice(0, 3).map((c2) => c2.descricao).join(", ")}.` });
+  if (atrasPagar.length) alertas.push({ id: "pagar-atrasado", tom: "critico", titulo: `${atrasPagar.length} conta${atrasPagar.length > 1 ? "s" : ""} a pagar vencida${atrasPagar.length > 1 ? "s" : ""}`, detalhe: `${brl4(atrasPagar.reduce((s2, c2) => s2 + (c2.valor ?? 0), 0))} em aberto: ${atrasPagar.slice(0, 3).map((c2) => c2.descricao).join(", ")}.` });
   const em7 = brtDay(agora + 7 * DIA2);
   const prox7 = aPagar.filter((c2) => c2.status === "pendente" && c2.vencimento <= em7);
-  if (prox7.length) alertas.push({ id: "pagar-7d", tom: "atencao", titulo: `${prox7.length} conta${prox7.length > 1 ? "s" : ""} vence${prox7.length > 1 ? "m" : ""} em 7 dias`, detalhe: `${brl3(prox7.reduce((s2, c2) => s2 + (c2.valor ?? 0), 0))}: ${prox7.slice(0, 3).map((c2) => `${c2.descricao} (${c2.vencimento.slice(8)}/${c2.vencimento.slice(5, 7)})`).join(", ")}.` });
+  if (prox7.length) alertas.push({ id: "pagar-7d", tom: "atencao", titulo: `${prox7.length} conta${prox7.length > 1 ? "s" : ""} vence${prox7.length > 1 ? "m" : ""} em 7 dias`, detalhe: `${brl4(prox7.reduce((s2, c2) => s2 + (c2.valor ?? 0), 0))}: ${prox7.slice(0, 3).map((c2) => `${c2.descricao} (${c2.vencimento.slice(8)}/${c2.vencimento.slice(5, 7)})`).join(", ")}.` });
   const atrasReceber = aReceber.filter((c2) => c2.status === "atrasado");
   if (atrasReceber.length) alertas.push({ id: "receber-atrasado", tom: "atencao", titulo: `${atrasReceber.length} recebimento${atrasReceber.length > 1 ? "s" : ""} atrasado${atrasReceber.length > 1 ? "s" : ""}`, detalhe: `${atrasReceber.slice(0, 3).map((c2) => c2.descricao).join(", ")}. Se j\xE1 caiu no Inter, importe o extrato para conciliar.` });
   const mesAnt = mesDe(somaMeses(`${mesRef}-01`, -1));
   const guiaPaga = contas.some((c2) => c2.tipo === "pagar" && c2.categoria === "Impostos e Taxas" && c2.pago_em && mesDe(c2.pago_em) === mesRef);
   const recAnt = soma2(entradas, mesAnt);
   if (!guiaPaga && recAnt > 0) {
-    const dia4 = Number(hoje.slice(8));
-    alertas.push({ id: "guia-simples", tom: dia4 > 20 ? "critico" : "atencao", titulo: dia4 > 20 ? "Guia do Simples sem pagamento lan\xE7ado" : `Guia do Simples vence dia 20 (${20 - dia4 >= 0 ? `faltam ${20 - dia4} dias` : "hoje"})`, detalhe: `Referente a ${nomeMes(mesAnt)}. Estimativa ${brl3(r25(recAnt * cfg.aliquotaImpostos))} (${Math.round(cfg.aliquotaImpostos * 100)}% de ${brl3(recAnt)}); o valor real sai do PGDAS.` });
+    const dia5 = Number(hoje.slice(8));
+    alertas.push({ id: "guia-simples", tom: dia5 > 20 ? "critico" : "atencao", titulo: dia5 > 20 ? "Guia do Simples sem pagamento lan\xE7ado" : `Guia do Simples vence dia 20 (${20 - dia5 >= 0 ? `faltam ${20 - dia5} dias` : "hoje"})`, detalhe: `Referente a ${nomeMes(mesAnt)}. Estimativa ${brl4(r26(recAnt * cfg.aliquotaImpostos))} (${Math.round(cfg.aliquotaImpostos * 100)}% de ${brl4(recAnt)}); o valor real sai do PGDAS.` });
   }
-  if (mesesDeCaixa !== null && mesesDeCaixa < 3) alertas.push({ id: "caixa-baixo", tom: mesesDeCaixa < 1.5 ? "critico" : "atencao", titulo: `Caixa cobre ${mesesDeCaixa.toLocaleString("pt-BR")} ${mesesDeCaixa === 1 ? "m\xEAs" : "meses"} de despesa`, detalhe: `Saldo do Inter ${brl3(saldoInter)} contra despesa m\xE9dia de ${brl3(despesaMedia)} por m\xEAs.` });
-  if (foraMes > 0) alertas.push({ id: "fora-inter", tom: "info", titulo: `${brl3(r25(foraMes))} pagos fora do Inter neste m\xEAs`, detalhe: "Despesa paga no cart\xE3o ou do bolso. Entra no resultado, mas n\xE3o mexe no saldo do Inter: acompanhe o que voc\xEA precisa repor." });
+  if (mesesDeCaixa !== null && mesesDeCaixa < 3) alertas.push({ id: "caixa-baixo", tom: mesesDeCaixa < 1.5 ? "critico" : "atencao", titulo: `Caixa cobre ${mesesDeCaixa.toLocaleString("pt-BR")} ${mesesDeCaixa === 1 ? "m\xEAs" : "meses"} de despesa`, detalhe: `Saldo do Inter ${brl4(saldoInter)} contra despesa m\xE9dia de ${brl4(despesaMedia)} por m\xEAs.` });
+  if (foraMes > 0) alertas.push({ id: "fora-inter", tom: "info", titulo: `${brl4(r26(foraMes))} pagos fora do Inter neste m\xEAs`, detalhe: "Despesa paga no cart\xE3o ou do bolso. Entra no resultado, mas n\xE3o mexe no saldo do Inter: acompanhe o que voc\xEA precisa repor." });
   if (ultimo && (agora - diaMs(ultimo)) / DIA2 > 7) alertas.push({ id: "extrato-velho", tom: "info", titulo: "Extrato do Inter desatualizado", detalhe: `O \xFAltimo lan\xE7amento \xE9 de ${ultimo.slice(8)}/${ultimo.slice(5, 7)}. Importe o extrato recente para o saldo e a concilia\xE7\xE3o refletirem o banco.` });
   const fechadosSemImposto = meses(4).slice(0, 3).filter((m) => soma2(despesas, m) > 0);
-  const custoAuto = fechadosSemImposto.length ? r25(fechadosSemImposto.reduce((t, m) => t + soma2(despesas, m) - soma2(despesas, m, "Impostos e Taxas"), 0) / fechadosSemImposto.length) : 0;
+  const custoAuto = fechadosSemImposto.length ? r26(fechadosSemImposto.reduce((t, m) => t + soma2(despesas, m) - soma2(despesas, m, "Impostos e Taxas"), 0) / fechadosSemImposto.length) : 0;
   const premissas = finPremissas(db, custoAuto);
   const metaPol = row(db, "select value from policies where key = 'mrr_goal'");
   let meta = { valor: 1200, data: "31/12/2026" };
@@ -5877,11 +7026,11 @@ function finPainel(db, agora) {
     if (j2 && typeof j2.value === "number" && j2.value > 0) meta = { valor: j2.value, data: j2.date ?? meta.data };
   } catch {
   }
-  const projecao = projetar(r25(mrr), saldoInter, mesRef, premissas, meta.valor);
+  const projecao = projetar(r26(mrr), saldoInter, mesRef, premissas, meta.valor);
   const hist = rows(db, "select day, mrr_brl from mrr_daily order by day");
   const porDia = /* @__PURE__ */ new Map();
   for (const h of hist) porDia.set(h.day, (porDia.get(h.day) ?? 0) + h.mrr_brl);
-  const mrrSerie = [...porDia.entries()].map(([day, total]) => ({ day, total: r25(total) }));
+  const mrrSerie = [...porDia.entries()].map(([day, total]) => ({ day, total: r26(total) }));
   const tres = meses(4).slice(0, 3);
   const gastoMkt = tres.reduce((t, m) => t + soma2(despesas, m, "Marketing e Vendas"), 0);
   const ind = indicadores({ mrr, clientes: ativos, mrrSerie, hoje, entradasMes: atual.entradas, resultadoMes: atual.resultado, churn: premissas.churn, meta, gastoMarketing3m: gastoMkt, clientesNovos3m: null });
@@ -5890,7 +7039,7 @@ function finPainel(db, agora) {
   const saldoPorDia = /* @__PURE__ */ new Map();
   for (const e of ext) {
     acc += e.valor;
-    saldoPorDia.set(e.data, r25(acc));
+    saldoPorDia.set(e.data, r26(acc));
   }
   const saldoSerie = [];
   let ult = 0;
@@ -5901,7 +7050,7 @@ function finPainel(db, agora) {
     if (!saldoPorDia.has(d) && saldoSerie.length === 0) ult = [...saldoPorDia.entries()].filter(([k]) => k < d).map(([, v]) => v).pop() ?? 0;
     saldoSerie.push({ data: d, saldo: ult });
   }
-  const despesasPorCategoria = CATEGORIAS_DESPESA.map((c2) => ({ categoria: c2, mes: soma2(despesas, mesRef, c2), tresMeses: r25(tres.reduce((t, m) => t + soma2(despesas, m, c2), 0) / 3) })).filter((x) => x.mes > 0 || x.tresMeses > 0).sort((a, b) => b.mes - a.mes || b.tresMeses - a.tresMeses);
+  const despesasPorCategoria = CATEGORIAS_DESPESA.map((c2) => ({ categoria: c2, mes: soma2(despesas, mesRef, c2), tresMeses: r26(tres.reduce((t, m) => t + soma2(despesas, m, c2), 0) / 3) })).filter((x) => x.mes > 0 || x.tresMeses > 0).sort((a, b) => b.mes - a.mes || b.tresMeses - a.tresMeses);
   const fluxo = (() => {
     const ini = brtDay(agora - 30 * DIA2);
     const fim = brtDay(agora + 150 * DIA2);
@@ -5929,13 +7078,13 @@ function finPainel(db, agora) {
       else m.s += c2.valor;
       m.itens.push({ descricao: `${c2.descricao}${c2.vencimento < hoje ? " (atrasada)" : ""}`, valor: c2.tipo === "receber" ? c2.valor : -c2.valor });
     }
-    let saldo = r25(ext.filter((e) => e.data < ini).reduce((t, e) => t + e.valor, 0));
+    let saldo = r26(ext.filter((e) => e.data < ini).reduce((t, e) => t + e.valor, 0));
     const dias = [];
     for (let t = Date.parse(`${ini}T12:00:00Z`), f = Date.parse(`${fim}T12:00:00Z`); t <= f; t += DIA2) {
       const d = new Date(t).toISOString().slice(0, 10);
       const m = mov.get(d);
-      saldo = r25(saldo + (m ? m.e - m.s : 0));
-      dias.push({ data: d, entradas: r25(m?.e ?? 0), saidas: r25(m?.s ?? 0), saldo, projetado: d > hoje, itens: m ? m.itens.slice(0, 8) : [] });
+      saldo = r26(saldo + (m ? m.e - m.s : 0));
+      dias.push({ data: d, entradas: r26(m?.e ?? 0), saidas: r26(m?.s ?? 0), saldo, projetado: d > hoje, itens: m ? m.itens.slice(0, 8) : [] });
     }
     const fut = dias.filter((x) => x.data >= hoje);
     const menor = fut.length ? fut.reduce((a, b) => b.saldo < a.saldo ? b : a) : null;
@@ -5951,7 +7100,7 @@ function finPainel(db, agora) {
       ]
     };
   })();
-  if (fluxo.negativoEm) alertas.unshift({ id: "caixa-negativo", tom: "critico", titulo: `Caixa fica negativo em ${fluxo.negativoEm.slice(8)}/${fluxo.negativoEm.slice(5, 7)}`, detalhe: `Com as contas em aberto, o saldo do Inter cai a ${brl3(fluxo.menorSaldo?.valor ?? 0)}. Veja a aba Fluxo de caixa.` });
+  if (fluxo.negativoEm) alertas.unshift({ id: "caixa-negativo", tom: "critico", titulo: `Caixa fica negativo em ${fluxo.negativoEm.slice(8)}/${fluxo.negativoEm.slice(5, 7)}`, detalhe: `Com as contas em aberto, o saldo do Inter cai a ${brl4(fluxo.menorSaldo?.valor ?? 0)}. Veja a aba Fluxo de caixa.` });
   return {
     agora,
     hoje,
@@ -5963,13 +7112,13 @@ function finPainel(db, agora) {
       entradasMes: atual.entradas,
       saidasMes: atual.saidas,
       resultadoMes: atual.resultado,
-      mrr: r25(mrr),
+      mrr: r26(mrr),
       clientesAtivos: ativos,
-      ticketMedio: ativos ? r25(mrr / ativos) : null,
+      ticketMedio: ativos ? r26(mrr / ativos) : null,
       mesesDeCaixa,
       despesaMediaMensal: despesaMedia,
-      pagoForaDoInterMes: r25(foraMes),
-      pagoForaDoInterTotal: r25(foraTotal),
+      pagoForaDoInterMes: r26(foraMes),
+      pagoForaDoInterTotal: r26(foraTotal),
       aPagar30d: soma30(aPagar),
       aReceber30d: soma30(aReceber)
     },
@@ -5997,7 +7146,7 @@ function finPainel(db, agora) {
 }
 
 // packages/core/src/api.ts
-var CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'";
+var CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data: https://*.fbcdn.net https://*.cdninstagram.com; media-src 'self' blob: data:; frame-ancestors 'none'";
 var json = (status, body, headers = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
 async function readJson(req, max = 64e3) {
   const text = await req.text();
@@ -6021,6 +7170,16 @@ function createHandler(svc) {
       if (origin && !allowed.has(origin)) return json(403, { error: "origem n\xE3o permitida" });
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
       if (req.method === "POST" && url.pathname === "/api/webhooks/resend") return receberWebhook(brain2, svc.env, req);
+      if (req.method === "GET" && url.pathname === "/api/linkedin/callback") {
+        let destino = "/#linkedin";
+        try {
+          await liCallback(brain2, svc.env, svc.fetch ?? fetch, url.origin, url.searchParams.get("code") ?? "", url.searchParams.get("state") ?? "");
+        } catch (e) {
+          brain2.audit("sistema", "li_conexao_falhou", e instanceof Error ? e.message.slice(0, 200) : "erro");
+          destino = `/?linkedin=erro#linkedin`;
+        }
+        return new Response(null, { status: 302, headers: { location: destino } });
+      }
       if (req.method === "GET" && url.pathname.startsWith("/api/midia/")) return servirMidia(brain2, url.pathname.slice("/api/midia/".length));
       if (url.pathname === "/api/instagram/entrega" || url.pathname === "/api/instagram/contexto") {
         if (!tokenValido(svc.env, req)) return json(401, { error: "token inv\xE1lido" });
@@ -6034,11 +7193,14 @@ function createHandler(svc) {
       if (req.method === "GET" && url.pathname === "/api/health") return out(200, { ok: true, server: "brain-server", llm: brain2.llm, sse: svc.sse === true });
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain2));
+      if (req.method === "GET" && url.pathname === "/api/midia") return out(200, midiaPainel(brain2, url.searchParams.get("de"), url.searchParams.get("ate")));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain2.db, brain2.clock()));
+      if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain2.db, brain2.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? ""));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...await gscPainelCompleto(brain2, svc.env, svc.fetch ?? fetch), ga: gaPainel(brain2, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain2, url.searchParams.get("semana") ?? void 0));
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain2, svc.env));
+      if (req.method === "GET" && url.pathname === "/api/linkedin") return out(200, liPainel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
         try {
@@ -6102,6 +7264,21 @@ function createHandler(svc) {
         if (acao === "legenda") editarLegenda(brain2, pid, String(body.legenda ?? ""));
         if (acao === "publicar" || acao === "aprovar" && body.publicarAgora === true) message = await publicarPost(brain2, svc.env, pid, svc.fetch ?? fetch);
         return out(200, { ...igPainel(brain2, svc.env), message });
+      }
+      if (req.method === "POST" && url.pathname === "/api/linkedin/conectar") return out(200, { url: liUrlAutorizar(brain2, svc.env, url.origin, body.alvo === "organizacao" ? "organizacao" : "pessoa") });
+      if (url.pathname === "/api/linkedin/gerar") {
+        const r = await liGerar(brain2, svc.env, svc.fetch ?? fetch, { forcar: true });
+        return out(200, { ...liPainel(brain2, svc.env), message: r ? `Post novo: ${r.categoria}.` : "" });
+      }
+      const liAcao = url.pathname.match(/^\/api\/linkedin\/([\w-]+)\/(aprovar|rejeitar|publicar|texto|postei)$/);
+      if (liAcao) {
+        const [, pid, acao] = liAcao;
+        let message = "";
+        if (acao === "aprovar" || acao === "rejeitar") liDecidir(brain2, pid, acao, String(body.motivo ?? ""));
+        if (acao === "texto") liEditar(brain2, pid, String(body.texto ?? ""));
+        if (acao === "postei") liMarcarPublicado(brain2, pid);
+        if (acao === "publicar" || acao === "aprovar" && body.publicarAgora === true) message = await liPublicar(brain2, svc.env, pid, svc.fetch ?? fetch);
+        return out(200, { ...liPainel(brain2, svc.env), message });
       }
       if (url.pathname === "/api/seo/sincronizar") {
         const f = svc.fetch ?? fetch;
@@ -6201,6 +7378,12 @@ function createHandler(svc) {
           brain2.audit("voce", "financeiro_conta_nova", void 0, { criadas: r.criadas });
           return out(200, { ...r, painel: finPainel(brain2.db, agora) });
         }
+        if (rota === "venda") {
+          const r = finNovaVenda(brain2.db, agora, body.venda);
+          brain2.audit("voce", "financeiro_venda", String(body.venda?.cliente ?? ""), r);
+          brain2.emit("change");
+          return out(200, { ...r, painel: finPainel(brain2.db, agora) });
+        }
         if (rota === "conta/pagar") {
           finPagarConta(brain2.db, idDe(), String(body.pagoEm ?? ""), body.valor === void 0 ? void 0 : Number(body.valor));
           brain2.audit("voce", "financeiro_pago", String(body.id));
@@ -6243,8 +7426,8 @@ function createHandler(svc) {
         }
         if (rota === "premissas") {
           const p = body.premissas ?? {};
-          const num2 = (v) => v === void 0 ? void 0 : Number(v);
-          finSetPremissas(brain2.db, { novosPorMes: num2(p.novosPorMes), precoNovo: num2(p.precoNovo), churn: num2(p.churn), aliquotaImpostos: num2(p.aliquotaImpostos), custoMensal: p.custoMensal === void 0 ? void 0 : p.custoMensal === null || p.custoMensal === "" ? null : Number(p.custoMensal) });
+          const num3 = (v) => v === void 0 ? void 0 : Number(v);
+          finSetPremissas(brain2.db, { novosPorMes: num3(p.novosPorMes), precoNovo: num3(p.precoNovo), churn: num3(p.churn), aliquotaImpostos: num3(p.aliquotaImpostos), custoMensal: p.custoMensal === void 0 ? void 0 : p.custoMensal === null || p.custoMensal === "" ? null : Number(p.custoMensal) });
           brain2.audit("voce", "financeiro_premissas");
           return out(200, { painel: finPainel(brain2.db, agora) });
         }
@@ -6279,7 +7462,13 @@ function createHandler(svc) {
       }
       if (url.pathname === "/api/refresh-data") {
         const avisos = await refreshDados(brain2, svc.env);
-        return out(200, { avisos, dashboard: dashboardData(brain2) });
+        const diag = await sincronizarMidia(brain2, svc.env, { dias: Number(body.dias) || 90 });
+        for (const d of diag.filter((x) => !x.ok)) avisos.push(`${d.parte}: ${d.erro}`);
+        return out(200, { avisos, dashboard: dashboardData(brain2), midia: midiaPainel(brain2, body.de, body.ate) });
+      }
+      if (url.pathname === "/api/midia/premissas") {
+        salvarPremissas(brain2, { conversaoLeadCliente: Number(body.conversaoLeadCliente), retencaoMeses: Number(body.retencaoMeses), razaoLtvCac: Number(body.razaoLtvCac) });
+        return out(200, midiaPainel(brain2, body.de, body.ate));
       }
       if (url.pathname === "/api/subscriptions/add") {
         const source = body.source === "manual" ? "manual" : "pix";
@@ -6576,7 +7765,7 @@ function planGuardiao(i) {
 }
 
 // packages/core/src/handlers.ts
-var brl2 = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n3 % 1 ? 2 : 0 }).replace(/ /g, " ");
+var brl3 = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n3 % 1 ? 2 : 0 }).replace(/ /g, " ");
 var allSubs = (brain2) => rows(brain2.db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
 async function guardiao({ brain: brain2, env, now }) {
   let note = "";
@@ -6625,14 +7814,14 @@ async function guardiao({ brain: brain2, env, now }) {
     payload: p.payload,
     dedupeKey: p.dedupe_key
   }));
-  return { status: "done", result: `MRR fechado em ${brl2(total)}.${note}`, proposals };
+  return { status: "done", result: `MRR fechado em ${brl3(total)}.${note}`, proposals };
 }
 async function financeiro({ brain: brain2 }) {
   const m = brain2.metrics();
   const falta = Math.max(0, m.mrr.goal - m.mrr.total);
   const pct = Math.round(m.mrr.total / m.mrr.goal * 100);
   const d = m.descontos.map((x) => `${x.contas} em ${x.quando}`).join(", ");
-  return { status: "done", result: `MRR de ${brl2(m.mrr.total)}, ${pct}% de ${brl2(m.mrr.goal)}. Faltam ${brl2(falta)}, cerca de ${Math.ceil(falta / m.mrr.essencialPrice)} Essenciais a ${brl2(m.mrr.essencialPrice)}.${d ? ` Reajustes \xE0 vista: ${d}.` : ""}` };
+  return { status: "done", result: `MRR de ${brl3(m.mrr.total)}, ${pct}% de ${brl3(m.mrr.goal)}. Faltam ${brl3(falta)}, cerca de ${Math.ceil(falta / m.mrr.essencialPrice)} Essenciais a ${brl3(m.mrr.essencialPrice)}.${d ? ` Reajustes \xE0 vista: ${d}.` : ""}` };
 }
 async function midia({ brain: brain2, env, now }) {
   const token = env.META_SYSTEM_USER_TOKEN;
@@ -6649,26 +7838,26 @@ async function midia({ brain: brain2, env, now }) {
   const proposals = wastedSpend(ads, 50).map((c2) => ({
     agentId: "midia",
     kind: "revisar_campanha",
-    title: `Revisar campanha "${c2.campaign_name}": ${brl2(c2.spend)} sem lead em 7 dias`,
-    why: `Gastou ${brl2(c2.spend)}, teve ${c2.clicks} cliques e nenhum lead. O Brain nunca pausa sozinho: voc\xEA decide pausar, trocar o criativo ou manter.`,
+    title: `Revisar campanha "${c2.campaign_name}": ${brl3(c2.spend)} sem lead em 7 dias`,
+    why: `Gastou ${brl3(c2.spend)}, teve ${c2.clicks} cliques e nenhum lead. O Brain nunca pausa sozinho: voc\xEA decide pausar, trocar o criativo ou manter.`,
     impactoBrl: c2.spend,
     risk: "baixo",
     channel: "interno",
     payload: { ...c2 },
     dedupeKey: `campanha_sem_lead:${c2.campaign_id}:${day}`
   }));
-  return { status: "done", result: m.adsErro ? `${adsNote.trim()}${ig}` : `Leu os an\xFAncios dos \xFAltimos 7 dias: ${brl2(spend)} gastos e ${leads} leads.${ig}`, proposals };
+  return { status: "done", result: m.adsErro ? `${adsNote.trim()}${ig}` : `Leu os an\xFAncios dos \xFAltimos 7 dias: ${brl3(spend)} gastos e ${leads} leads.${ig}`, proposals };
 }
 async function chief({ brain: brain2 }) {
   const snap = brain2.snapshot([]);
   const pend = snap.proposals.filter((p) => p.status === "pendente");
-  const top = pend.slice(0, 3).map((p) => `${p.title} (${brl2(p.impactoBrl)})`);
+  const top = pend.slice(0, 3).map((p) => `${p.title} (${brl3(p.impactoBrl)})`);
   const m = snap.metrics;
   const soon = m.descontos.length ? ` Pr\xF3ximo reajuste: ${m.descontos[0].quando}.` : "";
   const blocked = row(brain2.db, "select count(*) as n from agent_runs where status = 'blocked' and created_at >= ?", now0(brain2))?.n ?? 0;
   return {
     status: "done",
-    result: pend.length === 0 ? `Briefing: fila vazia. MRR em ${brl2(m.mrr.total)}.${soon}` : `Briefing: ${pend.length} propostas esperando voc\xEA${snap.overflow ? ` (+${snap.overflow} fora do teto)` : ""}. Primeiras: ${top.join("; ")}. MRR em ${brl2(m.mrr.total)}.${soon}${blocked ? ` ${blocked} tarefas travadas por falta de integra\xE7\xE3o.` : ""}`
+    result: pend.length === 0 ? `Briefing: fila vazia. MRR em ${brl3(m.mrr.total)}.${soon}` : `Briefing: ${pend.length} propostas esperando voc\xEA${snap.overflow ? ` (+${snap.overflow} fora do teto)` : ""}. Primeiras: ${top.join("; ")}. MRR em ${brl3(m.mrr.total)}.${soon}${blocked ? ` ${blocked} tarefas travadas por falta de integra\xE7\xE3o.` : ""}`
   };
 }
 var now0 = (brain2) => Date.parse(`${brtDay(brain2.clock())}T00:00:00-03:00`);
@@ -6697,107 +7886,6 @@ function ruleChat(brain2, integrations) {
     remember(brain2, "jarvis", reply.text);
     return reply;
   };
-}
-
-// packages/core/src/llm.ts
-function llmConfig(env, kind) {
-  const forced = env.LLM_PROVIDER;
-  const provider = forced === "openai" || forced === "anthropic" ? forced : env.OPENAI_API_KEY ? "openai" : env.ANTHROPIC_API_KEY ? "anthropic" : null;
-  if (!provider) return null;
-  const apiKey = provider === "openai" ? env.OPENAI_API_KEY : env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  const override = kind === "jarvis" ? env.JARVIS_MODEL : env.AGENT_MODEL;
-  const model = override ?? env.JARVIS_MODEL ?? (provider === "openai" ? env.OPENAI_MODEL ?? "gpt-4.1" : "claude-sonnet-5-5");
-  return {
-    provider,
-    apiKey,
-    model,
-    // Estimativa. Confira os preços do seu modelo e ajuste no .env.local.
-    priceInUsd: Number(env.LLM_PRICE_IN_USD_PER_MTOK ?? (provider === "openai" ? 2 : 3)),
-    priceOutUsd: Number(env.LLM_PRICE_OUT_USD_PER_MTOK ?? (provider === "openai" ? 8 : 15)),
-    usdBrl: Number(env.USD_BRL ?? 5.5)
-  };
-}
-var costBrl = (c2, u) => Math.round((u.input_tokens * c2.priceInUsd + u.output_tokens * c2.priceOutUsd) / 1e6 * c2.usdBrl * 1e4) / 1e4;
-async function callAnthropic(c2, req, fetchFn) {
-  const res = await fetchFn("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": c2.apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: c2.model, max_tokens: req.maxTokens ?? 1024, system: req.system, messages: req.messages, ...req.tools?.length ? { tools: req.tools } : {} })
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Anthropic ${res.status}${body ? `: ${body.slice(0, 160)}` : ""}`);
-  }
-  return await res.json();
-}
-function toOpenAi(system, messages) {
-  const out = [{ role: "system", content: system }];
-  for (const m of messages) {
-    if (typeof m.content === "string") {
-      out.push(m.role === "user" ? { role: "user", content: m.content } : { role: "assistant", content: m.content });
-      continue;
-    }
-    if (m.role === "assistant") {
-      const calls = m.content.filter((b) => b.type === "tool_use");
-      out.push({ role: "assistant", content: textOf(m.content) || null, ...calls.length ? { tool_calls: calls.map((b) => ({ id: b.id, type: "function", function: { name: b.name, arguments: JSON.stringify(b.input) } })) } : {} });
-    } else {
-      for (const b of m.content) if (b.type === "tool_result") out.push({ role: "tool", tool_call_id: b.tool_use_id, content: b.is_error ? `Erro: ${b.content}` : b.content });
-    }
-  }
-  return out;
-}
-async function callOpenAi(c2, req, fetchFn) {
-  const res = await fetchFn("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { authorization: `Bearer ${c2.apiKey}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      model: c2.model,
-      max_completion_tokens: req.maxTokens ?? 1024,
-      messages: toOpenAi(req.system, req.messages),
-      ...req.tools?.length ? { tools: req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })) } : {}
-    })
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`OpenAI ${res.status}${body ? `: ${body.slice(0, 160)}` : ""}`);
-  }
-  const j2 = await res.json();
-  const msg = j2.choices[0]?.message;
-  const content = [];
-  if (msg?.content) content.push({ type: "text", text: msg.content });
-  for (const t of msg?.tool_calls ?? []) {
-    let input = {};
-    try {
-      input = JSON.parse(t.function.arguments || "{}");
-    } catch {
-    }
-    content.push({ type: "tool_use", id: t.id, name: t.function.name, input });
-  }
-  return { content, stop_reason: j2.choices[0]?.finish_reason ?? "stop", usage: { input_tokens: j2.usage?.prompt_tokens ?? 0, output_tokens: j2.usage?.completion_tokens ?? 0 } };
-}
-var callLlm = (c2, req, fetchFn = fetch) => c2.provider === "openai" ? callOpenAi(c2, req, fetchFn) : callAnthropic(c2, req, fetchFn);
-var textOf = (blocks) => blocks.flatMap((b) => b.type === "text" ? [b.text] : []).join("\n").trim();
-async function toolLoop(c2, req, runTool, fetchFn = fetch) {
-  const messages = [...req.messages];
-  let cost = 0;
-  for (let round = 0; round < (req.maxRounds ?? 6); round++) {
-    const r = await callLlm(c2, { ...req, messages }, fetchFn);
-    cost += costBrl(c2, r.usage);
-    const uses = r.content.filter((b) => b.type === "tool_use");
-    if (uses.length === 0) return { text: textOf(r.content), cost };
-    messages.push({ role: "assistant", content: r.content });
-    const results = [];
-    for (const u of uses) {
-      try {
-        results.push({ type: "tool_result", tool_use_id: u.id, content: await runTool(u.name, u.input) });
-      } catch (e) {
-        results.push({ type: "tool_result", tool_use_id: u.id, content: e instanceof Error ? e.message : "erro", is_error: true });
-      }
-    }
-    messages.push({ role: "user", content: results });
-  }
-  return { text: "N\xE3o consegui concluir dentro do limite de passos. Tente pedir de forma mais direta.", cost };
 }
 
 // packages/core/src/web.ts
@@ -6842,7 +7930,7 @@ var WEB_TOOL = {
 };
 
 // packages/core/src/jarvis-dados.ts
-var dia3 = (ms2) => ms2 ? new Date(ms2 - 3 * 36e5).toISOString().slice(0, 10) : null;
+var dia4 = (ms2) => ms2 ? new Date(ms2 - 3 * 36e5).toISOString().slice(0, 10) : null;
 function verSeo(brain2, env) {
   const g = gscPainel(brain2, env);
   const a = gaPainel(brain2, env);
@@ -6882,7 +7970,7 @@ function verInstagram(brain2, env) {
     publicacao_automatica: brain2.policy("ig_auto_publicar", false) === true,
     configurado: !!(env.META_SYSTEM_USER_TOKEN && env.META_IG_ID),
     aguardando_sua_aprovacao: ls.filter((l) => l.status === "pendente").length,
-    posts: ls.map((l) => ({ tema: l.tema, pilar: l.pilar, status: l.status, para: dia3(l.agendado_para), publicado_em: dia3(l.publicado_em), link: l.permalink, motivo: l.erro, legenda_inicio: l.legenda.slice(0, 140) }))
+    posts: ls.map((l) => ({ tema: l.tema, pilar: l.pilar, status: l.status, para: dia4(l.agendado_para), publicado_em: dia4(l.publicado_em), link: l.permalink, motivo: l.erro, legenda_inicio: l.legenda.slice(0, 140) }))
   };
 }
 function verPlanejamento(brain2, semana) {
@@ -7149,9 +8237,9 @@ var Runner = class {
       brain2.log(agent.id, out.result + extra, out.status === "blocked" ? "alerta" : "ok");
       void barred;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      brain2.finishRun(runId, { status: "error", error: msg.slice(0, 300) });
-      if (!brain2.killed()) brain2.log(agent.id, `Falhou: ${msg.slice(0, 160)}`, "alerta");
+      const msg2 = e instanceof Error ? e.message : String(e);
+      brain2.finishRun(runId, { status: "error", error: msg2.slice(0, 300) });
+      if (!brain2.killed()) brain2.log(agent.id, `Falhou: ${msg2.slice(0, 160)}`, "alerta");
     }
   }
   /** Rotina diária: os três coletores em paralelo e, por último, o briefing do Chief. */
@@ -7439,15 +8527,23 @@ var BrainDO = class extends DurableObject {
       await publicarDevidos(this.brain, strings(this.env));
     } catch {
     }
+    try {
+      await liRotina(this.brain, strings(this.env));
+    } catch {
+    }
+    try {
+      await midiaRotina(this.brain, strings(this.env));
+    } catch {
+    }
     const started = this.runner.tick();
     await this.runner.idle();
     return { ...rec, started };
   }
   /** Dias úteis, 10h (Brasília): começa a busca do dia. Ler sites, CRM e rascunhos encadeiam sozinhos quando cada etapa termina. */
   async rotina() {
-    const msg = await rodarRotina(this.brain, strings(this.env));
+    const msg2 = await rodarRotina(this.brain, strings(this.env));
     await this.arm(2e4);
-    return msg;
+    return msg2;
   }
   async alarm() {
     await this.daily();

@@ -169,3 +169,5 @@ export const api = {
     }),
   teamFeed: (e) => chamar(`/api/team-feed?team=${encodeURIComponent(e)}`),
 };
+
+export const finDetalhe = (linha, mes) => chamar(`/api/financeiro/detalhe?linha=${encodeURIComponent(linha)}&mes=${encodeURIComponent(mes)}`);

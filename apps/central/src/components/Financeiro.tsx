@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Check, Clock, Info, Plus, Target, TriangleAlert, Undo2, X } from "lucide-react";
 import { _ } from "../lib";
-import { api } from "../api";
+import { api, chamar, finDetalhe } from "../api";
 import { GraficoLinhas, Ranking } from "./charts";
 import { jaDigitados } from "./Command";
 import { th } from "../shared-inline";
@@ -11,6 +11,7 @@ import { useBrain } from "../store";
 import { avisos } from "./Avisos";
 import { FinDre } from "./FinDre";
 import { FinLancar } from "./FinLancar";
+import { useInspetor, NumClick } from "./Inspetor";
 
 export const Qt = (e) =>
   `${["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"][Number(e.slice(5, 7)) - 1]}/${e.slice(2, 4)}`;
@@ -851,6 +852,7 @@ export function Financeiro() {
           })
           .catch((h) => o(h instanceof Error ? h.message : "Erro ao carregar."));
     }, [e]);
+  const insp = useInspetor();
   React.useEffect(() => {
     g();
     const h = window.setInterval(g, 6e4);
@@ -875,6 +877,27 @@ export function Financeiro() {
       return false;
     }
   };
+  const somaDias = (d, n) => new Date(Date.parse(d + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+  const verDre = (titulo, linha, mes, sub) =>
+    insp.abrir({ titulo, sub, carregar: () => finDetalhe(linha, mes).then((r) => ({ total: r.total, itens: r.itens })) });
+  const verContas = (titulo, lista, sub) =>
+    insp.abrir({
+      titulo,
+      sub,
+      itens: lista.map((c) => ({ data: c.vencimento, desc: `${c.descricao}${c.contraparte ? " · " + c.contraparte : ""}`, origem: c.recorrente ? "Recorrente" : "Conta", valor: c.valor ?? 0, aviso: c.status === "atrasado" ? "atrasada" : "" })),
+    });
+  const verMrr = () =>
+    insp.abrir({
+      titulo: "MRR",
+      sub: "Assinaturas ativas (Stripe, Pix e manuais) pelo preço efetivo",
+      nota: "O MRR soma o preço efetivo mensal de cada assinatura ativa. Se um cliente aparece duplicado ou com valor errado, é aqui que aparece.",
+      carregar: () =>
+        chamar("/api/subscriptions").then((r) => ({
+          itens: r.subscriptions
+            .filter((s) => ["active", "trialing", "past_due"].includes(s.status))
+            .map((s) => ({ desc: s.label || s.external_id, origem: `${s.source}${s.origin ? " · " + s.origin : ""} · ${s.status}`, valor: s.effective_price_brl ?? 0, aviso: s.discount_ends_at ? `desconto até ${s.discount_ends_at.slice(0, 10)}` : "" })),
+        })),
+    });
   if (!e)
     return (
       <div className="page">
@@ -935,6 +958,7 @@ export function Financeiro() {
         </p>
       ) : null}
       <FinLancar d={a} aberto={l} onFechar={() => c(false)} rodar={x} />
+      {insp.painel}
       <nav className="subtabs" aria-label="Seções do financeiro">
         {[
           ["resumo", "Resumo"],
@@ -955,7 +979,7 @@ export function Financeiro() {
           <section className="kpis fin-kpis" aria-label="Números principais">
             <div className="kpi kpi-hero">
               <span>Saldo no Inter</span>
-              <b>{an(j.saldoInter)}</b>
+              <b><NumClick onClick={() => verDre("Saldo no Inter", "Saldo Inter", a.mesRef, "Soma de todo o extrato importado")}>{an(j.saldoInter)}</NumClick></b>
               <small>
                 {N === null
                   ? "Sem despesa m\xE9dia ainda"
@@ -967,17 +991,17 @@ export function Financeiro() {
                 {"Resultado de "}
                 {ec(`${a.mesRef}-01`)}
               </span>
-              <b className={j.resultadoMes >= 0 ? "t-ok" : "t-crit"}>{an(j.resultadoMes)}</b>
+              <b className={j.resultadoMes >= 0 ? "t-ok" : "t-crit"}><NumClick onClick={() => verDre("Resultado do mês", "Resultado", a.mesRef, "Entradas menos saídas, regime de caixa")}>{an(j.resultadoMes)}</NumClick></b>
               <small>
-                {_(j.entradasMes)}
+                <NumClick onClick={() => verDre("Entradas do mês", "Receita bruta", a.mesRef, "Tudo que entrou, regime de caixa")}>{_(j.entradasMes)}</NumClick>
                 {" entrou \xB7 "}
-                {_(j.saidasMes)}
+                <NumClick onClick={() => verDre("Saídas do mês", "Despesas", a.mesRef, "Tudo que saiu, regime de caixa")}>{_(j.saidasMes)}</NumClick>
                 {" saiu"}
               </small>
             </div>
             <div className="kpi">
               <span>MRR</span>
-              <b>{_(j.mrr)}</b>
+              <b><NumClick onClick={verMrr}>{_(j.mrr)}</NumClick></b>
               <small>
                 {j.clientesAtivos}
                 {" clientes \xB7 ticket "}
@@ -986,7 +1010,7 @@ export function Financeiro() {
             </div>
             <div className="kpi">
               <span>A pagar em 30 dias</span>
-              <b>{_(j.aPagar30d)}</b>
+              <b><NumClick onClick={() => verContas("A pagar em 30 dias", a.aPagar.filter((c) => c.vencimento <= somaDias(a.hoje, 30)), "Contas em aberto com vencimento até 30 dias")}>{_(j.aPagar30d)}</NumClick></b>
               <small>
                 {a.aPagar.length}
                 {" em aberto"}
@@ -994,7 +1018,7 @@ export function Financeiro() {
             </div>
             <div className="kpi">
               <span>A receber em 30 dias</span>
-              <b>{_(j.aReceber30d)}</b>
+              <b><NumClick onClick={() => verContas("A receber em 30 dias", a.aReceber.filter((c) => c.vencimento <= somaDias(a.hoje, 30)), "Recebimentos em aberto com vencimento até 30 dias")}>{_(j.aReceber30d)}</NumClick></b>
               <small>
                 {a.aReceber.length}
                 {" em aberto"}
@@ -1002,7 +1026,7 @@ export function Financeiro() {
             </div>
             <div className="kpi">
               <span>Pago fora do Inter</span>
-              <b className={j.pagoForaDoInterTotal ? "t-warn" : ""}>{_(j.pagoForaDoInterTotal)}</b>
+              <b className={j.pagoForaDoInterTotal ? "t-warn" : ""}><NumClick onClick={() => verDre("Pago fora do Inter", "Fora do Inter", a.mesRef, "Contas pagas sem lançamento no extrato")}>{_(j.pagoForaDoInterTotal)}</NumClick></b>
               <small>Cartão ou do bolso, no total</small>
             </div>
           </section>

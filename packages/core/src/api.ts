@@ -19,7 +19,7 @@ import { liCallback, liUrlAutorizar, liDecidir, liEditar, liGerar, liMarcarPubli
 import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
-import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finPagarConta, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
+import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finPagarConta, finDetalhe, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
 import { TEAMS, AGENTS } from "@brain/shared";
 
 export interface Services {
@@ -102,6 +102,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain));
       if (req.method === "GET" && url.pathname === "/api/midia") return out(200, midiaPainel(brain, url.searchParams.get("de"), url.searchParams.get("ate")));
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain.db, brain.clock()));
+      if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain.db, brain.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? ""));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain, url.searchParams.get("semana") ?? undefined));

@@ -391,6 +391,54 @@ interface ExtRow {
   fonte: string;
 }
 
+export type FinMov = { data: string; valor: number; cat: string; desc: string; origem: string; ref: string; conciliado: boolean };
+
+/** Movimentos que alimentam a DRE (regime de caixa), com a origem de cada um para inspeção. */
+function movimentosFin(ext: ExtRow[], contas: ContaRow[]): { entradas: FinMov[]; despesas: FinMov[] } {
+  const entradas: FinMov[] = ext
+    .filter((e) => e.valor > 0)
+    .map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
+  const despesas: FinMov[] = [
+    ...contas
+      .filter((c) => c.tipo === "pagar" && c.pago_em && c.valor)
+      .map((c) => ({ data: c.pago_em!, valor: c.valor!, cat: categoria(c.categoria, false), desc: c.descricao, origem: c.extrato_id === null ? "Conta paga (fora do Inter)" : "Conta paga", ref: `conta:${c.id}`, conciliado: c.extrato_id !== null })),
+    ...ext
+      .filter((e) => e.valor < 0 && e.conta_id === null)
+      .map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false), desc: e.descricao, origem: "Extrato Inter (sem conta)", ref: `extrato:${e.id}`, conciliado: false })),
+  ];
+  // Recebimentos marcados como recebidos sem lançamento no extrato (ex.: dinheiro fora do Inter) também são receita.
+  for (const c of contas)
+    if (c.tipo === "receber" && c.pago_em && c.valor && c.extrato_id === null)
+      entradas.push({ data: c.pago_em, valor: c.valor, cat: categoria(c.categoria, true), desc: c.descricao, origem: "Recebido fora do Inter", ref: `conta:${c.id}`, conciliado: false });
+  return { entradas, despesas };
+}
+
+/** Lançamentos que compõem uma célula da DRE. `linha` = rótulo da linha; `mes` = AAAA-MM. */
+export function finDetalhe(db: Db, agora: number, linha: string, mes: string) {
+  const ext = rows<ExtRow>(db, "select id, data, descricao, valor, categoria, conta_id, fonte from fin_extrato order by data, id");
+  const contas = rows<ContaRow>(db, "select id, tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, extrato_id, grupo, obs from fin_contas order by vencimento, id");
+  const { entradas, despesas } = movimentosFin(ext, contas);
+  const limpo = linha.replace(/^\(-\)\s*/, "");
+  const lista = mes.split(",").filter(Boolean);
+  const noMes = (l: FinMov[]) => l.filter((m) => lista.includes(mesDe(m.data)));
+  let itens: FinMov[];
+  let lado: "entrada" | "saida" | "mista";
+  if (limpo === "Receita bruta") { itens = noMes(entradas); lado = "entrada"; }
+  else if (limpo === "Receita líquida") { itens = [...noMes(entradas), ...noMes(despesas).filter((m) => m.cat === "Impostos e Taxas").map((m) => ({ ...m, valor: -m.valor }))]; lado = "mista"; }
+  else if (limpo === "Despesas") { itens = noMes(despesas); lado = "saida"; }
+  else if (limpo === "Saldo Inter") {
+    itens = ext.map((e) => ({ data: e.data, valor: e.valor, cat: e.categoria ?? "", desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
+    lado = "mista";
+  } else if (limpo === "Fora do Inter") {
+    itens = contas.filter((c) => c.tipo === "pagar" && c.pago_em && c.valor && c.extrato_id === null).map((c) => ({ data: c.pago_em!, valor: c.valor!, cat: categoria(c.categoria, false), desc: c.descricao, origem: "Pago fora do Inter", ref: `conta:${c.id}`, conciliado: false }));
+    lado = "saida";
+  } else if (limpo === "Resultado") { itens = [...noMes(entradas), ...noMes(despesas).map((m) => ({ ...m, valor: -m.valor }))]; lado = "mista"; }
+  else if (CATEGORIAS_RECEITA.includes(limpo)) { itens = noMes(entradas).filter((m) => m.cat === limpo); lado = "entrada"; }
+  else { itens = noMes(despesas).filter((m) => m.cat === limpo); lado = "saida"; }
+  itens.sort((a, b) => (a.data < b.data ? 1 : -1));
+  return { linha, mes, lado, total: r2(itens.reduce((s, m) => s + m.valor, 0)), itens };
+}
+
 export function finPainel(db: Db, agora: number): FinPainel {
   const hoje = brtDay(agora);
   const mesRef = mesDe(hoje);
@@ -419,21 +467,14 @@ export function finPainel(db: Db, agora: number): FinPainel {
   const ultimo = ext.length ? ext[ext.length - 1]!.data : null;
 
   // Fluxo por mês. Receita: o que entrou no extrato. Despesa: o que foi pago (contas) + saídas do extrato sem conta.
-  type Mov = { data: string; valor: number; cat: string };
-  const entradas: Mov[] = ext.filter((e) => e.valor > 0).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true) }));
-  const despesas: Mov[] = [
-    ...contas.filter((c) => c.tipo === "pagar" && c.pago_em && c.valor).map((c) => ({ data: c.pago_em!, valor: c.valor!, cat: categoria(c.categoria, false) })),
-    ...ext.filter((e) => e.valor < 0 && e.conta_id === null).map((e) => ({ data: e.data, valor: -e.valor, cat: categoria(e.categoria, false) })),
-  ];
-  // Recebimentos marcados como recebidos sem lançamento no extrato (ex.: dinheiro fora do Inter) também são receita.
-  for (const c of contas) if (c.tipo === "receber" && c.pago_em && c.valor && c.extrato_id === null) entradas.push({ data: c.pago_em, valor: c.valor, cat: categoria(c.categoria, true) });
+  const { entradas, despesas } = movimentosFin(ext, contas);
 
   const meses = (n: number) => {
     const out: string[] = [];
     for (let i = n - 1; i >= 0; i--) out.push(mesDe(somaMeses(`${mesRef}-01`, -i)));
     return out;
   };
-  const soma = (l: Mov[], mes: string, cat?: string) => r2(l.filter((m) => mesDe(m.data) === mes && (!cat || m.cat === cat)).reduce((s, m) => s + m.valor, 0));
+  const soma = (l: FinMov[], mes: string, cat?: string) => r2(l.filter((m) => mesDe(m.data) === mes && (!cat || m.cat === cat)).reduce((s, m) => s + m.valor, 0));
 
   const serie = meses(6).map((m) => ({ mes: m, entradas: soma(entradas, m), saidas: soma(despesas, m), resultado: r2(soma(entradas, m) - soma(despesas, m)) }));
   const atual = serie[serie.length - 1]!;

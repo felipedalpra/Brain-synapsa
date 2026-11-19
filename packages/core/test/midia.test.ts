@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Brain } from "../src/brain";
+import { Brain, brtDay } from "../src/brain";
 import { openDb } from "../src/node-db";
 import { analiseAnuncios, analiseInstagram, lerPremissas, salvarPremissas } from "../src/midia";
 
@@ -79,7 +79,7 @@ describe("analise de anuncios", () => {
 import { analiseCriativos, analisePixel, analisePublicos, midiaPainel, periodoDe } from "../src/midia";
 import { sincronizarMidia } from "../src/midia-sync";
 
-const diaDe = (b: Brain, atras: number) => new Date(b.clock() - atras * 86_400_000).toISOString().slice(0, 10);
+const diaDe = (b: Brain, atras: number) => brtDay(b.clock() - atras * 86_400_000);
 const adDia = (b: Brain, ad: string, atras: number, spend: number, impr: number, reach: number, clicks: number, leads: number) =>
   b.db.prepare("insert into meta_ad_dia (day, ad_id, ad_name, adset_id, adset_name, campaign_id, campaign_name, spend, impressions, reach, clicks, link_clicks, leads, updated_at) values (?, ?, ?, 's1', 'Conjunto', 'c1', 'Campanha', ?, ?, ?, ?, ?, ?, ?)")
     .run(diaDe(b, atras), ad, `Anúncio ${ad}`, spend, impr, reach, clicks, clicks, leads, b.clock());

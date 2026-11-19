@@ -3354,3 +3354,14 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .mid-legenda { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 14px; font-size: 12.5px; color: var(--muted); }
 .mid-legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
 @media (max-width: 600px) { .mid-cri-n { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mid-ref { justify-items: start; } }
+
+/* Inspeção de números */
+.num-click { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; border-bottom: 1px dotted var(--muted); }
+.num-click:hover, .num-click:focus-visible { color: var(--accent, #8B5CF6); border-bottom-color: currentColor; outline: none; }
+.insp-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 80; display: flex; justify-content: flex-end; }
+.insp { width: min(640px, 100%); height: 100%; overflow-y: auto; background: var(--bg, #0b0b12); border-left: 1px solid var(--line, #2a2a3a); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.insp header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.insp h3 { margin: 0 0 2px; }
+.insp-total { display: flex; justify-content: space-between; align-items: baseline; margin: 0; padding: 8px 0; border-bottom: 1px solid var(--line, #2a2a3a); }
+.insp-total b { font-size: 22px; }
+.insp td.num, .insp th.num { text-align: right; white-space: nowrap; }

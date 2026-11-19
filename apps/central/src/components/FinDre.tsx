@@ -4,6 +4,8 @@ import * as React from "react";
 import { _ } from "../lib";
 import { GraficoLinhas } from "./charts";
 import { FinDreMensal } from "./Financeiro";
+import { useInspetor, NumClick } from "./Inspetor";
+import { finDetalhe } from "../api";
 
 const brl = (n) => (n < 0 ? `(${_(Math.abs(n))})` : _(n));
 const pct = (n, base) => (base > 0 ? `${(Math.round((n / base) * 1000) / 10).toLocaleString("pt-BR")}%` : "—");
@@ -13,6 +15,37 @@ const OPEX = ["Pessoal", "Marketing e Vendas", "Tecnologia/Ferramentas", "Admini
 export function FinDre({ d }) {
   const meses = d.dre.meses;
   const [sel, setSel] = React.useState(meses.length - 1);
+  const insp = useInspetor();
+  // índice do mês na série → "AAAA-MM" (a última coluna é o mês de referência)
+  const ymDe = (i) => {
+    const [y, m] = d.mesRef.split("-").map(Number);
+    const t = y * 12 + (m - 1) - (meses.length - 1 - i);
+    return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+  };
+  const LINHA_API = (rot) => {
+    if (d.categoriasReceita.includes(rot) || OPEX.includes(rot)) return rot;
+    return {
+      "Receita bruta": "Receita bruta",
+      "(−) Deduções: impostos e taxas": "Impostos e Taxas",
+      "= Receita líquida": "Receita líquida",
+      "(−) Custos diretos (CMV)": "Custos Diretos (CMV)",
+      "(−) Despesas financeiras": "Financeiras",
+      "(−) Outras despesas": "Outras Despesas",
+      "= Resultado líquido": "Resultado",
+    }[rot];
+  };
+  const abrir = (rot, ci) => {
+    const linha = LINHA_API(rot);
+    if (!linha) return;
+    const idx = colunas[ci].idx;
+    const mes = idx.map(ymDe).join(",");
+    insp.abrir({
+      titulo: rot.replace(/^[=(−)\s]+/, "").replace(/^\(−\)\s*/, "") || rot,
+      sub: `${colunas[ci].rot} · regime de caixa`,
+      nota: "Receita = entradas no extrato do Inter + recebimentos marcados como pagos fora do Inter. Despesa = contas pagas + saídas do extrato sem conta.",
+      carregar: () => finDetalhe(linha, mes).then((r) => ({ total: r.total, itens: r.itens })),
+    });
+  };
   const linhas = Object.fromEntries(d.dre.linhas.map((l) => [l.label, l.valores]));
   const soma = (label, idx) => r2(idx.reduce((t, i) => t + (linhas[label]?.[i] ?? 0), 0));
   const ano = meses[sel].slice(-2);
@@ -126,10 +159,10 @@ export function FinDre({ d }) {
                 return (
                   <tr key={rot} className={cls}>
                     <td>{rot}</td>
-                    <td className={neg(v0)}>{cel(v0)}</td>
+                    <td className={neg(v0)}>{v0 !== 0 && LINHA_API(rot) ? <NumClick onClick={() => abrir(rot, 0)}>{cel(v0)}</NumClick> : cel(v0)}</td>
                     <td className="dv-pct">{v0 === 0 ? "" : pct(Math.abs(v0), C[0].rb)}</td>
-                    <td className={neg(v1)}>{colunas[1].idx.length ? cel(v1) : "—"}</td>
-                    <td className={neg(v2)}>{cel(v2)}</td>
+                    <td className={neg(v1)}>{colunas[1].idx.length ? (v1 !== 0 && LINHA_API(rot) ? <NumClick onClick={() => abrir(rot, 1)}>{cel(v1)}</NumClick> : cel(v1)) : "—"}</td>
+                    <td className={neg(v2)}>{v2 !== 0 && LINHA_API(rot) ? <NumClick onClick={() => abrir(rot, 2)}>{cel(v2)}</NumClick> : cel(v2)}</td>
                     <td className="dv-pct">{v2 === 0 ? "" : pct(Math.abs(v2), C[2].rb)}</td>
                   </tr>
                 );
@@ -158,6 +191,7 @@ export function FinDre({ d }) {
         <summary>Ver todos os meses lado a lado</summary>
         <FinDreMensal d={d} />
       </details>
+      {insp.painel}
     </div>
   );
 }
