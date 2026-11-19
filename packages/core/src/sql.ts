@@ -100,6 +100,17 @@ create table if not exists envios (
   detail text,
   at integer not null
 );
+create table if not exists cadencia_email (
+  email text primary key,
+  nome text not null,
+  plano text,
+  origem text,
+  entrou_em integer not null,
+  step integer not null default 0,
+  ultima_acao integer,
+  pausada integer not null default 0,
+  motivo text
+);
 create table if not exists email_suppression (
   email text primary key,
   reason text not null,

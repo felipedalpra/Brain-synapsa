@@ -27,6 +27,7 @@ export * from "./meta";
 export * from "./mrr";
 export * from "./prospeccao";
 export * from "./prospeccao-email";
+export * from "./cadencia";
 export * from "./runner";
 export * from "./seed";
 export * from "./sql";

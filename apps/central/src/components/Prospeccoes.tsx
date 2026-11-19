@@ -6,6 +6,7 @@ import { api } from "../api";
 import { avisos } from "./Avisos";
 import { jaDigitados } from "./Command";
 import { th } from "../shared-inline";
+import { CadenciaPainel } from "./Cadencia";
 
 export const Sh = {
   novo: "Novas",
@@ -701,6 +702,7 @@ export function ProspeccaoPainel() {
           </p>
         ) : null}
       </section>
+      <CadenciaPainel />
     </div>
   );
 }
