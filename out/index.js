@@ -7803,6 +7803,20 @@ function createHandler(svc) {
         salvarPremissas(brain2, { conversaoLeadCliente: Number(body.conversaoLeadCliente), retencaoMeses: Number(body.retencaoMeses), razaoLtvCac: Number(body.razaoLtvCac) });
         return out(200, midiaPainel(brain2, body.de, body.ate));
       }
+      if (url.pathname === "/api/subscriptions/renomear") {
+        const source = body.source === "manual" ? "manual" : "pix";
+        const id = String(body.id ?? "");
+        const label = String(body.label ?? "").trim().slice(0, 80);
+        if (!id || !label) throw new BrainError("invalid", "Informe a assinatura e o nome.");
+        const cur = row(brain2.db, "select origin from subscriptions where source = ? and external_id = ?", source, id);
+        if (!cur) throw new BrainError("not_found", "Assinatura n\xE3o encontrada.");
+        if (cur.origin !== "informado") throw new BrainError("invalid", "S\xF3 assinaturas informadas por voc\xEA podem ser renomeadas aqui.");
+        run(brain2.db, "update subscriptions set label = ?, updated_at = ? where source = ? and external_id = ?", label, brain2.clock(), source, id);
+        if (typeof body.contaDe === "string" && body.contaDe.trim()) run(brain2.db, "update fin_contas set descricao = ? where descricao = ?", label, body.contaDe.trim());
+        brain2.audit("voce", "renomear_assinatura", `${source}:${id}`, { label });
+        brain2.emit("change");
+        return out(200, snapshot());
+      }
       if (url.pathname === "/api/subscriptions/add") {
         const source = body.source === "manual" ? "manual" : "pix";
         const label = String(body.label ?? "").trim().slice(0, 80);

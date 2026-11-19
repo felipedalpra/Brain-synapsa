@@ -400,6 +400,21 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         salvarPremissas(brain, { conversaoLeadCliente: Number(body.conversaoLeadCliente), retencaoMeses: Number(body.retencaoMeses), razaoLtvCac: Number(body.razaoLtvCac) });
         return out(200, midiaPainel(brain, body.de, body.ate));
       }
+      if (url.pathname === "/api/subscriptions/renomear") {
+        // Troca o nome de uma assinatura informada (Pix/manual) e, se pedir, o nome das contas dela no financeiro.
+        const source = body.source === "manual" ? "manual" : "pix";
+        const id = String(body.id ?? "");
+        const label = String(body.label ?? "").trim().slice(0, 80);
+        if (!id || !label) throw new BrainError("invalid", "Informe a assinatura e o nome.");
+        const cur = row<{ origin: string }>(brain.db, "select origin from subscriptions where source = ? and external_id = ?", source, id);
+        if (!cur) throw new BrainError("not_found", "Assinatura não encontrada.");
+        if (cur.origin !== "informado") throw new BrainError("invalid", "Só assinaturas informadas por você podem ser renomeadas aqui.");
+        run(brain.db, "update subscriptions set label = ?, updated_at = ? where source = ? and external_id = ?", label, brain.clock(), source, id);
+        if (typeof body.contaDe === "string" && body.contaDe.trim()) run(brain.db, "update fin_contas set descricao = ? where descricao = ?", label, body.contaDe.trim());
+        brain.audit("voce", "renomear_assinatura", `${source}:${id}`, { label });
+        brain.emit("change");
+        return out(200, snapshot());
+      }
       if (url.pathname === "/api/subscriptions/add") {
         // Receita que não passa pelo Stripe (Pix, por exemplo), informada por você.
         const source = body.source === "manual" ? "manual" : "pix";
