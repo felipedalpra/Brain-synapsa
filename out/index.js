@@ -6948,6 +6948,13 @@ function finIgnorarExtrato(db, id, ignorar) {
   if (!e) throw new BrainError("not_found", "Lan\xE7amento n\xE3o encontrado.");
   run(db, "update fin_extrato set categoria = ? where id = ?", ignorar ? IGNORAR : e.valor > 0 ? "Outras Receitas" : "Outras Despesas", id);
 }
+function finClassificarExtrato(db, id, cat, descricao) {
+  const e = row(db, "select valor from fin_extrato where id = ?", id);
+  if (!e) throw new BrainError("not_found", "Lan\xE7amento n\xE3o encontrado.");
+  const c2 = categoria(cat, e.valor > 0);
+  run(db, "update fin_extrato set categoria = ? where id = ?", c2, id);
+  if (descricao && descricao.trim()) run(db, "update fin_extrato set descricao = ? where id = ?", descricao.trim().slice(0, 200), id);
+}
 function movimentosFin(ext, contas) {
   const entradas = ext.filter((e) => e.valor > 0 && !ignorado(e)).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
   const despesas = [
@@ -7491,6 +7498,11 @@ function createHandler(svc) {
         if (rota === "lancamento") {
           finAddManual(brain2.db, agora, body.lancamento);
           brain2.audit("voce", "financeiro_lancamento_avulso");
+          return out(200, { painel: finPainel(brain2.db, agora) });
+        }
+        if (rota === "extrato/categoria") {
+          finClassificarExtrato(brain2.db, idDe(), String(body.categoria ?? ""), typeof body.descricao === "string" ? body.descricao : void 0);
+          brain2.audit("voce", "financeiro_extrato_classificado", String(body.id));
           return out(200, { painel: finPainel(brain2.db, agora) });
         }
         if (rota === "extrato/ignorar") {

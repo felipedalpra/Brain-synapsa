@@ -401,6 +401,15 @@ export function finIgnorarExtrato(db: Db, id: number, ignorar: boolean): void {
   run(db, "update fin_extrato set categoria = ? where id = ?", ignorar ? IGNORAR : e.valor > 0 ? "Outras Receitas" : "Outras Despesas", id);
 }
 
+/** Reclassifica um lançamento do extrato (categoria e, se quiser, o nome que aparece). */
+export function finClassificarExtrato(db: Db, id: number, cat: string, descricao?: string): void {
+  const e = row<{ valor: number }>(db, "select valor from fin_extrato where id = ?", id);
+  if (!e) throw new BrainError("not_found", "Lançamento não encontrado.");
+  const c = categoria(cat, e.valor > 0);
+  run(db, "update fin_extrato set categoria = ? where id = ?", c, id);
+  if (descricao && descricao.trim()) run(db, "update fin_extrato set descricao = ? where id = ?", descricao.trim().slice(0, 200), id);
+}
+
 export type FinMov = { data: string; valor: number; cat: string; desc: string; origem: string; ref: string; conciliado: boolean; situacao?: string };
 
 /** Movimentos que alimentam a DRE (regime de caixa), com a origem de cada um para inspeção. */

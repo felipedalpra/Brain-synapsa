@@ -19,7 +19,7 @@ import { liCallback, liUrlAutorizar, liDecidir, liEditar, liGerar, liMarcarPubli
 import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
-import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finIgnorarExtrato, finPagarConta, finDetalhe, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
+import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finClassificarExtrato, finIgnorarExtrato, finPagarConta, finDetalhe, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
 import { TEAMS, AGENTS } from "@brain/shared";
 
 export interface Services {
@@ -319,6 +319,11 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (rota === "lancamento") {
           finAddManual(brain.db, agora, body.lancamento as ExtratoIn);
           brain.audit("voce", "financeiro_lancamento_avulso");
+          return out(200, { painel: finPainel(brain.db, agora) });
+        }
+        if (rota === "extrato/categoria") {
+          finClassificarExtrato(brain.db, idDe(), String(body.categoria ?? ""), typeof body.descricao === "string" ? body.descricao : undefined);
+          brain.audit("voce", "financeiro_extrato_classificado", String(body.id));
           return out(200, { painel: finPainel(brain.db, agora) });
         }
         if (rota === "extrato/ignorar") {
