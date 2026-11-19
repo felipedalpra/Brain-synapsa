@@ -19,7 +19,7 @@ describe("DRE por competência", () => {
     const comp = finDetalhe(db, AGORA, "Receita bruta", "2026-11");
     expect(comp.total).toBe(230);
     expect(comp.itens.some((i) => i.desc.includes("Outra Empresa"))).toBe(false);
-    expect(comp.itens.map((i) => i.situacao).sort()).toEqual(["a vencer", "pago"]);
+    expect(comp.itens.map((i) => i.situacao).sort()).toEqual(["vendido"]);
     const caixa = finDetalhe(db, AGORA, "Receita bruta", "2026-11", "caixa");
     expect(caixa.total).toBe(662);
   });
@@ -52,13 +52,27 @@ describe("faturas do Stripe", () => {
     const { sincronizarFaturasStripe } = await import("../src/fin-stripe");
     const db = openDb(":memory:");
     const brain = new Brain(db, () => AGORA);
-    db.prepare("insert into fin_contas (tipo, descricao, categoria, vencimento, valor, pago_em) values ('receber','Stripe','Recorrência (Mensalidade)','2026-11-05',45.96,'2026-11-05')".replace("pago_em)", "pago_em, criado_em)").replace("'2026-11-05')", "'2026-11-05', 1)")).run();
+    db.prepare("insert into fin_contas (tipo, descricao, categoria, vencimento, valor, pago_em, criado_em) values ('receber','Stripe','Recorrência (Mensalidade)','2026-10-05',45.96,'2026-10-05',1)").run()
     const t = (d: string) => Math.floor(Date.parse(d) / 1000);
     const inv = (id: string, nome: string, d: string) => ({ id, customer: `cus_${id}`, customer_name: nome, customer_email: null, amount_paid: 4900, currency: "brl", created: t(d), status: "paid" });
-    const f = (async () => new Response(JSON.stringify({ has_more: false, data: [inv("a", "Ana", "2026-11-03T12:00:00Z"), inv("b", "Beto", "2026-11-10T12:00:00Z"), inv("c", "Cris", "2026-11-12T12:00:00Z")] }))) as unknown as typeof fetch;
+    const f = (async () => new Response(JSON.stringify({ has_more: false, data: [inv("a", "Ana", "2026-10-03T12:00:00Z"), inv("b", "Beto", "2026-10-10T12:00:00Z"), inv("c", "Cris", "2026-10-12T12:00:00Z")] }))) as unknown as typeof fetch;
     const r = await sincronizarFaturasStripe(brain, { STRIPE_READ_KEY: "rk_test" }, f);
     expect(r.faturas).toBe(3);
     const p = finPainel(db, AGORA);
-    expect(valorDre(p, "Receita bruta")).toBe(147);
+    // meses passados: faturas pagas por cliente, no lugar da linha "Stripe" lançada à mão
+    expect(p.dre.linhas.find((l) => l.label === "Receita bruta")!.valores.at(-2)).toBe(147);
+  });
+});
+
+describe("mês corrente: o que foi vendido, não o que foi pago", () => {
+  it("assinaturas ativas entram pelo valor cheio da venda, mesmo com só metade recebida", () => {
+    const db = openDb(":memory:");
+    finNovaVenda(db, AGORA, { cliente: "Clínica", valorMensal: 230, inicio: "2026-11-17", parcelas: [{ valor: 115, pagoEm: "2026-11-17" }, { valor: 115, pagoEm: null, vencimento: "2026-12-01" }] });
+    db.prepare("insert into subscriptions (source, external_id, label, list_price_brl, effective_price_brl, status, origin, updated_at) values ('stripe','cus_1','cus_1',49,49,'active','sincronizado',1)").run();
+    db.prepare("insert into subscriptions (source, external_id, label, list_price_brl, effective_price_brl, status, origin, updated_at) values ('stripe','cus_2','cus_2',49,49,'canceled','sincronizado',1)").run();
+    const p = finPainel(db, AGORA);
+    expect(valorDre(p, "Receita bruta")).toBe(230 + 49);
+    expect(p.kpis.entradasMes).toBe(115); // caixa: só o que entrou
+    expect(finDetalhe(db, AGORA, "Receita bruta", "2026-11").itens.map((i) => i.valor).sort((a, b) => a - b)).toEqual([49, 230]);
   });
 });

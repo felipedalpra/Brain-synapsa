@@ -461,7 +461,7 @@ export function FinDreMensal({ d: e }) {
           </table>
         </div>
         <p className="muted">
-          Regime de competência: receita e despesa pelo vencimento do lançamento, pagas ou não. O caixa real
+          Regime de competência: receita é o que foi vendido e está ativo no mês, despesa é a conta do mês, pagas ou não. O caixa real
           (Inter e pagamentos fora dele) fica no fluxo de caixa. Imposto é a guia lançada, não estimativa.
         </p>
       </section>

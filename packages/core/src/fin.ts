@@ -411,6 +411,13 @@ export function finClassificarExtrato(db: Db, id: number, cat: string, descricao
   if (descricao && descricao.trim()) run(db, "update fin_extrato set descricao = ? where id = ?", descricao.trim().slice(0, 200), id);
 }
 
+const subsDe = (db: Db) => rows<SubscriptionRow>(db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
+const nomesStripe = (db: Db): Record<string, string> => {
+  const m: Record<string, string> = {};
+  for (const x of faturasStripe(db)) if (x.cliente_id) m[x.cliente_id] = x.nome;
+  return m;
+};
+
 export type FinMov = { data: string; valor: number; cat: string; desc: string; origem: string; ref: string; conciliado: boolean; situacao?: string };
 
 /** Movimentos que alimentam a DRE (regime de caixa), com a origem de cada um para inspeção. */
@@ -438,13 +445,15 @@ function movimentosFin(ext: ExtRow[], contas: ContaRow[]): { entradas: FinMov[];
  * Entradas do extrato sem lançamento correspondente não entram (aparecem como "sem conciliar"); lançamentos avulsos entram na data.
  * Saídas do extrato sem conta continuam entrando como despesa, pois não há outro registro delas.
  */
-function movimentosCompetencia(ext: ExtRow[], contas: ContaRow[], hoje: string, faturas: FaturaRow[] = []): { entradas: FinMov[]; despesas: FinMov[] } {
+function movimentosCompetencia(ext: ExtRow[], contas: ContaRow[], hoje: string, faturas: FaturaRow[] = [], subs: SubscriptionRow[] = [], nomes: Record<string, string> = {}): { entradas: FinMov[]; despesas: FinMov[] } {
   const sit = (c: ContaRow) => (c.pago_em ? "pago" : c.vencimento < hoje ? "atrasado" : "a vencer");
   const entradas: FinMov[] = [
     ...contas
-      .filter((c) => c.tipo === "receber" && c.valor && !(faturas.length && /stripe/i.test(c.descricao)))
+      .filter((c) => c.tipo === "receber" && c.valor && !(faturas.length && /stripe/i.test(c.descricao)) && !(mesDe(c.vencimento) === mesDe(hoje) && categoria(c.categoria, true) === "Recorrência (Mensalidade)"))
       .map((c) => ({ data: c.vencimento, valor: c.valor!, cat: categoria(c.categoria, true), desc: c.descricao, origem: c.grupo ? "Recorrência / venda" : "Conta a receber", ref: `conta:${c.id}`, conciliado: c.extrato_id !== null, situacao: sit(c) })),
-    ...faturas.map((x) => ({ data: x.data, valor: x.valor, cat: "Recorrência (Mensalidade)", desc: `${x.nome} (Stripe)`, origem: "Fatura paga no Stripe", ref: `stripe:${x.id}`, conciliado: true, situacao: "pago" })),
+    // Mês corrente: a receita recorrente é o que está vendido e ativo (o valor de cada assinatura), pago ou não, parcelado ou não.
+    ...subs.filter(isActive).map((s) => ({ data: `${mesDe(hoje)}-01`, valor: s.effective_price_brl, cat: "Recorrência (Mensalidade)", desc: nomes[s.label ?? ""] ?? s.label ?? s.external_id, origem: `Assinatura ativa (${s.source})`, ref: `sub:${s.source}:${s.external_id}`, conciliado: true, situacao: "vendido" })),
+    ...faturas.filter((x) => mesDe(x.data) !== mesDe(hoje)).map((x) => ({ data: x.data, valor: x.valor, cat: "Recorrência (Mensalidade)", desc: `${x.nome} (Stripe)`, origem: "Fatura paga no Stripe", ref: `stripe:${x.id}`, conciliado: true, situacao: "pago" })),
     ...ext
       .filter((e) => e.valor > 0 && e.fonte === "avulso" && e.conta_id === null && !ignorado(e))
       .map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Lançamento avulso", ref: `extrato:${e.id}`, conciliado: true, situacao: "avulso" })),
@@ -464,7 +473,7 @@ function movimentosCompetencia(ext: ExtRow[], contas: ContaRow[], hoje: string, 
 export function finDetalhe(db: Db, agora: number, linha: string, mes: string, base: "competencia" | "caixa" = "competencia") {
   const ext = rows<ExtRow>(db, "select id, data, descricao, valor, categoria, conta_id, fonte from fin_extrato order by data, id");
   const contas = rows<ContaRow>(db, "select id, tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, extrato_id, grupo, obs from fin_contas order by vencimento, id");
-  const { entradas, despesas } = base === "caixa" ? movimentosFin(ext, contas) : movimentosCompetencia(ext, contas, brtDay(agora), faturasStripe(db));
+  const { entradas, despesas } = base === "caixa" ? movimentosFin(ext, contas) : movimentosCompetencia(ext, contas, brtDay(agora), faturasStripe(db), subsDe(db), nomesStripe(db));
   const limpo = linha.replace(/^\(-\)\s*/, "");
   const lista = mes.split(",").filter(Boolean);
   const noMes = (l: FinMov[]) => l.filter((m) => lista.includes(mesDe(m.data)));
@@ -515,7 +524,7 @@ export function finPainel(db: Db, agora: number): FinPainel {
 
   // Fluxo por mês. Receita: o que entrou no extrato. Despesa: o que foi pago (contas) + saídas do extrato sem conta.
   const { entradas, despesas } = movimentosFin(ext, contas);
-  const comp = movimentosCompetencia(ext, contas, hoje, faturasStripe(db));
+  const comp = movimentosCompetencia(ext, contas, hoje, faturasStripe(db), subsDe(db), nomesStripe(db));
 
   const meses = (n: number) => {
     const out: string[] = [];

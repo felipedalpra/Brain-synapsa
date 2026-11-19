@@ -56,7 +56,7 @@ export function FinDre({ d, atualizar }) {
       ignorar,
       titulo: rot.replace(/^[=(−)\s]+/, "").replace(/^\(−\)\s*/, "") || rot,
       sub: `${colunas[ci].rot} · competência`,
-      nota: "Competência: conta pelo vencimento do lançamento (cliente, recorrência, conta a pagar), pago ou não. Entrada do extrato sem lançamento não entra.",
+      nota: "Competência: no mês atual, a receita recorrente é o valor de cada assinatura ativa (o que foi vendido), recebido ou não. Meses anteriores usam as faturas e os lançamentos do mês. O que entrou de fato está no fluxo de caixa.",
       carregar: () => finDetalhe(linha, mes, "competencia").then((r) => ({ total: r.total, itens: r.itens })),
     });
   };
@@ -185,7 +185,7 @@ export function FinDre({ d, atualizar }) {
           </table>
         </div>
         <p className="muted">
-          Regime de competência: receita é o que foi lançado para o mês (vendas, mensalidades, parcelas pelo vencimento), recebido ou não; despesa é a conta do mês, paga ou não. O que entrou e saiu de fato está no fluxo de caixa. Imposto é a guia lançada, não estimativa.
+          Regime de competência: a receita do mês é o que foi vendido e está em vigor (cada assinatura ativa pelo valor da venda), recebido ou não; despesa é a conta do mês, paga ou não. O que entrou e saiu de fato está no fluxo de caixa. Imposto é a guia lançada, não estimativa.
         </p>
       </section>
       <section className="panel span-3" aria-labelledby="dv-g">

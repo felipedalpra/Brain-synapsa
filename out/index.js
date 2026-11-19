@@ -7000,6 +7000,12 @@ function finClassificarExtrato(db, id, cat, descricao) {
   run(db, "update fin_extrato set categoria = ? where id = ?", c2, id);
   if (descricao && descricao.trim()) run(db, "update fin_extrato set descricao = ? where id = ?", descricao.trim().slice(0, 200), id);
 }
+var subsDe = (db) => rows(db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
+var nomesStripe = (db) => {
+  const m = {};
+  for (const x of faturasStripe(db)) if (x.cliente_id) m[x.cliente_id] = x.nome;
+  return m;
+};
 function movimentosFin(ext, contas) {
   const entradas = ext.filter((e) => e.valor > 0 && !ignorado(e)).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Extrato Inter", ref: `extrato:${e.id}`, conciliado: e.conta_id !== null }));
   const despesas = [
@@ -7011,11 +7017,13 @@ function movimentosFin(ext, contas) {
       entradas.push({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: "Recebido fora do Inter", ref: `conta:${c2.id}`, conciliado: false });
   return { entradas, despesas };
 }
-function movimentosCompetencia(ext, contas, hoje, faturas = []) {
+function movimentosCompetencia(ext, contas, hoje, faturas = [], subs = [], nomes = {}) {
   const sit = (c2) => c2.pago_em ? "pago" : c2.vencimento < hoje ? "atrasado" : "a vencer";
   const entradas = [
-    ...contas.filter((c2) => c2.tipo === "receber" && c2.valor && !(faturas.length && /stripe/i.test(c2.descricao))).map((c2) => ({ data: c2.vencimento, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: c2.grupo ? "Recorr\xEAncia / venda" : "Conta a receber", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null, situacao: sit(c2) })),
-    ...faturas.map((x) => ({ data: x.data, valor: x.valor, cat: "Recorr\xEAncia (Mensalidade)", desc: `${x.nome} (Stripe)`, origem: "Fatura paga no Stripe", ref: `stripe:${x.id}`, conciliado: true, situacao: "pago" })),
+    ...contas.filter((c2) => c2.tipo === "receber" && c2.valor && !(faturas.length && /stripe/i.test(c2.descricao)) && !(mesDe(c2.vencimento) === mesDe(hoje) && categoria(c2.categoria, true) === "Recorr\xEAncia (Mensalidade)")).map((c2) => ({ data: c2.vencimento, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: c2.grupo ? "Recorr\xEAncia / venda" : "Conta a receber", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null, situacao: sit(c2) })),
+    // Mês corrente: a receita recorrente é o que está vendido e ativo (o valor de cada assinatura), pago ou não, parcelado ou não.
+    ...subs.filter(isActive).map((s2) => ({ data: `${mesDe(hoje)}-01`, valor: s2.effective_price_brl, cat: "Recorr\xEAncia (Mensalidade)", desc: nomes[s2.label ?? ""] ?? s2.label ?? s2.external_id, origem: `Assinatura ativa (${s2.source})`, ref: `sub:${s2.source}:${s2.external_id}`, conciliado: true, situacao: "vendido" })),
+    ...faturas.filter((x) => mesDe(x.data) !== mesDe(hoje)).map((x) => ({ data: x.data, valor: x.valor, cat: "Recorr\xEAncia (Mensalidade)", desc: `${x.nome} (Stripe)`, origem: "Fatura paga no Stripe", ref: `stripe:${x.id}`, conciliado: true, situacao: "pago" })),
     ...ext.filter((e) => e.valor > 0 && e.fonte === "avulso" && e.conta_id === null && !ignorado(e)).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Lan\xE7amento avulso", ref: `extrato:${e.id}`, conciliado: true, situacao: "avulso" }))
   ];
   const despesas = [
@@ -7027,7 +7035,7 @@ function movimentosCompetencia(ext, contas, hoje, faturas = []) {
 function finDetalhe(db, agora, linha, mes2, base = "competencia") {
   const ext = rows(db, "select id, data, descricao, valor, categoria, conta_id, fonte from fin_extrato order by data, id");
   const contas = rows(db, "select id, tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, extrato_id, grupo, obs from fin_contas order by vencimento, id");
-  const { entradas, despesas } = base === "caixa" ? movimentosFin(ext, contas) : movimentosCompetencia(ext, contas, brtDay(agora), faturasStripe(db));
+  const { entradas, despesas } = base === "caixa" ? movimentosFin(ext, contas) : movimentosCompetencia(ext, contas, brtDay(agora), faturasStripe(db), subsDe(db), nomesStripe(db));
   const limpo = linha.replace(/^\(-\)\s*/, "");
   const lista = mes2.split(",").filter(Boolean);
   const noMes = (l) => l.filter((m) => lista.includes(mesDe(m.data)));
@@ -7086,7 +7094,7 @@ function finPainel(db, agora) {
   const saldoInter = r26(ext.reduce((s2, e) => s2 + e.valor, 0));
   const ultimo = ext.length ? ext[ext.length - 1].data : null;
   const { entradas, despesas } = movimentosFin(ext, contas);
-  const comp = movimentosCompetencia(ext, contas, hoje, faturasStripe(db));
+  const comp = movimentosCompetencia(ext, contas, hoje, faturasStripe(db), subsDe(db), nomesStripe(db));
   const meses = (n3) => {
     const out = [];
     for (let i = n3 - 1; i >= 0; i--) out.push(mesDe(somaMeses(`${mesRef}-01`, -i)));
