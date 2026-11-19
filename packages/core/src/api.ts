@@ -20,6 +20,7 @@ import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receber
 import { receberWebhook } from "./webhook-resend";
 import { autoSet, rodarRotina, rotinaSet, avancar as prospAvancar, descartar as prospDescartar, enviarAoCrm, iniciarDescoberta, iniciarEnriquecimento, prospeccaoPainel } from "./prospeccao";
 import { sincronizarFaturasStripe } from "./fin-stripe";
+import { sincronizarAssinaturasStripe } from "./handlers";
 import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finClassificarExtrato, finIgnorarExtrato, finPagarConta, finDetalhe, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
 import { TEAMS, AGENTS } from "@brain/shared";
 
@@ -323,7 +324,13 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
           return out(200, { painel: finPainel(brain.db, agora) });
         }
         if (rota === "stripe/sincronizar") {
-          const r = await sincronizarFaturasStripe(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch);
+          let r: { ok: boolean; faturas: number; erro?: string };
+          try {
+            if (svc.env.STRIPE_READ_KEY) await sincronizarAssinaturasStripe(brain, svc.env, agora);
+            r = await sincronizarFaturasStripe(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch);
+          } catch (e) {
+            r = { ok: false, faturas: 0, erro: e instanceof Error ? e.message : String(e) };
+          }
           if (r.ok) brain.audit("voce", "financeiro_stripe_faturas", String(r.faturas));
           return out(r.ok ? 200 : 502, { ...r, painel: finPainel(brain.db, agora) });
         }
@@ -380,7 +387,11 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       }
       if (url.pathname === "/api/refresh-data") {
         const avisos = await refreshDados(brain, svc.env);
-        await sincronizarFaturasStripe(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch);
+        try {
+          if (svc.env.STRIPE_READ_KEY) await sincronizarAssinaturasStripe(brain, svc.env, brain.clock());
+        } catch (e) {
+          avisos.push(`stripe: ${e instanceof Error ? e.message : String(e)}`);
+        }
         const diag = await sincronizarMidia(brain, svc.env, { dias: Number(body.dias) || 90 });
         for (const d of diag.filter((x) => !x.ok)) avisos.push(`${d.parte}: ${d.erro}`);
         return out(200, { avisos, dashboard: dashboardData(brain), midia: midiaPainel(brain, body.de, body.ate) });

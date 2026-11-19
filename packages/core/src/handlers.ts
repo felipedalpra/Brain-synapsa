@@ -28,25 +28,30 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 const allSubs = (brain: Brain) => rows<SubscriptionRow>(brain.db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
 
+/** Lê as assinaturas do Stripe e atualiza a tabela subscriptions (MRR). */
+export async function sincronizarAssinaturasStripe(brain: Brain, env: Record<string, string | undefined>, now: number): Promise<{ n: number; note: string }> {
+  const synced = (await fetchStripeSubs(env.STRIPE_READ_KEY!)).map(stripeToRow);
+  tx(brain.db, () => {
+    run(brain.db, "delete from subscriptions where source = 'stripe' and origin = 'informado'");
+    for (const r of synced) {
+      run(brain.db, `insert into subscriptions (source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status, origin, updated_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?, 'sincronizado', ?)
+        on conflict(source, external_id) do update set list_price_brl = excluded.list_price_brl, effective_price_brl = excluded.effective_price_brl, discount_ends_at = excluded.discount_ends_at, status = excluded.status, origin = 'sincronizado', updated_at = excluded.updated_at`,
+        r.source, r.external_id, r.professional_id, r.label, r.list_price_brl, r.effective_price_brl, r.discount_ends_at, r.status, now);
+    }
+  });
+  // Propostas abertas sobre as assinaturas "informadas" perdem o sentido depois do Stripe real.
+  run(brain.db, "update proposals set status = 'rejeitada', decided_at = ?, review_note = 'substituída pela leitura real do Stripe' where status = 'pendente' and dedupe_key like 'fim_desconto:stripe:informado-%'", now);
+  const fat = await sincronizarFaturasStripe(brain, env);
+  return { n: synced.length, note: ` Stripe sincronizado: ${synced.length} assinaturas${fat.ok ? `, ${fat.faturas} faturas pagas` : ` (faturas: ${fat.erro})`}.` };
+}
+
 /** Guardião de Dados: sincroniza o Stripe (se houver chave), fecha o MRR do dia e aponta divergência e fim de desconto. */
 export async function guardiao({ brain, env, now }: HandlerCtx): Promise<HandlerResult> {
   let note = "";
   const day = brtDay(now);
   if (env.STRIPE_READ_KEY) {
-    const synced = (await fetchStripeSubs(env.STRIPE_READ_KEY)).map(stripeToRow);
-    tx(brain.db, () => {
-      run(brain.db, "delete from subscriptions where source = 'stripe' and origin = 'informado'");
-      for (const r of synced) {
-        run(brain.db, `insert into subscriptions (source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status, origin, updated_at)
-          values (?, ?, ?, ?, ?, ?, ?, ?, 'sincronizado', ?)
-          on conflict(source, external_id) do update set list_price_brl = excluded.list_price_brl, effective_price_brl = excluded.effective_price_brl, discount_ends_at = excluded.discount_ends_at, status = excluded.status, origin = 'sincronizado', updated_at = excluded.updated_at`,
-          r.source, r.external_id, r.professional_id, r.label, r.list_price_brl, r.effective_price_brl, r.discount_ends_at, r.status, now);
-      }
-    });
-    // Propostas abertas sobre as assinaturas "informadas" perdem o sentido depois do Stripe real.
-    run(brain.db, "update proposals set status = 'rejeitada', decided_at = ?, review_note = 'substituída pela leitura real do Stripe' where status = 'pendente' and dedupe_key like 'fim_desconto:stripe:informado-%'", now);
-    const fat = await sincronizarFaturasStripe(brain, env);
-    note = ` Stripe sincronizado: ${synced.length} assinaturas${fat.ok ? `, ${fat.faturas} faturas pagas` : ` (faturas: ${fat.erro})`}.`;
+    note = (await sincronizarAssinaturasStripe(brain, env, now)).note;
   } else {
     note = " Sem STRIPE_READ_KEY: usei os valores que você informou.";
   }

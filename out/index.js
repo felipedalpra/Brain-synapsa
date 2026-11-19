@@ -6640,6 +6640,178 @@ async function sincronizarFaturasStripe(brain2, env, f = fetch) {
 }
 var faturasStripe = (db) => rows(db, "select id, cliente_id, nome, data, valor from fin_stripe_fatura order by data, id");
 
+// packages/core/src/guardiao.ts
+var AGENT_ID = "guardiao-de-dados";
+async function fetchStripeSubs(key) {
+  const out = [];
+  let after;
+  for (let page = 0; page < 50; page++) {
+    const qs = new URLSearchParams({ status: "all", limit: "100" });
+    qs.append("expand[]", "data.discounts");
+    qs.append("expand[]", "data.discount");
+    qs.append("expand[]", "data.discounts.source.coupon");
+    qs.append("expand[]", "data.discount.source.coupon");
+    if (after) qs.set("starting_after", after);
+    const res = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, { headers: { authorization: `Bearer ${key}` } });
+    if (!res.ok) throw new Error(`stripe subscriptions: ${res.status}`);
+    const body = await res.json();
+    for (const s2 of body.data) {
+      const discounts = s2.discounts && s2.discounts.length > 0 ? s2.discounts : s2.discount ? [s2.discount] : [];
+      out.push({ ...s2, discounts });
+    }
+    if (!body.has_more || body.data.length === 0) break;
+    after = body.data[body.data.length - 1].id;
+  }
+  return out;
+}
+function planGuardiao(i) {
+  const { stripeRows, others, all, now, windowDays, day } = i;
+  const proposals = [];
+  const alerts = [];
+  const platformRows = others.filter((r) => r.source === "platform");
+  if (platformRows.length > 0) {
+    for (const d of reconcile(stripeRows, platformRows)) {
+      const diff = Math.abs((d.stripe_brl ?? 0) - (d.platform_brl ?? 0));
+      alerts.push({ kind: "divergencia_receita", severity: "atencao", ref: d.external_id, payload: { ...d }, dedupe_key: `div:${d.external_id}:${day}` });
+      proposals.push({
+        agent_id: AGENT_ID,
+        kind: "divergencia_receita",
+        title: `Conferir assinatura ${d.external_id}: Stripe e plataforma n\xE3o batem`,
+        payload: { ...d },
+        impacto_brl: diff,
+        risk: "baixo",
+        channel: "interno",
+        dedupe_key: `div:${d.external_id}:${day}`
+      });
+    }
+  }
+  for (const e of endingDiscounts(all, now, windowDays)) {
+    const endDay = e.row.discount_ends_at.slice(0, 10);
+    const key = `fim_desconto:${e.row.source}:${e.row.external_id}:${endDay}`;
+    alerts.push({ kind: "fim_desconto", severity: "info", ref: e.row.external_id, payload: { termina_em: endDay, dias: e.days_left }, dedupe_key: key });
+    proposals.push({
+      agent_id: AGENT_ID,
+      kind: "retencao_fim_desconto",
+      title: `Desconto termina em ${e.days_left} dias (${endDay}): falar com o cliente antes do reajuste`,
+      payload: {
+        fonte: e.row.source,
+        assinatura: e.row.external_id,
+        preco_atual_brl: e.row.effective_price_brl,
+        preco_cheio_brl: e.row.list_price_brl,
+        regra: "nao oferecer desconto"
+      },
+      impacto_brl: Math.round(e.row.list_price_brl * 12 * 100) / 100,
+      risk: "medio",
+      channel: "tarefa",
+      dedupe_key: key
+    });
+  }
+  return { proposals, alerts };
+}
+
+// packages/core/src/handlers.ts
+var brl3 = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n3 % 1 ? 2 : 0 }).replace(/ /g, " ");
+var allSubs = (brain2) => rows(brain2.db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
+async function sincronizarAssinaturasStripe(brain2, env, now) {
+  const synced = (await fetchStripeSubs(env.STRIPE_READ_KEY)).map(stripeToRow);
+  tx(brain2.db, () => {
+    run(brain2.db, "delete from subscriptions where source = 'stripe' and origin = 'informado'");
+    for (const r of synced) {
+      run(
+        brain2.db,
+        `insert into subscriptions (source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status, origin, updated_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?, 'sincronizado', ?)
+        on conflict(source, external_id) do update set list_price_brl = excluded.list_price_brl, effective_price_brl = excluded.effective_price_brl, discount_ends_at = excluded.discount_ends_at, status = excluded.status, origin = 'sincronizado', updated_at = excluded.updated_at`,
+        r.source,
+        r.external_id,
+        r.professional_id,
+        r.label,
+        r.list_price_brl,
+        r.effective_price_brl,
+        r.discount_ends_at,
+        r.status,
+        now
+      );
+    }
+  });
+  run(brain2.db, "update proposals set status = 'rejeitada', decided_at = ?, review_note = 'substitu\xEDda pela leitura real do Stripe' where status = 'pendente' and dedupe_key like 'fim_desconto:stripe:informado-%'", now);
+  const fat = await sincronizarFaturasStripe(brain2, env);
+  return { n: synced.length, note: ` Stripe sincronizado: ${synced.length} assinaturas${fat.ok ? `, ${fat.faturas} faturas pagas` : ` (faturas: ${fat.erro})`}.` };
+}
+async function guardiao({ brain: brain2, env, now }) {
+  let note = "";
+  const day = brtDay(now);
+  if (env.STRIPE_READ_KEY) {
+    note = (await sincronizarAssinaturasStripe(brain2, env, now)).note;
+  } else {
+    note = " Sem STRIPE_READ_KEY: usei os valores que voc\xEA informou.";
+  }
+  const all = allSubs(brain2);
+  const { bySource, total } = mrrBySource(all);
+  for (const [source, v] of Object.entries({ ...bySource, total: { mrr: total, count: Object.values(bySource).reduce((n3, x) => n3 + x.count, 0) } })) {
+    run(brain2.db, "insert into mrr_daily (day, source, mrr_brl, subs_count) values (?, ?, ?, ?) on conflict(day, source) do update set mrr_brl = excluded.mrr_brl, subs_count = excluded.subs_count", day, source, v.mrr, v.count);
+  }
+  const plan = planGuardiao({ stripeRows: all.filter((r) => r.source === "stripe"), others: all.filter((r) => r.source !== "stripe"), all, now: new Date(now), windowDays: 30, day });
+  const proposals = plan.proposals.map((p) => ({
+    agentId: "guardiao",
+    kind: p.kind,
+    title: p.title,
+    why: p.kind === "retencao_fim_desconto" ? `O desconto acaba e o plano volta ao pre\xE7o cheio. Fale com a pessoa antes. Regra: nenhum agente oferece desconto, voc\xEA decide o que dizer.` : `Stripe e plataforma registram valores diferentes para a mesma assinatura. Confira antes de fechar o MRR.`,
+    impactoBrl: p.impacto_brl,
+    risk: p.risk,
+    channel: p.channel,
+    payload: p.payload,
+    dedupeKey: p.dedupe_key
+  }));
+  return { status: "done", result: `MRR fechado em ${brl3(total)}.${note}`, proposals };
+}
+async function financeiro({ brain: brain2 }) {
+  const m = brain2.metrics();
+  const falta = Math.max(0, m.mrr.goal - m.mrr.total);
+  const pct = Math.round(m.mrr.total / m.mrr.goal * 100);
+  const d = m.descontos.map((x) => `${x.contas} em ${x.quando}`).join(", ");
+  return { status: "done", result: `MRR de ${brl3(m.mrr.total)}, ${pct}% de ${brl3(m.mrr.goal)}. Faltam ${brl3(falta)}, cerca de ${Math.ceil(falta / m.mrr.essencialPrice)} Essenciais a ${brl3(m.mrr.essencialPrice)}.${d ? ` Reajustes \xE0 vista: ${d}.` : ""}` };
+}
+async function midia({ brain: brain2, env, now }) {
+  const token = env.META_SYSTEM_USER_TOKEN;
+  const acct = env.META_AD_ACCOUNT_ID;
+  if (!token || !acct) return { status: "blocked", result: "Falta META_SYSTEM_USER_TOKEN ou META_AD_ACCOUNT_ID nos secrets do Brain para ler os an\xFAncios." };
+  const m = await syncMeta(brain2, env, now, 7);
+  if (m.adsErro && (m.igErro || !env.META_IG_ID)) throw new Error(m.adsErro);
+  const ads = m.ads ?? [];
+  const ig = m.ig ? ` Instagram: ${m.ig.followers ?? "?"} seguidores.` : m.igErro ? ` Instagram falhou: ${m.igErro}.` : "";
+  const adsNote = m.adsErro ? ` An\xFAncios falharam: ${m.adsErro}.` : "";
+  const spend = ads.reduce((n3, r) => n3 + r.spend, 0);
+  const leads = ads.reduce((n3, r) => n3 + r.leads, 0);
+  const day = brtDay(now);
+  const proposals = wastedSpend(ads, 50).map((c2) => ({
+    agentId: "midia",
+    kind: "revisar_campanha",
+    title: `Revisar campanha "${c2.campaign_name}": ${brl3(c2.spend)} sem lead em 7 dias`,
+    why: `Gastou ${brl3(c2.spend)}, teve ${c2.clicks} cliques e nenhum lead. O Brain nunca pausa sozinho: voc\xEA decide pausar, trocar o criativo ou manter.`,
+    impactoBrl: c2.spend,
+    risk: "baixo",
+    channel: "interno",
+    payload: { ...c2 },
+    dedupeKey: `campanha_sem_lead:${c2.campaign_id}:${day}`
+  }));
+  return { status: "done", result: m.adsErro ? `${adsNote.trim()}${ig}` : `Leu os an\xFAncios dos \xFAltimos 7 dias: ${brl3(spend)} gastos e ${leads} leads.${ig}`, proposals };
+}
+async function chief({ brain: brain2 }) {
+  const snap = brain2.snapshot([]);
+  const pend = snap.proposals.filter((p) => p.status === "pendente");
+  const top = pend.slice(0, 3).map((p) => `${p.title} (${brl3(p.impactoBrl)})`);
+  const m = snap.metrics;
+  const soon = m.descontos.length ? ` Pr\xF3ximo reajuste: ${m.descontos[0].quando}.` : "";
+  const blocked = row(brain2.db, "select count(*) as n from agent_runs where status = 'blocked' and created_at >= ?", now0(brain2))?.n ?? 0;
+  return {
+    status: "done",
+    result: pend.length === 0 ? `Briefing: fila vazia. MRR em ${brl3(m.mrr.total)}.${soon}` : `Briefing: ${pend.length} propostas esperando voc\xEA${snap.overflow ? ` (+${snap.overflow} fora do teto)` : ""}. Primeiras: ${top.join("; ")}. MRR em ${brl3(m.mrr.total)}.${soon}${blocked ? ` ${blocked} tarefas travadas por falta de integra\xE7\xE3o.` : ""}`
+  };
+}
+var now0 = (brain2) => Date.parse(`${brtDay(brain2.clock())}T00:00:00-03:00`);
+var HANDLERS = { guardiao, financeiro, midia, chief };
+
 // packages/core/src/fin-proj.ts
 var r25 = (n3) => Math.round(n3 * 100) / 100;
 var HORIZONTE_MESES = 36;
@@ -7555,7 +7727,13 @@ function createHandler(svc) {
           return out(200, { painel: finPainel(brain2.db, agora) });
         }
         if (rota === "stripe/sincronizar") {
-          const r = await sincronizarFaturasStripe(brain2, svc.env, svc.fetch ?? fetch);
+          let r;
+          try {
+            if (svc.env.STRIPE_READ_KEY) await sincronizarAssinaturasStripe(brain2, svc.env, agora);
+            r = await sincronizarFaturasStripe(brain2, svc.env, svc.fetch ?? fetch);
+          } catch (e) {
+            r = { ok: false, faturas: 0, erro: e instanceof Error ? e.message : String(e) };
+          }
           if (r.ok) brain2.audit("voce", "financeiro_stripe_faturas", String(r.faturas));
           return out(r.ok ? 200 : 502, { ...r, painel: finPainel(brain2.db, agora) });
         }
@@ -7612,7 +7790,11 @@ function createHandler(svc) {
       }
       if (url.pathname === "/api/refresh-data") {
         const avisos = await refreshDados(brain2, svc.env);
-        await sincronizarFaturasStripe(brain2, svc.env, svc.fetch ?? fetch);
+        try {
+          if (svc.env.STRIPE_READ_KEY) await sincronizarAssinaturasStripe(brain2, svc.env, brain2.clock());
+        } catch (e) {
+          avisos.push(`stripe: ${e instanceof Error ? e.message : String(e)}`);
+        }
         const diag = await sincronizarMidia(brain2, svc.env, { dias: Number(body.dias) || 90 });
         for (const d of diag.filter((x) => !x.ok)) avisos.push(`${d.parte}: ${d.erro}`);
         return out(200, { avisos, dashboard: dashboardData(brain2), midia: midiaPainel(brain2, body.de, body.ate) });
@@ -7845,175 +8027,6 @@ async function runChecks(db, env, now, f = fetch) {
   );
   return out;
 }
-
-// packages/core/src/guardiao.ts
-var AGENT_ID = "guardiao-de-dados";
-async function fetchStripeSubs(key) {
-  const out = [];
-  let after;
-  for (let page = 0; page < 50; page++) {
-    const qs = new URLSearchParams({ status: "all", limit: "100" });
-    qs.append("expand[]", "data.discounts");
-    qs.append("expand[]", "data.discount");
-    qs.append("expand[]", "data.discounts.source.coupon");
-    qs.append("expand[]", "data.discount.source.coupon");
-    if (after) qs.set("starting_after", after);
-    const res = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, { headers: { authorization: `Bearer ${key}` } });
-    if (!res.ok) throw new Error(`stripe subscriptions: ${res.status}`);
-    const body = await res.json();
-    for (const s2 of body.data) {
-      const discounts = s2.discounts && s2.discounts.length > 0 ? s2.discounts : s2.discount ? [s2.discount] : [];
-      out.push({ ...s2, discounts });
-    }
-    if (!body.has_more || body.data.length === 0) break;
-    after = body.data[body.data.length - 1].id;
-  }
-  return out;
-}
-function planGuardiao(i) {
-  const { stripeRows, others, all, now, windowDays, day } = i;
-  const proposals = [];
-  const alerts = [];
-  const platformRows = others.filter((r) => r.source === "platform");
-  if (platformRows.length > 0) {
-    for (const d of reconcile(stripeRows, platformRows)) {
-      const diff = Math.abs((d.stripe_brl ?? 0) - (d.platform_brl ?? 0));
-      alerts.push({ kind: "divergencia_receita", severity: "atencao", ref: d.external_id, payload: { ...d }, dedupe_key: `div:${d.external_id}:${day}` });
-      proposals.push({
-        agent_id: AGENT_ID,
-        kind: "divergencia_receita",
-        title: `Conferir assinatura ${d.external_id}: Stripe e plataforma n\xE3o batem`,
-        payload: { ...d },
-        impacto_brl: diff,
-        risk: "baixo",
-        channel: "interno",
-        dedupe_key: `div:${d.external_id}:${day}`
-      });
-    }
-  }
-  for (const e of endingDiscounts(all, now, windowDays)) {
-    const endDay = e.row.discount_ends_at.slice(0, 10);
-    const key = `fim_desconto:${e.row.source}:${e.row.external_id}:${endDay}`;
-    alerts.push({ kind: "fim_desconto", severity: "info", ref: e.row.external_id, payload: { termina_em: endDay, dias: e.days_left }, dedupe_key: key });
-    proposals.push({
-      agent_id: AGENT_ID,
-      kind: "retencao_fim_desconto",
-      title: `Desconto termina em ${e.days_left} dias (${endDay}): falar com o cliente antes do reajuste`,
-      payload: {
-        fonte: e.row.source,
-        assinatura: e.row.external_id,
-        preco_atual_brl: e.row.effective_price_brl,
-        preco_cheio_brl: e.row.list_price_brl,
-        regra: "nao oferecer desconto"
-      },
-      impacto_brl: Math.round(e.row.list_price_brl * 12 * 100) / 100,
-      risk: "medio",
-      channel: "tarefa",
-      dedupe_key: key
-    });
-  }
-  return { proposals, alerts };
-}
-
-// packages/core/src/handlers.ts
-var brl3 = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n3 % 1 ? 2 : 0 }).replace(/ /g, " ");
-var allSubs = (brain2) => rows(brain2.db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
-async function guardiao({ brain: brain2, env, now }) {
-  let note = "";
-  const day = brtDay(now);
-  if (env.STRIPE_READ_KEY) {
-    const synced = (await fetchStripeSubs(env.STRIPE_READ_KEY)).map(stripeToRow);
-    tx(brain2.db, () => {
-      run(brain2.db, "delete from subscriptions where source = 'stripe' and origin = 'informado'");
-      for (const r of synced) {
-        run(
-          brain2.db,
-          `insert into subscriptions (source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status, origin, updated_at)
-          values (?, ?, ?, ?, ?, ?, ?, ?, 'sincronizado', ?)
-          on conflict(source, external_id) do update set list_price_brl = excluded.list_price_brl, effective_price_brl = excluded.effective_price_brl, discount_ends_at = excluded.discount_ends_at, status = excluded.status, origin = 'sincronizado', updated_at = excluded.updated_at`,
-          r.source,
-          r.external_id,
-          r.professional_id,
-          r.label,
-          r.list_price_brl,
-          r.effective_price_brl,
-          r.discount_ends_at,
-          r.status,
-          now
-        );
-      }
-    });
-    run(brain2.db, "update proposals set status = 'rejeitada', decided_at = ?, review_note = 'substitu\xEDda pela leitura real do Stripe' where status = 'pendente' and dedupe_key like 'fim_desconto:stripe:informado-%'", now);
-    const fat = await sincronizarFaturasStripe(brain2, env);
-    note = ` Stripe sincronizado: ${synced.length} assinaturas${fat.ok ? `, ${fat.faturas} faturas pagas` : ` (faturas: ${fat.erro})`}.`;
-  } else {
-    note = " Sem STRIPE_READ_KEY: usei os valores que voc\xEA informou.";
-  }
-  const all = allSubs(brain2);
-  const { bySource, total } = mrrBySource(all);
-  for (const [source, v] of Object.entries({ ...bySource, total: { mrr: total, count: Object.values(bySource).reduce((n3, x) => n3 + x.count, 0) } })) {
-    run(brain2.db, "insert into mrr_daily (day, source, mrr_brl, subs_count) values (?, ?, ?, ?) on conflict(day, source) do update set mrr_brl = excluded.mrr_brl, subs_count = excluded.subs_count", day, source, v.mrr, v.count);
-  }
-  const plan = planGuardiao({ stripeRows: all.filter((r) => r.source === "stripe"), others: all.filter((r) => r.source !== "stripe"), all, now: new Date(now), windowDays: 30, day });
-  const proposals = plan.proposals.map((p) => ({
-    agentId: "guardiao",
-    kind: p.kind,
-    title: p.title,
-    why: p.kind === "retencao_fim_desconto" ? `O desconto acaba e o plano volta ao pre\xE7o cheio. Fale com a pessoa antes. Regra: nenhum agente oferece desconto, voc\xEA decide o que dizer.` : `Stripe e plataforma registram valores diferentes para a mesma assinatura. Confira antes de fechar o MRR.`,
-    impactoBrl: p.impacto_brl,
-    risk: p.risk,
-    channel: p.channel,
-    payload: p.payload,
-    dedupeKey: p.dedupe_key
-  }));
-  return { status: "done", result: `MRR fechado em ${brl3(total)}.${note}`, proposals };
-}
-async function financeiro({ brain: brain2 }) {
-  const m = brain2.metrics();
-  const falta = Math.max(0, m.mrr.goal - m.mrr.total);
-  const pct = Math.round(m.mrr.total / m.mrr.goal * 100);
-  const d = m.descontos.map((x) => `${x.contas} em ${x.quando}`).join(", ");
-  return { status: "done", result: `MRR de ${brl3(m.mrr.total)}, ${pct}% de ${brl3(m.mrr.goal)}. Faltam ${brl3(falta)}, cerca de ${Math.ceil(falta / m.mrr.essencialPrice)} Essenciais a ${brl3(m.mrr.essencialPrice)}.${d ? ` Reajustes \xE0 vista: ${d}.` : ""}` };
-}
-async function midia({ brain: brain2, env, now }) {
-  const token = env.META_SYSTEM_USER_TOKEN;
-  const acct = env.META_AD_ACCOUNT_ID;
-  if (!token || !acct) return { status: "blocked", result: "Falta META_SYSTEM_USER_TOKEN ou META_AD_ACCOUNT_ID nos secrets do Brain para ler os an\xFAncios." };
-  const m = await syncMeta(brain2, env, now, 7);
-  if (m.adsErro && (m.igErro || !env.META_IG_ID)) throw new Error(m.adsErro);
-  const ads = m.ads ?? [];
-  const ig = m.ig ? ` Instagram: ${m.ig.followers ?? "?"} seguidores.` : m.igErro ? ` Instagram falhou: ${m.igErro}.` : "";
-  const adsNote = m.adsErro ? ` An\xFAncios falharam: ${m.adsErro}.` : "";
-  const spend = ads.reduce((n3, r) => n3 + r.spend, 0);
-  const leads = ads.reduce((n3, r) => n3 + r.leads, 0);
-  const day = brtDay(now);
-  const proposals = wastedSpend(ads, 50).map((c2) => ({
-    agentId: "midia",
-    kind: "revisar_campanha",
-    title: `Revisar campanha "${c2.campaign_name}": ${brl3(c2.spend)} sem lead em 7 dias`,
-    why: `Gastou ${brl3(c2.spend)}, teve ${c2.clicks} cliques e nenhum lead. O Brain nunca pausa sozinho: voc\xEA decide pausar, trocar o criativo ou manter.`,
-    impactoBrl: c2.spend,
-    risk: "baixo",
-    channel: "interno",
-    payload: { ...c2 },
-    dedupeKey: `campanha_sem_lead:${c2.campaign_id}:${day}`
-  }));
-  return { status: "done", result: m.adsErro ? `${adsNote.trim()}${ig}` : `Leu os an\xFAncios dos \xFAltimos 7 dias: ${brl3(spend)} gastos e ${leads} leads.${ig}`, proposals };
-}
-async function chief({ brain: brain2 }) {
-  const snap = brain2.snapshot([]);
-  const pend = snap.proposals.filter((p) => p.status === "pendente");
-  const top = pend.slice(0, 3).map((p) => `${p.title} (${brl3(p.impactoBrl)})`);
-  const m = snap.metrics;
-  const soon = m.descontos.length ? ` Pr\xF3ximo reajuste: ${m.descontos[0].quando}.` : "";
-  const blocked = row(brain2.db, "select count(*) as n from agent_runs where status = 'blocked' and created_at >= ?", now0(brain2))?.n ?? 0;
-  return {
-    status: "done",
-    result: pend.length === 0 ? `Briefing: fila vazia. MRR em ${brl3(m.mrr.total)}.${soon}` : `Briefing: ${pend.length} propostas esperando voc\xEA${snap.overflow ? ` (+${snap.overflow} fora do teto)` : ""}. Primeiras: ${top.join("; ")}. MRR em ${brl3(m.mrr.total)}.${soon}${blocked ? ` ${blocked} tarefas travadas por falta de integra\xE7\xE3o.` : ""}`
-  };
-}
-var now0 = (brain2) => Date.parse(`${brtDay(brain2.clock())}T00:00:00-03:00`);
-var HANDLERS = { guardiao, financeiro, midia, chief };
 
 // packages/core/src/jarvis.ts
 var remember = (brain2, role, text) => run(brain2.db, "insert into chat (role, text, at) values (?, ?, ?)", role, text, brain2.clock());
