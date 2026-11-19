@@ -1,3 +1,4 @@
+import { sincronizarFaturasStripe } from "./fin-stripe";
 import { mrrBySource, stripeToRow } from "./mrr";
 import { planGuardiao, fetchStripeSubs } from "./guardiao";
 import { syncMeta } from "./data";
@@ -44,7 +45,8 @@ export async function guardiao({ brain, env, now }: HandlerCtx): Promise<Handler
     });
     // Propostas abertas sobre as assinaturas "informadas" perdem o sentido depois do Stripe real.
     run(brain.db, "update proposals set status = 'rejeitada', decided_at = ?, review_note = 'substituída pela leitura real do Stripe' where status = 'pendente' and dedupe_key like 'fim_desconto:stripe:informado-%'", now);
-    note = ` Stripe sincronizado: ${synced.length} assinaturas.`;
+    const fat = await sincronizarFaturasStripe(brain, env);
+    note = ` Stripe sincronizado: ${synced.length} assinaturas${fat.ok ? `, ${fat.faturas} faturas pagas` : ` (faturas: ${fat.erro})`}.`;
   } else {
     note = " Sem STRIPE_READ_KEY: usei os valores que você informou.";
   }

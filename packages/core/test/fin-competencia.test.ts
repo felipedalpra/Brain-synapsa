@@ -45,3 +45,20 @@ describe("ignorar movimentação de outro negócio", () => {
     expect(finPainel(db, AGORA).kpis.entradasMes).toBe(547);
   });
 });
+
+describe("faturas do Stripe", () => {
+  it("trazem todos os clientes e substituem as contas 'Stripe' lançadas à mão", async () => {
+    const { Brain } = await import("../src/brain");
+    const { sincronizarFaturasStripe } = await import("../src/fin-stripe");
+    const db = openDb(":memory:");
+    const brain = new Brain(db, () => AGORA);
+    db.prepare("insert into fin_contas (tipo, descricao, categoria, vencimento, valor, pago_em) values ('receber','Stripe','Recorrência (Mensalidade)','2026-11-05',45.96,'2026-11-05')".replace("pago_em)", "pago_em, criado_em)").replace("'2026-11-05')", "'2026-11-05', 1)")).run();
+    const t = (d: string) => Math.floor(Date.parse(d) / 1000);
+    const inv = (id: string, nome: string, d: string) => ({ id, customer: `cus_${id}`, customer_name: nome, customer_email: null, amount_paid: 4900, currency: "brl", created: t(d), status: "paid" });
+    const f = (async () => new Response(JSON.stringify({ has_more: false, data: [inv("a", "Ana", "2026-11-03T12:00:00Z"), inv("b", "Beto", "2026-11-10T12:00:00Z"), inv("c", "Cris", "2026-11-12T12:00:00Z")] }))) as unknown as typeof fetch;
+    const r = await sincronizarFaturasStripe(brain, { STRIPE_READ_KEY: "rk_test" }, f);
+    expect(r.faturas).toBe(3);
+    const p = finPainel(db, AGORA);
+    expect(valorDre(p, "Receita bruta")).toBe(147);
+  });
+});

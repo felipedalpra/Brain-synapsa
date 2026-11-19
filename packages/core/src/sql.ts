@@ -152,6 +152,7 @@ create table if not exists meta_criativo (
   ad_id text primary key, nome text not null, status text not null, criado text, campanha text, conjunto text,
   miniatura text, imagem text, texto text, titulo text, cta text, link_ig text, atualizado_em integer not null
 );
+create table if not exists fin_stripe_fatura (id text primary key, cliente_id text, nome text not null, data text not null, valor real not null, atualizado_em integer not null);
 create table if not exists meta_pixel (pixel_id text primary key, nome text not null, ultimo_disparo text, indisponivel integer not null default 0, atualizado_em integer not null);
 create table if not exists meta_pixel_dia (day text not null, pixel_id text not null, evento text not null, total integer not null, primary key (day, pixel_id, evento));
 create table if not exists meta_quebra_dia (day text not null, tipo text not null, chave text not null, spend real not null, impressions integer not null, clicks integer not null, leads integer not null, primary key (day, tipo, chave));

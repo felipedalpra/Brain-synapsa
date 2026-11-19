@@ -1695,6 +1695,7 @@ create table if not exists meta_criativo (
   ad_id text primary key, nome text not null, status text not null, criado text, campanha text, conjunto text,
   miniatura text, imagem text, texto text, titulo text, cta text, link_ig text, atualizado_em integer not null
 );
+create table if not exists fin_stripe_fatura (id text primary key, cliente_id text, nome text not null, data text not null, valor real not null, atualizado_em integer not null);
 create table if not exists meta_pixel (pixel_id text primary key, nome text not null, ultimo_disparo text, indisponivel integer not null default 0, atualizado_em integer not null);
 create table if not exists meta_pixel_dia (day text not null, pixel_id text not null, evento text not null, total integer not null, primary key (day, pixel_id, evento));
 create table if not exists meta_quebra_dia (day text not null, tipo text not null, chave text not null, spend real not null, impressions integer not null, clicks integer not null, leads integer not null, primary key (day, tipo, chave));
@@ -6595,6 +6596,50 @@ function prospeccaoPainel(brain2, env) {
   };
 }
 
+// packages/core/src/fin-stripe.ts
+async function fetchFaturasPagas(key, f = fetch) {
+  const out = [];
+  let after;
+  for (let page = 0; page < 30; page++) {
+    const qs = new URLSearchParams({ status: "paid", limit: "100" });
+    if (after) qs.set("starting_after", after);
+    const res = await f(`https://api.stripe.com/v1/invoices?${qs}`, { headers: { authorization: `Bearer ${key}` } });
+    if (!res.ok) throw new Error(`stripe invoices: ${res.status}${res.status === 403 || res.status === 401 ? " (a chave de leitura precisa da permiss\xE3o Invoices: leitura)" : ""}`);
+    const body = await res.json();
+    out.push(...body.data);
+    if (!body.has_more || body.data.length === 0) break;
+    after = body.data[body.data.length - 1].id;
+  }
+  return out;
+}
+async function sincronizarFaturasStripe(brain2, env, f = fetch) {
+  if (!env.STRIPE_READ_KEY) return { ok: false, faturas: 0, erro: "Sem STRIPE_READ_KEY." };
+  try {
+    const inv = (await fetchFaturasPagas(env.STRIPE_READ_KEY, f)).filter((i) => i.currency.toLowerCase() === "brl" && i.amount_paid > 0);
+    const agora = brain2.clock();
+    tx(brain2.db, () => {
+      for (const i of inv) {
+        const quando = (i.status_transitions?.paid_at ?? i.created) * 1e3;
+        run(
+          brain2.db,
+          `insert into fin_stripe_fatura (id, cliente_id, nome, data, valor, atualizado_em) values (?, ?, ?, ?, ?, ?)
+          on conflict(id) do update set cliente_id = excluded.cliente_id, nome = excluded.nome, data = excluded.data, valor = excluded.valor, atualizado_em = excluded.atualizado_em`,
+          i.id,
+          i.customer,
+          i.customer_name || i.customer_email || i.customer || "Cliente Stripe",
+          brtDay(quando),
+          i.amount_paid / 100,
+          agora
+        );
+      }
+    });
+    return { ok: true, faturas: inv.length };
+  } catch (e) {
+    return { ok: false, faturas: 0, erro: e instanceof Error ? e.message : String(e) };
+  }
+}
+var faturasStripe = (db) => rows(db, "select id, cliente_id, nome, data, valor from fin_stripe_fatura order by data, id");
+
 // packages/core/src/fin-proj.ts
 var r25 = (n3) => Math.round(n3 * 100) / 100;
 var HORIZONTE_MESES = 36;
@@ -6966,10 +7011,11 @@ function movimentosFin(ext, contas) {
       entradas.push({ data: c2.pago_em, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: "Recebido fora do Inter", ref: `conta:${c2.id}`, conciliado: false });
   return { entradas, despesas };
 }
-function movimentosCompetencia(ext, contas, hoje) {
+function movimentosCompetencia(ext, contas, hoje, faturas = []) {
   const sit = (c2) => c2.pago_em ? "pago" : c2.vencimento < hoje ? "atrasado" : "a vencer";
   const entradas = [
-    ...contas.filter((c2) => c2.tipo === "receber" && c2.valor).map((c2) => ({ data: c2.vencimento, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: c2.grupo ? "Recorr\xEAncia / venda" : "Conta a receber", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null, situacao: sit(c2) })),
+    ...contas.filter((c2) => c2.tipo === "receber" && c2.valor && !(faturas.length && /stripe/i.test(c2.descricao))).map((c2) => ({ data: c2.vencimento, valor: c2.valor, cat: categoria(c2.categoria, true), desc: c2.descricao, origem: c2.grupo ? "Recorr\xEAncia / venda" : "Conta a receber", ref: `conta:${c2.id}`, conciliado: c2.extrato_id !== null, situacao: sit(c2) })),
+    ...faturas.map((x) => ({ data: x.data, valor: x.valor, cat: "Recorr\xEAncia (Mensalidade)", desc: `${x.nome} (Stripe)`, origem: "Fatura paga no Stripe", ref: `stripe:${x.id}`, conciliado: true, situacao: "pago" })),
     ...ext.filter((e) => e.valor > 0 && e.fonte === "avulso" && e.conta_id === null && !ignorado(e)).map((e) => ({ data: e.data, valor: e.valor, cat: categoria(e.categoria, true), desc: e.descricao, origem: "Lan\xE7amento avulso", ref: `extrato:${e.id}`, conciliado: true, situacao: "avulso" }))
   ];
   const despesas = [
@@ -6981,7 +7027,7 @@ function movimentosCompetencia(ext, contas, hoje) {
 function finDetalhe(db, agora, linha, mes2, base = "competencia") {
   const ext = rows(db, "select id, data, descricao, valor, categoria, conta_id, fonte from fin_extrato order by data, id");
   const contas = rows(db, "select id, tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, extrato_id, grupo, obs from fin_contas order by vencimento, id");
-  const { entradas, despesas } = base === "caixa" ? movimentosFin(ext, contas) : movimentosCompetencia(ext, contas, brtDay(agora));
+  const { entradas, despesas } = base === "caixa" ? movimentosFin(ext, contas) : movimentosCompetencia(ext, contas, brtDay(agora), faturasStripe(db));
   const limpo = linha.replace(/^\(-\)\s*/, "");
   const lista = mes2.split(",").filter(Boolean);
   const noMes = (l) => l.filter((m) => lista.includes(mesDe(m.data)));
@@ -7040,7 +7086,7 @@ function finPainel(db, agora) {
   const saldoInter = r26(ext.reduce((s2, e) => s2 + e.valor, 0));
   const ultimo = ext.length ? ext[ext.length - 1].data : null;
   const { entradas, despesas } = movimentosFin(ext, contas);
-  const comp = movimentosCompetencia(ext, contas, hoje);
+  const comp = movimentosCompetencia(ext, contas, hoje, faturasStripe(db));
   const meses = (n3) => {
     const out = [];
     for (let i = n3 - 1; i >= 0; i--) out.push(mesDe(somaMeses(`${mesRef}-01`, -i)));
@@ -7500,6 +7546,11 @@ function createHandler(svc) {
           brain2.audit("voce", "financeiro_lancamento_avulso");
           return out(200, { painel: finPainel(brain2.db, agora) });
         }
+        if (rota === "stripe/sincronizar") {
+          const r = await sincronizarFaturasStripe(brain2, svc.env, svc.fetch ?? fetch);
+          if (r.ok) brain2.audit("voce", "financeiro_stripe_faturas", String(r.faturas));
+          return out(r.ok ? 200 : 502, { ...r, painel: finPainel(brain2.db, agora) });
+        }
         if (rota === "extrato/categoria") {
           finClassificarExtrato(brain2.db, idDe(), String(body.categoria ?? ""), typeof body.descricao === "string" ? body.descricao : void 0);
           brain2.audit("voce", "financeiro_extrato_classificado", String(body.id));
@@ -7553,6 +7604,7 @@ function createHandler(svc) {
       }
       if (url.pathname === "/api/refresh-data") {
         const avisos = await refreshDados(brain2, svc.env);
+        await sincronizarFaturasStripe(brain2, svc.env, svc.fetch ?? fetch);
         const diag = await sincronizarMidia(brain2, svc.env, { dias: Number(body.dias) || 90 });
         for (const d of diag.filter((x) => !x.ok)) avisos.push(`${d.parte}: ${d.erro}`);
         return out(200, { avisos, dashboard: dashboardData(brain2), midia: midiaPainel(brain2, body.de, body.ate) });
@@ -7884,7 +7936,8 @@ async function guardiao({ brain: brain2, env, now }) {
       }
     });
     run(brain2.db, "update proposals set status = 'rejeitada', decided_at = ?, review_note = 'substitu\xEDda pela leitura real do Stripe' where status = 'pendente' and dedupe_key like 'fim_desconto:stripe:informado-%'", now);
-    note = ` Stripe sincronizado: ${synced.length} assinaturas.`;
+    const fat = await sincronizarFaturasStripe(brain2, env);
+    note = ` Stripe sincronizado: ${synced.length} assinaturas${fat.ok ? `, ${fat.faturas} faturas pagas` : ` (faturas: ${fat.erro})`}.`;
   } else {
     note = " Sem STRIPE_READ_KEY: usei os valores que voc\xEA informou.";
   }
