@@ -94,4 +94,21 @@ describe("instagram", () => {
     expect(servirMidia(b, nome).status).toBe(404);
     expect(igContexto(b).recentes[0]!.motivoRejeicao).toBe("fora do posicionamento");
   });
+  it("carrossel de 7 slides com processamento lento: pausa, guarda o progresso e termina na rodada seguinte", async () => {
+    const b = mk();
+    const r = receberPost(b, post({ slides: Array(7).fill(JPG), chave: "lento" }), "https://brain.dev");
+    decidirPost(b, r.id, "aprovar");
+    let n = 0, lentas = 20;
+    const f = (async (url: string, init?: any) => {
+      n++;
+      if (init?.method === "GET") return new Response(JSON.stringify(String(url).includes("permalink") ? { permalink: "https://instagram.com/p/z" } : { status_code: lentas-- > 0 ? "IN_PROGRESS" : "FINISHED", permalink: "https://instagram.com/p/z" }), { status: 200 });
+      return new Response(JSON.stringify({ id: `c${n}` }), { status: 200 });
+    }) as unknown as typeof fetch;
+    expect(await publicarPost(b, ENV, r.id, f, async () => {})).toMatch(/andamento/);
+    expect(n).toBeLessThanOrEqual(30);
+    expect(igPainel(b, ENV).posts[0]!.status).toBe("aprovado");
+    let guard = 0;
+    while (igPainel(b, ENV).posts[0]!.status !== "publicado" && guard++ < 10) await publicarPost(b, ENV, r.id, f, async () => {});
+    expect(igPainel(b, ENV).posts[0]!.status).toBe("publicado");
+  });
 });

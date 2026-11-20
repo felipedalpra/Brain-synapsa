@@ -135,6 +135,8 @@ async function graph(env: Env, f: typeof fetch, metodo: "GET" | "POST", caminho:
 }
 
 /** Publica um post aprovado: 1 imagem vira post simples; 2 a 10 viram carrossel. */
+class Pausa extends Error { constructor() { super("pausa"); } }
+
 export async function publicarPost(brain: Brain, env: Env, id: string, f: typeof fetch = fetch, espera: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))): Promise<string> {
   if (brain.killed()) throw new BrainError("kill_switch", "Botão de emergência ligado.");
   const p = row<Linha>(brain.db, "select * from ig_posts where id = ?", id);
@@ -149,35 +151,57 @@ export async function publicarPost(brain: Brain, env: Env, id: string, f: typeof
   if (!midias.length) throw new BrainError("invalid", "Esse post não tem imagem.");
   // marca antes de chamar: se a resposta se perder, não publica duas vezes
   run(brain.db, "update ig_posts set status = 'falhou', erro = 'publicação interrompida: confira o perfil antes de tentar de novo' where id = ?", id);
+  // O Workers limita as chamadas por execução. Conto as minhas e, se faltar fôlego, guardo o progresso e continuo na próxima rodada.
+  const LIMITE = 30;
+  let usadas = 0;
+  const fc = (async (...a: Parameters<typeof fetch>) => {
+    if (++usadas > LIMITE) throw new Pausa();
+    return f(...a);
+  }) as typeof fetch;
+  const prog = row<{ filhos: string; container: string | null }>(brain.db, "select filhos, container from ig_progresso where post_id = ?", id);
+  const filhos: string[] = prog ? (JSON.parse(prog.filhos) as string[]) : [];
   try {
     const pronto = async (container: string) => {
       for (let i = 0; i < 10; i++) {
-        const st = await graph(env, f, "GET", container, { fields: "status_code" });
+        const st = await graph(env, fc, "GET", container, { fields: "status_code" });
         if (st.status_code === "FINISHED" || st.status_code === undefined) return;
         if (st.status_code === "ERROR" || st.status_code === "EXPIRED") throw new BrainError("invalid", `O Instagram não processou a imagem (${st.status_code}).`);
-        await espera(2000);
+        await espera(3000);
       }
+      throw new Pausa();
     };
     let criacao: string;
     if (midias.length === 1) {
-      criacao = (await graph(env, f, "POST", `${ig}/media`, { image_url: midias[0]!, caption: p.legenda })).id;
+      criacao = prog?.container ?? (await graph(env, fc, "POST", `${ig}/media`, { image_url: midias[0]!, caption: p.legenda })).id;
+      run(brain.db, "insert or replace into ig_progresso (post_id, filhos, container) values (?, '[]', ?)", id, criacao);
+    } else if (prog?.container) {
+      criacao = prog.container;
     } else {
-      const filhos: string[] = [];
-      for (const u of midias) {
-        const c = (await graph(env, f, "POST", `${ig}/media`, { image_url: u, is_carousel_item: "true" })).id as string;
-        await pronto(c);
+      for (let i = filhos.length; i < midias.length; i++) {
+        const c = (await graph(env, fc, "POST", `${ig}/media`, { image_url: midias[i]!, is_carousel_item: "true" })).id as string;
         filhos.push(c);
+        run(brain.db, "insert or replace into ig_progresso (post_id, filhos, container) values (?, ?, null)", id, JSON.stringify(filhos));
       }
-      criacao = (await graph(env, f, "POST", `${ig}/media`, { media_type: "CAROUSEL", children: filhos.join(","), caption: p.legenda })).id;
+      for (const c of filhos) await pronto(c);
+      criacao = (await graph(env, fc, "POST", `${ig}/media`, { media_type: "CAROUSEL", children: filhos.join(","), caption: p.legenda })).id;
+      run(brain.db, "insert or replace into ig_progresso (post_id, filhos, container) values (?, ?, ?)", id, JSON.stringify(filhos), criacao);
     }
     await pronto(criacao);
-    const mediaId = (await graph(env, f, "POST", `${ig}/media_publish`, { creation_id: criacao })).id as string;
-    const link = await graph(env, f, "GET", mediaId, { fields: "permalink" }).then((r) => (r.permalink as string) ?? null).catch(() => null);
+    usadas = Math.min(usadas, LIMITE - 4);
+    const mediaId = (await graph(env, fc, "POST", `${ig}/media_publish`, { creation_id: criacao })).id as string;
+    const link = await graph(env, fc, "GET", mediaId, { fields: "permalink" }).then((r) => (r.permalink as string) ?? null).catch(() => null);
     run(brain.db, "update ig_posts set status = 'publicado', publicado_em = ?, media_id = ?, permalink = ?, erro = null where id = ?", brain.clock(), mediaId, link, id);
+    run(brain.db, "delete from ig_progresso where post_id = ?", id);
     brain.audit("sistema", "ig_publicou", p.tema, { mediaId });
     brain.emit("change");
     return "Publicado no Instagram.";
   } catch (e) {
+    if (e instanceof Pausa) {
+      // nada foi publicado ainda: devolve para a fila e a próxima rodada continua de onde parou
+      run(brain.db, "update ig_posts set status = 'aprovado', erro = 'em andamento: continuo na próxima rodada' where id = ?", id);
+      brain.emit("change");
+      return "Publicação em andamento: continua na próxima rodada.";
+    }
     const msg = e instanceof Error ? e.message : String(e);
     run(brain.db, "update ig_posts set status = 'falhou', erro = ? where id = ?", msg.slice(0, 300), id);
     brain.emit("change");
