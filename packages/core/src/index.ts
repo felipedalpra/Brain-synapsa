@@ -37,6 +37,7 @@ export * from "./webhook-resend";
 export * from "./inbound";
 export * from "./prospeccao-whatsapp";
 export * from "./gsc";
+export { painel as instinctPainel, sincronizar as instinctSincronizar, preparar as instinctPreparar, configurar as instinctConfigurar } from "./instinct";
 export * from "./ga";
 export * from "./instagram";
 export * from "./linkedin";

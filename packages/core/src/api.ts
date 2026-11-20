@@ -14,6 +14,7 @@ import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-emai
 import { autonomosAtivar, autonomosPainel, gerarAutonomos } from "./autonomos";
 import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
+import { configurar as instinctConfigurar, painel as instinctPainel, preparar as instinctPreparar, sincronizar as instinctSincronizar } from "./instinct";
 import { descobrirPropriedades, gaPainel, propriedadesGa, sincronizarGa } from "./ga";
 import { planAcao, planPainel } from "./planejamento";
 import { liCallback, liUrlAutorizar, liDecidir, liEditar, liGerar, liMarcarPublicado, liPainel, liPublicar } from "./linkedin";
@@ -108,6 +109,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain.db, brain.clock()));
       if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain.db, brain.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? "", url.searchParams.get("base") === "caixa" ? "caixa" : "competencia"));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
+      if (req.method === "GET" && url.pathname === "/api/instinct") return out(200, instinctPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain, url.searchParams.get("semana") ?? undefined));
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain, svc.env));
@@ -230,6 +232,9 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (rota === "enviar-crm") return out(200, await enviarAoCrm(brain, svc.env, ids(), f as typeof fetch));
         if (rota === "auto") return out(200, autoSet(brain, { ativo: body.ativo === undefined ? undefined : body.ativo === true, notaMin: body.notaMin === undefined ? undefined : Number(body.notaMin), limiteDia: body.limiteDia === undefined ? undefined : Number(body.limiteDia) }));
         if (rota === "rotina") return out(200, rotinaSet(brain, { ativo: body.ativo === undefined ? undefined : body.ativo === true, maximo: body.maximo === undefined ? undefined : Number(body.maximo) }));
+        if (rota === "instinct/sincronizar") return out(200, { message: await instinctSincronizar(brain, svc.env, f as typeof fetch) });
+        if (rota === "instinct/preparar") return out(200, { message: await instinctPreparar(brain, svc.env, f as typeof fetch) });
+        if (rota === "instinct/config") return out(200, instinctConfigurar(brain, String(body.planilha ?? "")));
         if (rota === "rotina/rodar") return out(200, { message: await rodarRotina(brain, svc.env, f as typeof fetch, { forcar: true }) });
         if (rota === "emails/gerar") return out(200, gerarRascunhos(brain));
         if (rota === "autonomos/ativar") return out(200, autonomosAtivar(brain, body.ativo === true));

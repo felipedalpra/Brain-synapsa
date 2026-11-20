@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, publicarDevidos, liRotina, midiaRotina, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, publicarDevidos, liRotina, midiaRotina, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -60,6 +60,8 @@ export class BrainDO extends DurableObject<Env> {
     try { gerarAutonomos(this.brain); } catch { /* autônomos: follow-ups vencidos viram rascunho */ }
     // Search Console: uma vez por dia (o próprio sincronizarGsc ignora se já rodou hoje); erro aqui não para a rotina.
     try { await sincronizarGsc(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece como último erro no painel de SEO */ }
+    // Placar do Instinct (planilha do Google): lê todo dia; erro fica guardado no painel de prospecção.
+    try { await instinctSincronizar(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece no painel do Instinct */ }
     try { await sincronizarGa(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece como último erro do GA4 */ }
     // Instagram: publica o post aprovado cujo horário chegou (no máximo 1 por dia, por padrão).
     try { await publicarDevidos(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro fica no próprio post, na Central */ }
