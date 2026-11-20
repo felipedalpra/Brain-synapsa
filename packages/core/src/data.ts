@@ -4,11 +4,12 @@ import type { Brain } from "./brain";
 import { brtDay } from "./brain";
 import { fetchAdsInsights, fetchIgFollowerSeries, fetchIgPostMetricas, fetchIgPosts, fetchInstagram } from "./meta";
 import { row, rows, run } from "./sql";
+import { painel as instinctPainel, sincronizar as instinctSincronizar } from "./instinct";
 import type { SubscriptionRow } from "./types";
 
 type Env = Record<string, string | undefined>;
 
-export const FONTES = ["resumo", "receita", "clientes", "anuncios", "instagram", "execucoes", "propostas", "entregas", ...FONTES_CRM] as const;
+export const FONTES = ["resumo", "receita", "clientes", "anuncios", "instagram", "execucoes", "propostas", "entregas", "instinct", ...FONTES_CRM] as const;
 export type Fonte = (typeof FONTES)[number];
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -213,6 +214,9 @@ export async function consultarDados(ctx: DataCtx, fonte: string, opts: { dias?:
       return propostas(ctx.brain);
     case "entregas":
       return entregas(ctx.brain, opts.equipe);
+    case "instinct":
+      if (opts.atualizar === true) await instinctSincronizar(ctx.brain, ctx.env, ctx.fetchFn);
+      return instinctPainel(ctx.brain, ctx.env);
     case "crm_resumo":
     case "crm_leads":
     case "crm_atividades":
@@ -227,7 +231,7 @@ export async function consultarDados(ctx: DataCtx, fonte: string, opts: { dias?:
 export const DADOS_TOOL = {
   name: "consultar_dados",
   description:
-    "Dados reais e atuais do negócio. fonte: receita (MRR, histórico, clientes ativos, fins de desconto, projeção), clientes (lista de assinaturas Stripe e Pix), anuncios (Meta Ads por campanha: gasto, cliques, leads, custo por lead), instagram (seguidores, alcance, posts recentes com curtidas e comentários), execucoes (o que cada agente fez), propostas (fila e histórico), entregas (documentos completos que os agentes produziram), crm_resumo (CRM: leads, funil, conversão, atividades atrasadas), crm_leads (lista de leads do CRM, com filtros), crm_atividades, crm_reunioes, crm_funil. O CRM é só leitura e não devolve telefone nem e-mail. Use atualizar=true para ler de novo da Meta agora. Sempre consulte antes de dizer que não tem um dado.",
+    "Dados reais e atuais do negócio. fonte: receita (MRR, histórico, clientes ativos, fins de desconto, projeção), clientes (lista de assinaturas Stripe e Pix), anuncios (Meta Ads por campanha: gasto, cliques, leads, custo por lead), instagram (seguidores, alcance, posts recentes com curtidas e comentários), execucoes (o que cada agente fez), propostas (fila e histórico), instinct (placar da prospecção no WhatsApp feita pelo Instinct, agente externo do Felipe: abordados, responderam, reuniões, contas gratuitas e assinantes por dia e por tipo de lead, funil e lista de leads; atualizar=true relê a planilha agora), entregas (documentos completos que os agentes produziram), crm_resumo (CRM: leads, funil, conversão, atividades atrasadas), crm_leads (lista de leads do CRM, com filtros), crm_atividades, crm_reunioes, crm_funil. O CRM é só leitura e não devolve telefone nem e-mail. Use atualizar=true para ler de novo da Meta agora. Sempre consulte antes de dizer que não tem um dado.",
   input_schema: {
     type: "object",
     properties: {

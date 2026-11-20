@@ -106,7 +106,7 @@ describe("agentes", () => {
     expect(() => brain.assignTask("nao-existe", "x")).toThrowError(BrainError);
     expect(() => brain.assignTask("sdr", "  ")).toThrowError(BrainError);
   });
-  it("o elenco inteiro (24) está no estado", () => expect(Object.keys(mk().brain.runtime())).toHaveLength(24));
+  it("o elenco inteiro (25) está no estado", () => expect(Object.keys(mk().brain.runtime())).toHaveLength(25));
 });
 
 describe("fuso", () => {

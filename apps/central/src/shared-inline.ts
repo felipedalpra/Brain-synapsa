@@ -409,6 +409,30 @@ export const Q = [
     note: null,
   },
   {
+    id: "instinct",
+    area: "aquisicao",
+    ready: "parcial",
+    name: "Instinct (WhatsApp)",
+    mission: "Prospectar clínicas e influenciadoras no WhatsApp, abordar e marcar reunião. Roda fora do Brain, no número do Felipe.",
+    metric: "Taxa de resposta e reuniões marcadas por semana",
+    needs: "A planilha \"Instinct - Funil de prospecção\", preenchida pelo próprio Instinct.",
+    triggers: [
+      "Leitura diária da planilha às 7h"
+    ],
+    subs: [],
+    auto: [
+      "Ler o placar da planilha",
+      "Calcular as taxas por tipo de lead"
+    ],
+    aprova: [],
+    humano: [
+      "A prospecção e as conversas ficam com o Instinct e com você"
+    ],
+    limits: "O Brain não escolhe os leads nem manda mensagem pelo Instinct. Só lê o placar.",
+    learns: "Taxa de resposta, de reunião e de conversão por tipo de lead.",
+    note: "Agente externo."
+  },
+  {
     id: "prospeccao",
     area: "aquisicao",
     ready: "pronto",

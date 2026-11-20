@@ -75,7 +75,7 @@ export function InstinctPainel() {
             </details>
           ) : null}
           {p.leads.length ? (
-            <details>
+            <details open={p.leads.length <= 10}>
               <summary>Leads ({p.leads.length})</summary>
               <table>
                 <thead><tr><th>Nome</th><th>Tipo</th><th>Cidade</th><th>Status</th><th>Atualizado</th></tr></thead>

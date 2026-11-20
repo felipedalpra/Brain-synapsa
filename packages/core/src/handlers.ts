@@ -1,4 +1,5 @@
 import { sincronizarFaturasStripe } from "./fin-stripe";
+import { painel as instinctPainel, sincronizar as instinctSincronizar } from "./instinct";
 import { mrrBySource, stripeToRow } from "./mrr";
 import { planGuardiao, fetchStripeSubs } from "./guardiao";
 import { syncMeta } from "./data";
@@ -132,5 +133,17 @@ export async function chief({ brain }: HandlerCtx): Promise<HandlerResult> {
 const now0 = (brain: Brain) => Date.parse(`${brtDay(brain.clock())}T00:00:00-03:00`);
 
 /** Agentes com rotina de código. Os demais dependem do raciocínio da IA. */
-export const HANDLERS: Record<string, (c: HandlerCtx) => Promise<HandlerResult>> = { guardiao, financeiro, midia, chief };
+/** Instinct é um agente externo: o Brain não manda nele. Esta rotina só lê o placar da planilha e resume. */
+async function instinct(c: HandlerCtx): Promise<HandlerResult> {
+  try {
+    await instinctSincronizar(c.brain, c.env as Record<string, string | undefined>);
+  } catch (e) {
+    return { status: "blocked", result: `Não consegui ler a planilha do Instinct: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  const t = instinctPainel(c.brain, c.env as Record<string, string | undefined>).ultimos30.total;
+  const pc = (v: number | null) => (v === null ? "sem base" : `${String(v).replace(".", ",")}%`);
+  return { status: "done", result: `Instinct, últimos 30 dias: ${t.abordados} abordados, ${t.responderam} responderam (${pc(t.taxaResposta)}), ${t.reunioes} reuniões, ${t.contas} contas gratuitas e ${t.assinantes} assinantes (conversão ${pc(t.taxaConversao)}).` };
+}
+
+export const HANDLERS: Record<string, (c: HandlerCtx) => Promise<HandlerResult>> = { guardiao, financeiro, midia, chief, instinct };
 

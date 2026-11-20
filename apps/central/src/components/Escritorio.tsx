@@ -78,6 +78,12 @@ export const Do = {
       </text>
     </g>
   ),
+  instinct: (
+    <g>
+      <path d="M52 66 l2 -4 a7 6 0 1 1 3 3 z" fill="#4cc38a" stroke={L} strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M56 59 q1 4 5 5" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+    </g>
+  ),
   conteudo: (
     <g>
       <path

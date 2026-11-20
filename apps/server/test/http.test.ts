@@ -24,7 +24,7 @@ describe("API local", () => {
   it("devolve o estado completo", async () => {
     const s = (await (await fetch(`${base}/api/state`)).json()) as any;
     expect(s.mode).toBe("live");
-    expect(Object.keys(s.runtime)).toHaveLength(24);
+    expect(Object.keys(s.runtime)).toHaveLength(25);
     expect(s.integrations.length).toBe(11);
     expect(s.metrics.mrr.total).toBe(496);
   });

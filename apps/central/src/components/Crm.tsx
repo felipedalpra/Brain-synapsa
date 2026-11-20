@@ -9,6 +9,7 @@ import { GraficoBarras, Ranking } from "./charts";
 import { jaDigitados } from "./Command";
 import { th } from "../shared-inline";
 import { ProspeccaoPainel } from "./Prospeccoes";
+import { InstinctPainel } from "./Instinct";
 
 export const wh = [
   {
@@ -607,6 +608,7 @@ export function ListaLeadsSecao({ titulo: e, itens: a, vazio: t, aviso: r }) {
 }
 export function Prospeccoes() {
   const [e, a] = React.useState("painel");
+  const [sub, setSub] = React.useState("geral");
   return (
     <>
       <div
@@ -656,7 +658,15 @@ export function Prospeccoes() {
               Clínicas achadas no Google Maps e qualificadas pelo site. Só entram no CRM com o seu clique.
             </p>
           </header>
-          <ProspeccaoPainel />
+          <div className="subtabs" role="tablist" style={{ margin: "0 0 8px" }}>
+            <button type="button" role="tab" aria-selected={sub === "geral"} className={sub === "geral" ? "on" : ""} onClick={() => setSub("geral")}>
+              Clínicas e autônomos
+            </button>
+            <button type="button" role="tab" aria-selected={sub === "instinct"} className={sub === "instinct" ? "on" : ""} onClick={() => setSub("instinct")}>
+              WhatsApp (Instinct)
+            </button>
+          </div>
+          {sub === "instinct" ? <InstinctPainel /> : <ProspeccaoPainel />}
         </div>
       )}
     </>
