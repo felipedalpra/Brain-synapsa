@@ -5,6 +5,7 @@ import type { ProspectStatus, ProspectView, ProspeccaoPainel, ProspectRunView } 
 import { BrainError, type Brain } from "./brain";
 import { crmClient, CrmError, type NewLead } from "./crm";
 import { emailsResumo, gerarRascunhos, rascunhosPendentes } from "./prospeccao-email";
+import { gerarAutonomos } from "./autonomos";
 import { row, rows, run, type Db } from "./sql";
 
 type Env = Record<string, string | undefined>;
@@ -63,17 +64,18 @@ const itens = async (env: Env, f: typeof fetch, ds: string, limit = 500): Promis
 
 // ---- Descoberta -----------------------------------------------------------
 
-export interface DescobertaIn { regiao: string; busca?: string; maximo?: number }
+export interface DescobertaIn { regiao: string; busca?: string; maximo?: number; tipo?: "clinica" | "autonomo" }
 
 export async function iniciarDescoberta(brain: Brain, env: Env, d: DescobertaIn, f: typeof fetch = fetch): Promise<string> {
   const regiao = (d.regiao ?? "").trim();
   if (regiao.length < 3 || regiao.length > 80) throw new BrainError("invalid", "Diga a cidade, ex.: São Paulo, SP.");
   const busca = (d.busca ?? "").trim().slice(0, 80);
-  const termos = busca ? [busca] : ["clínica de psicologia", "centro de psicologia", "clínica multidisciplinar psicologia"];
+  const autonomo = d.tipo === "autonomo";
+  const termos = busca ? [busca] : autonomo ? ["psicólogo clínico", "psicóloga clínica", "consultório de psicologia"] : ["clínica de psicologia", "centro de psicologia", "clínica multidisciplinar psicologia"];
   const maximo = Math.min(Math.max(Math.floor(d.maximo ?? 20), 1), 60);
   const teto = tetoDaRodada(brain);
   const r = await iniciar(env, f, ATORES.maps, { searchStringsArray: termos, locationQuery: `${regiao}, Brasil`, maxCrawledPlacesPerSearch: maximo, language: "pt-BR", skipClosedPlaces: true, scrapePlaceDetailPage: false }, teto);
-  run(brain.db, "insert into prospect_runs (tipo, apify_run_id, dataset_id, status, consulta, criado_em) values ('descoberta', ?, ?, 'rodando', ?, ?)", r.id, r.defaultDatasetId ?? null, `${termos.length > 1 ? "clínicas de psicologia" : busca} · ${regiao}`, brain.clock());
+  run(brain.db, "insert into prospect_runs (tipo, apify_run_id, dataset_id, status, consulta, criado_em) values ('descoberta', ?, ?, 'rodando', ?, ?)", r.id, r.defaultDatasetId ?? null, `${autonomo ? "autônomos" : termos.length > 1 ? "clínicas de psicologia" : busca} · ${regiao}`, brain.clock());
   brain.audit("voce", "prospeccao_descoberta", regiao);
   brain.emit("prospeccao");
   return `Busca iniciada: ${termos[0]} em ${regiao} (até ${maximo} lugares, teto US$ ${teto}).`;
@@ -88,6 +90,9 @@ const host = (u: string | null): string | null => {
 /** Nomes que não são clínica-alvo: clube, serviço público, hospital, escola, consultório individual. */
 const NAO_CLINICA = /\b(clube|caps\b|capsi|ubs\b|hospital|escola|col[eé]gio|universidade|faculdade|prefeitura|igreja|academia|cemp|detran|psic[oó]log[oa]\s+[A-ZÀ-Ú]|psiconew|consult[oó]rio\s+(de\s+)?psicologia\s+[A-ZÀ-Ú][a-zà-ú]+\s+[A-ZÀ-Ú])/i;
 export const ehAlvo = (nome: string): boolean => !NAO_CLINICA.test(nome);
+/** Autônomo: fica de fora o que é instituição ou clínica (clínica tem o fluxo próprio). */
+const NAO_AUTONOMO = /\b(clube|caps\b|capsi|ubs\b|hospital|escola|col[eé]gio|universidade|faculdade|prefeitura|igreja|academia|detran|cl[ií]nica|centro|instituto|n[uú]cleo|laborat[oó]rio)\b/i;
+export const ehAlvoAutonomo = (nome: string): boolean => !NAO_AUTONOMO.test(nome);
 
 /** Sites que não são o site da clínica (rede social, agenda de terceiros). Não adianta ler. */
 const SITE_RUIM = /(instagram|facebook|linktr\.ee|wa\.me|whatsapp|doctoralia|google|youtube|tiktok|linkedin)/i;
@@ -95,6 +100,7 @@ const SITE_RUIM = /(instagram|facebook|linktr\.ee|wa\.me|whatsapp|doctoralia|goo
 export function ingerirDescoberta(brain: Brain, itens_: Record<string, unknown>[], consulta: string): { novos: number; repetidos: number } {
   let novos = 0, repetidos = 0;
   const agora = brain.clock();
+  const auto = consulta.startsWith("autônomos");
   for (const it of itens_) {
     const placeId = s(it.placeId);
     const nome = s(it.title);
@@ -103,7 +109,8 @@ export function ingerirDescoberta(brain: Brain, itens_: Record<string, unknown>[
     const site = s(it.website);
     const ig = site && /instagram\.com/i.test(site) ? site : null;
     run(brain.db, "insert into prospects (place_id, nome, cidade, uf, endereco, telefone, site, instagram, avaliacoes, nota_google, status, consulta, criado_em, atualizado_em) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      placeId, nome.slice(0, 200), s(it.city), s(it.state)?.slice(0, 40) ?? null, s(it.address)?.slice(0, 300) ?? null, s(it.phone) ?? s(it.phoneUnformatted), site && !SITE_RUIM.test(site) ? site : null, ig, n(it.reviewsCount), n(it.totalScore), ehAlvo(nome) ? "novo" : "descartado", consulta, agora, agora);
+      placeId, nome.slice(0, 200), s(it.city), s(it.state)?.slice(0, 40) ?? null, s(it.address)?.slice(0, 300) ?? null, s(it.phone) ?? s(it.phoneUnformatted), site && !SITE_RUIM.test(site) ? site : null, ig, n(it.reviewsCount), n(it.totalScore), (auto ? ehAlvoAutonomo(nome) : ehAlvo(nome)) ? "novo" : "descartado", consulta, agora, agora);
+    if (auto) run(brain.db, "insert or ignore into prospect_autonomo (prospect_id) select id from prospects where place_id = ?", placeId);
     novos++;
   }
   return { novos, repetidos };
@@ -131,13 +138,15 @@ const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
 const LIXO = /\.(png|jpe?g|gif|webp|svg|css|js)$|wixpress|sentry|example\.|seudominio|email\.com$|@2x/i;
 
 /** Lê o texto das páginas de um site e tira sinais. Só dados públicos da própria clínica. */
-export function lerSinais(paginas: string[], siteHost: string | null): { crp: number; emails: string[]; instagram: string | null; whatsapp: boolean; agenda: boolean } {
+export function lerSinais(paginas: string[], siteHost: string | null, autonomo = false): { crp: number; emails: string[]; instagram: string | null; whatsapp: boolean; agenda: boolean } {
   const texto = paginas.join("\n");
   const crps = new Set([...texto.matchAll(/CRP[\s:.-]*(\d{2})\s*[\/-]\s*(\d{3,6})/gi)].map((m) => `${m[1]}/${m[2]}`));
   const emails = [...new Set((texto.match(EMAIL_RE) ?? []).map((e) => e.toLowerCase().replace(/[.,;)]+$/, "")).filter((e) => !LIXO.test(e)))];
   const doDominio = emails.filter((e) => siteHost && e.endsWith(`@${siteHost}`));
   const genericos = emails.filter((e) => GENERICO.test(e.split("@")[0]!));
-  const ordenados = [...new Set([...doDominio.filter((e) => GENERICO.test(e.split("@")[0]!)), ...genericos, ...doDominio])];
+  const base = [...new Set([...doDominio.filter((e) => GENERICO.test(e.split("@")[0]!)), ...genericos, ...doDominio])];
+  // Autônomo costuma divulgar um e-mail pessoal (gmail etc.) no próprio site. Só entra e-mail de provedor comum ou do domínio do site, nunca de terceiros.
+  const ordenados = autonomo ? [...new Set([...base, ...emails.filter((e) => /@(gmail|hotmail|outlook|yahoo|icloud|uol|bol|terra|live|msn)\./i.test(e))])] : base;
   const ig = /instagram\.com\/([A-Za-z0-9._]{3,30})/i.exec(texto);
   const igOk = ig && !/^(p|reel|reels|explore|accounts|stories|tv)$/i.test(ig[1]!) ? `https://instagram.com/${ig[1]}` : null;
   return { crp: crps.size, emails: ordenados.slice(0, 3), instagram: igOk, whatsapp: /wa\.me|api\.whatsapp\.com|whatsapp/i.test(texto), agenda: /agende (sua|uma)|agendamento online|agendar online|agende online/i.test(texto) };
@@ -156,6 +165,18 @@ export function pontuar(p: { crp: number | null; email: string | null; whatsapp:
   if ((p.notaGoogle ?? 0) >= 4.5) nota += 5;
   const status = p.crp === null ? "revisar" : crp >= 4 ? "qualificado" : crp >= 2 ? "revisar" : "descartado";
   return { nota: Math.min(100, nota), status };
+}
+
+/** Autônomo: precisa de CRP no site (quem divulga CRP é psicólogo de fato) e de e-mail público. Sem os dois, vai para revisão ou descarte. */
+export function pontuarAutonomo(p: { crp: number | null; email: string | null; whatsapp: boolean | null; instagram: string | null; avaliacoes: number | null; notaGoogle: number | null }): Pontuacao {
+  const crp = p.crp ?? 0;
+  let nota = crp >= 1 ? 25 : 0;
+  if (p.email) nota += 40;
+  if (p.whatsapp) nota += 10;
+  if (p.instagram) nota += 5;
+  if ((p.avaliacoes ?? 0) >= 30) nota += 10;
+  if ((p.notaGoogle ?? 0) >= 4.5) nota += 5;
+  return { nota: Math.min(100, nota), status: p.email && crp >= 1 ? "qualificado" : p.email || crp >= 1 ? "revisar" : "descartado" };
 }
 
 export function ingerirEnriquecimento(brain: Brain, itens_: Record<string, unknown>[], ids: number[]): { lidos: number; semSite: number } {
@@ -178,10 +199,11 @@ export function ingerirEnriquecimento(brain: Brain, itens_: Record<string, unkno
       run(brain.db, "update prospects set status = 'revisar', atualizado_em = ? where id = ?", agora, p.id);
       continue;
     }
-    const sin = lerSinais(paginas, h);
+    const auto = !!row(brain.db, "select 1 as x from prospect_autonomo where prospect_id = ?", p.id);
+    const sin = lerSinais(paginas, h, auto);
     const email = sin.emails[0] ?? null;
     const instagram = p.instagram ?? sin.instagram;
-    const pt = pontuar({ crp: sin.crp, email, whatsapp: sin.whatsapp, instagram, avaliacoes: p.avaliacoes, notaGoogle: p.nota_google });
+    const pt = (auto ? pontuarAutonomo : pontuar)({ crp: sin.crp, email, whatsapp: sin.whatsapp, instagram, avaliacoes: p.avaliacoes, notaGoogle: p.nota_google });
     run(brain.db, "update prospects set crp_count = ?, email = ?, email_fonte = ?, instagram = ?, whatsapp_no_site = ?, agenda_online = ?, nota = ?, status = ?, atualizado_em = ? where id = ?", sin.crp, email, email ? "site" : null, instagram, sin.whatsapp ? 1 : 0, sin.agenda ? 1 : 0, pt.nota, pt.status, agora, p.id);
     lidos++;
   }
@@ -228,7 +250,7 @@ export async function avancar(brain: Brain, env: Env, f: typeof fetch = fetch): 
   if (rotinaConfig(brain).ativo) {
     // Com a rotina ligada: terminou a busca, lê os sites; terminou a leitura, gera os rascunhos (que esperam o seu OK).
     if (ok.has("descoberta")) await iniciarEnriquecimento(brain, env, null, f).catch(() => undefined);
-    if (ok.has("enriquecimento")) { try { gerarRascunhos(brain); } catch { /* não derruba o avanço */ } }
+    if (ok.has("enriquecimento")) { try { gerarRascunhos(brain); } catch { /* não derruba o avanço */ } try { gerarAutonomos(brain); } catch { /* idem */ } }
   }
   if (concluidas) brain.emit("change");
   return { pendentes: pend.length - concluidas, concluidas };
@@ -256,7 +278,7 @@ export async function autoCrm(brain: Brain, env: Env, f: typeof fetch = fetch): 
   if (!c.ativo) return { criados: 0 };
   const sobra = c.limiteDia - enviadasHoje(brain);
   if (sobra <= 0) return { criados: 0 };
-  const ids = rows<{ id: number }>(brain.db, "select id from prospects where status = 'qualificado' and nota >= ? and telefone is not null order by nota desc, id limit ?", c.notaMin, sobra).map((x) => x.id);
+  const ids = rows<{ id: number }>(brain.db, "select id from prospects where status = 'qualificado' and nota >= ? and telefone is not null and id not in (select prospect_id from prospect_autonomo) order by nota desc, id limit ?", c.notaMin, sobra).map((x) => x.id);
   if (!ids.length) return { criados: 0 };
   try {
     const r = await enviarAoCrm(brain, env, ids, f);
@@ -292,9 +314,11 @@ export async function rodarRotina(brain: Brain, env: Env, f: typeof fetch = fetc
   if (!opts.forcar && c.ultimaData === hoje) return "Já rodou hoje.";
   if (row<{ n: number }>(brain.db, "select count(*) as n from prospect_runs where status = 'rodando'")?.n) return "Já existe uma rodada em andamento.";
   const cidade = REGIOES[c.indice % REGIOES.length]!;
+  // Com os autônomos ligados, a busca alterna por dia: clínicas num dia, psicólogos autônomos no outro.
+  const tipo = brain.policy<{ ativo?: boolean }>("prospect_autonomos", {}).ativo === true && Math.floor(brain.clock() / 86_400_000) % 2 === 1 ? "autonomo" : "clinica";
   brain.setPolicy("prospect_rotina", { ...c, indice: (c.indice + 1) % REGIOES.length, ultimaData: hoje });
   try {
-    const m = await iniciarDescoberta(brain, env, { regiao: cidade, maximo: c.maximo }, f);
+    const m = await iniciarDescoberta(brain, env, { regiao: cidade, maximo: c.maximo, tipo }, f);
     brain.audit("sistema", "prospeccao_rotina", cidade);
     return m;
   } catch (e) {
@@ -357,7 +381,7 @@ export function descartar(brain: Brain, id: number, descartar_: boolean): void {
 export function prospeccaoPainel(brain: Brain, env: Env): ProspeccaoPainel {
   const db: Db = brain.db;
   // Limpa o que já estava na lista antes do filtro existir (idempotente).
-  for (const x of rows<{ id: number; nome: string }>(db, "select id, nome from prospects where status = 'novo'")) if (!ehAlvo(x.nome)) run(db, "update prospects set status = 'descartado' where id = ?", x.id);
+  for (const x of rows<{ id: number; nome: string }>(db, "select id, nome from prospects where status = 'novo' and id not in (select prospect_id from prospect_autonomo)")) if (!ehAlvo(x.nome)) run(db, "update prospects set status = 'descartado' where id = ?", x.id);
   const ps = rows<Record<string, unknown>>(db, "select * from prospects order by nota desc, id desc limit 400");
   const contagem: Record<ProspectStatus, number> = { novo: 0, enriquecendo: 0, qualificado: 0, revisar: 0, descartado: 0, no_crm: 0 };
   for (const p of ps) contagem[p.status as ProspectStatus]++;

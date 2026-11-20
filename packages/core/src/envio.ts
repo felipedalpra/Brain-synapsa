@@ -5,6 +5,8 @@ export interface Envio {
   imagemUrl?: string;
   /** "prospeccao": sai pelo subdomínio de prospecção, com limite diário próprio. */
   remetente?: "prospeccao";
+  /** Psicólogo autônomo: o rodapé fala do contato profissional dele, não da clínica. */
+  perfil?: "autonomo";
 }
 
 export const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;

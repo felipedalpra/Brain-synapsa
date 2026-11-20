@@ -11,11 +11,11 @@ export function suppress(brain: Brain, email: string, reason: string): void {
 }
 
 /** Rodapé fixo: identifica quem manda e dá a saída. Sem isso o Brain não envia. */
-export const footer = (env: Env, prospeccao = false) =>
+export const footer = (env: Env, prospeccao = false, autonomo = false) =>
   `\n\n--\n${env.RESEND_SENDER_NAME ?? "Felipe Dalpra"}, Synapsa\n` +
-  (prospeccao ? "Escrevi para o contato que a sua clínica divulga publicamente. Para não receber mais e-mails meus, responda SAIR." : "Para não receber mais e-mails meus, responda SAIR.");
+  (prospeccao ? `${autonomo ? "Escrevi para o contato profissional que você divulga publicamente." : "Escrevi para o contato que a sua clínica divulga publicamente."} Para não receber mais e-mails meus, responda SAIR.` : "Para não receber mais e-mails meus, responda SAIR.");
 
-export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: string; subject: string; body: string; prospeccao?: boolean }, f: typeof fetch = fetch): Promise<string> {
+export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: string; subject: string; body: string; prospeccao?: boolean; autonomo?: boolean }, f: typeof fetch = fetch): Promise<string> {
   const from = p.prospeccao ? env.RESEND_FROM_PROSPECCAO : env.RESEND_FROM;
   if (!env.RESEND_API_KEY || !from) throw new BrainError("invalid", "Falta RESEND_API_KEY e RESEND_FROM nos secrets do Brain.");
   const to = p.to.trim().toLowerCase();
@@ -35,7 +35,7 @@ export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: str
       from,
       to: [to],
       subject: p.subject.slice(0, 200),
-      text: p.body + footer(env, p.prospeccao === true),
+      text: p.body + footer(env, p.prospeccao === true, p.autonomo === true),
       ...(replyTo ? { reply_to: replyTo } : {}),
       headers: { "List-Unsubscribe": `<mailto:${replyTo ?? "sair@synapsa.chat"}?subject=SAIR>` },
     }),
@@ -88,7 +88,7 @@ export async function sendApproved(brain: Brain, env: Env, proposalId: string, f
     if (hoje >= cap) throw new BrainError("invalid", `Limite de ${cap} e-mails de prospecção por dia atingido. Ele sobe aos poucos para proteger o domínio novo.`);
   }
   const msg = e.tipo === "email"
-    ? await sendEmail(brain, env, { id: p.id, to: e.para ?? "", subject: e.assunto ?? "", body: p.draft, prospeccao: prosp }, f)
+    ? await sendEmail(brain, env, { id: p.id, to: e.para ?? "", subject: e.assunto ?? "", body: p.draft, prospeccao: prosp, autonomo: e.perfil === "autonomo" }, f)
     : await publishInstagram(brain, env, { id: p.id, imageUrl: e.imagemUrl ?? "", caption: p.draft }, f);
   brain.audit("voce", "enviou", `${e.tipo}:${p.id}`);
   brain.emit("change");

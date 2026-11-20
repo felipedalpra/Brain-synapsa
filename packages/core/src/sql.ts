@@ -100,6 +100,7 @@ create table if not exists envios (
   detail text,
   at integer not null
 );
+create table if not exists prospect_autonomo (prospect_id integer primary key);
 create table if not exists cadencia_email (
   email text primary key,
   nome text not null,

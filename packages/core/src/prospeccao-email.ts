@@ -90,7 +90,7 @@ export function gerarRascunhos(brain: Brain): { novos: number; followups: number
   let novos = 0, followups = 0;
   const alvos = rows<Alvo & { email: string; respondeu: number | null; sair: number | null }>(brain.db,
     `select p.id, p.nome, p.cidade, p.crp_count, p.email, c.respondeu, c.sair from prospects p left join prospect_contato c on c.prospect_id = p.id
-     where p.email is not null and p.crp_count >= 4 and p.status in ('qualificado', 'no_crm') order by p.nota desc, p.id`);
+     where p.email is not null and p.crp_count >= 4 and p.status in ('qualificado', 'no_crm') and p.id not in (select prospect_id from prospect_autonomo) order by p.nota desc, p.id`);
   const enviados = new Map<string, number>(); // chave -> quando saiu
   for (const r of rows<{ k: string; at: number }>(brain.db, "select pr.dedupe_key as k, e.at as at from proposals pr join envios e on e.proposal_id = pr.id where e.status = 'enviado' and pr.dedupe_key like 'prosp-%'")) enviados.set(r.k, r.at);
   for (const a of alvos) {
@@ -111,7 +111,7 @@ export function marcarContato(brain: Brain, prospectId: number, acao: "respondeu
   run(brain.db, "insert into prospect_contato (prospect_id, respondeu, sair, atualizado_em) values (?, ?, ?, ?) on conflict(prospect_id) do update set respondeu = max(respondeu, excluded.respondeu), sair = max(sair, excluded.sair), atualizado_em = excluded.atualizado_em", prospectId, acao === "respondeu" ? 1 : 0, acao === "sair" ? 1 : 0, agora);
   if (acao === "sair" && p.email) run(brain.db, "insert into email_suppression (email, reason, at) values (?, 'pediu para sair', ?) on conflict(email) do update set reason = excluded.reason, at = excluded.at", p.email.toLowerCase(), agora);
   // Rascunhos pendentes dessa clínica deixam de fazer sentido.
-  for (const r of rows<{ id: string }>(brain.db, "select id from proposals where status = 'pendente' and dedupe_key like ?", `prosp-${prospectId}-e%`)) brain.decide(r.id, "rejeitada", "sistema");
+  for (const r of rows<{ id: string }>(brain.db, "select id from proposals where status = 'pendente' and (dedupe_key like ? or dedupe_key like ?)", `prosp-${prospectId}-e%`, `aut-${prospectId}-e%`)) brain.decide(r.id, "rejeitada", "sistema");
   brain.audit("voce", acao === "sair" ? "prospeccao_sair" : "prospeccao_respondeu", String(prospectId));
   brain.emit("change");
 }
@@ -144,7 +144,7 @@ export async function aprovarEEnviar(brain: Brain, env: Record<string, string | 
   if (sobra === 0) return { enviados, parou: `Limite de ${r0.capDia} e-mails de prospecção por dia atingido. Ele sobe aos poucos para proteger o domínio novo.` };
   for (const id of ids.slice(0, sobra)) {
     const p = row<{ status: string; kind: string }>(brain.db, "select status, kind from proposals where id = ?", id);
-    if (!p || p.kind !== "prospeccao_email") continue;
+    if (!p || (p.kind !== "prospeccao_email" && p.kind !== "prospeccao_autonomo")) continue;
     try {
       if (p.status === "pendente") brain.decide(id, "aprovada");
       await sendApproved(brain, env, id, f);

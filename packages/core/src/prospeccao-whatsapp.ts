@@ -49,7 +49,7 @@ export function painelWhatsapp(brain: Brain): PainelWhatsapp {
     brain.db,
     `select p.id, p.nome, p.cidade, p.telefone, p.whatsapp_no_site, p.nota from prospects p
      left join prospect_contato c on c.prospect_id = p.id
-     where p.status in ('qualificado','no_crm') and p.telefone is not null and coalesce(c.respondeu, 0) = 0 and coalesce(c.sair, 0) = 0
+     where p.status in ('qualificado','no_crm') and p.telefone is not null and p.id not in (select prospect_id from prospect_autonomo) and coalesce(c.respondeu, 0) = 0 and coalesce(c.sair, 0) = 0
      order by p.nota desc, p.id desc limit 300`,
   );
   const fila: ItemWhatsapp[] = [];

@@ -12,6 +12,7 @@ import { crmPainel } from "./crm-painel";
 import { finImportarExtrato, lerExtratoInter } from "./fin-import";
 import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-email";
 import { cadenciaAtivar, cadenciaImportar, cadenciaPainel, cadenciaPausar, gerarCadencia } from "./cadencia";
+import { autonomosAtivar, autonomosPainel, gerarAutonomos } from "./autonomos";
 import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
 import { descobrirPropriedades, gaPainel, propriedadesGa, sincronizarGa } from "./ga";
@@ -114,6 +115,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/linkedin") return out(200, liPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/cadencia") return out(200, cadenciaPainel(brain));
+      if (req.method === "GET" && url.pathname === "/api/autonomos") return out(200, autonomosPainel(brain));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
         try {
           return out(200, await crmPainel(svc.env, brain.clock(), (u, i) => (svc.fetch ?? fetch)(u, i), { atualizar: url.searchParams.get("atualizar") === "1" }));
@@ -231,7 +233,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         const rota = url.pathname.slice("/api/prospeccao/".length);
         const f = (u: string | URL | Request, i?: RequestInit) => (svc.fetch ?? fetch)(u as string, i);
         const ids = () => (Array.isArray(body.ids) ? body.ids.map(Number).filter((x: number) => Number.isInteger(x) && x > 0) : []);
-        if (rota === "descoberta") return out(200, { message: await iniciarDescoberta(brain, svc.env, { regiao: String(body.regiao ?? ""), busca: body.busca ? String(body.busca) : undefined, maximo: body.maximo ? Number(body.maximo) : undefined }, f as typeof fetch) });
+        if (rota === "descoberta") return out(200, { message: await iniciarDescoberta(brain, svc.env, { regiao: String(body.regiao ?? ""), busca: body.busca ? String(body.busca) : undefined, maximo: body.maximo ? Number(body.maximo) : undefined, tipo: body.tipo === "autonomo" ? "autonomo" : "clinica" }, f as typeof fetch) });
         if (rota === "enriquecer") return out(200, { message: await iniciarEnriquecimento(brain, svc.env, ids().length ? ids() : null, f as typeof fetch) });
         if (rota === "avancar") return out(200, await prospAvancar(brain, svc.env, f as typeof fetch));
         if (rota === "enviar-crm") return out(200, await enviarAoCrm(brain, svc.env, ids(), f as typeof fetch));
@@ -239,6 +241,8 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (rota === "rotina") return out(200, rotinaSet(brain, { ativo: body.ativo === undefined ? undefined : body.ativo === true, maximo: body.maximo === undefined ? undefined : Number(body.maximo) }));
         if (rota === "rotina/rodar") return out(200, { message: await rodarRotina(brain, svc.env, f as typeof fetch, { forcar: true }) });
         if (rota === "emails/gerar") return out(200, gerarRascunhos(brain));
+        if (rota === "autonomos/ativar") return out(200, autonomosAtivar(brain, body.ativo === true));
+        if (rota === "autonomos/gerar") return out(200, gerarAutonomos(brain));
         if (rota === "emails/enviar") return out(200, await aprovarEEnviar(brain, svc.env, Array.isArray(body.ids) ? body.ids.map(String) : [], f as typeof fetch));
         if (rota === "contato") { marcarContato(brain, Number(body.id), body.acao === "sair" ? "sair" : "respondeu"); return out(200, { ok: true }); }
         if (rota === "whatsapp") { marcarWhatsapp(brain, Number(body.id), Number(body.etapa), body.acao === "pular" ? "pular" : "enviado"); return out(200, { ok: true }); }

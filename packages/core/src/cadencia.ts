@@ -21,13 +21,13 @@ export function primeiroNomeCad(nome: string): string {
 }
 
 /** Texto simples (o envio do Brain é texto). Fiel ao fluxo antigo, sem o que a conformidade barra (a palavra "prontuário", urgência artificial). */
-export function montarCadencia(nomeCompleto: string, etapa: 1 | 2 | 3 | 4 | 5): { assunto: string; corpo: string } {
+export function montarCadencia(nomeCompleto: string, etapa: 1 | 2 | 3 | 4 | 5, opts: { frio?: boolean } = {}): { assunto: string; corpo: string } {
   const n = primeiroNomeCad(nomeCompleto) || "Olá";
   const abre = nomeCompleto.trim() ? `Olá, ${n}.` : "Olá.";
   const fecha = "Abraço,\nFelipe\nSynapsa";
   if (etapa === 1) return {
     assunto: `${n}, o mercado de saúde está mudando. Você está preparado?`,
-    corpo: `${abre}\n\nAntes de falar da Synapsa, deixa eu te contar o que está acontecendo na saúde no Brasil.\n\nO governo está integrando os dados de saúde do país em um registro digital único, a RNDS. Isso não é especulação: está acontecendo agora.\n\nO psicólogo que tiver a operação organizada, dados estruturados e souber usar tecnologia sai na frente. Quem não tiver vai ficar para trás.\n\nA Synapsa foi criada para isso: te colocar nesse futuro sem você precisar correr atrás de cada atualização. A plataforma se atualiza, você só precisa atender bem.\n\nPosso te mostrar como funciona em 15 minutos? É só responder este e-mail ou chamar no WhatsApp:\n${demo}\n\n${fecha}`,
+    corpo: `${abre}\n\n${opts.frio ? "Sou o Felipe, fundador da Synapsa, uma plataforma de gestão para psicólogos. Encontrei o seu contato profissional divulgado publicamente e achei que poderia ser útil.\n\n" : ""}Antes de falar da Synapsa, deixa eu te contar o que está acontecendo na saúde no Brasil.\n\nO governo está integrando os dados de saúde do país em um registro digital único, a RNDS. Isso não é especulação: está acontecendo agora.\n\nO psicólogo que tiver a operação organizada, dados estruturados e souber usar tecnologia sai na frente. Quem não tiver vai ficar para trás.\n\nA Synapsa foi criada para isso: te colocar nesse futuro sem você precisar correr atrás de cada atualização. A plataforma se atualiza, você só precisa atender bem.\n\nPosso te mostrar como funciona em 15 minutos? É só responder este e-mail ou chamar no WhatsApp:\n${demo}\n\n${fecha}`,
   };
   if (etapa === 2) return {
     assunto: `${n}, o que acontece com seu paciente nos outros 6 dias?`,

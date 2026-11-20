@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarCadencia, rodarRotina, sincronizarGsc, sincronizarGa, publicarDevidos, liRotina, midiaRotina, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarCadencia, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, publicarDevidos, liRotina, midiaRotina, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -57,6 +57,7 @@ export class BrainDO extends DurableObject<Env> {
   async daily(): Promise<{ failed: number; resumed: number; started: boolean }> {
     const rec = this.runner.recover();
     try { gerarRascunhos(this.brain); } catch { /* follow-ups vencidos viram rascunho; erro aqui não pode parar a rotina */ }
+    try { gerarAutonomos(this.brain); } catch { /* autônomos: follow-ups vencidos viram rascunho */ }
     try { gerarCadencia(this.brain); } catch { /* cadência de e-mail do cadastro (só roda ligada); erro aqui não para a rotina */ }
     // Search Console: uma vez por dia (o próprio sincronizarGsc ignora se já rodou hoje); erro aqui não para a rotina.
     try { await sincronizarGsc(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece como último erro no painel de SEO */ }
