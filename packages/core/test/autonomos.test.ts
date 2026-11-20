@@ -182,7 +182,7 @@ describe("HTML com a identidade da Synapsa", () => {
     expect(html).toContain("Onde a prática evolui.");
     expect(html).toContain("#8B5CF6");
     expect(html).toContain("#38BDF8");
-    expect(html).toContain("Falar com o Felipe no WhatsApp");
+    expect(html).toContain("Conhecer a Synapsa");
     expect(html).toContain("responda SAIR");
     expect(html).toContain("<ul");
   });
