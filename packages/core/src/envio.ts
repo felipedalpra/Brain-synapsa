@@ -7,6 +7,8 @@ export interface Envio {
   remetente?: "prospeccao";
   /** Psicólogo autônomo: o rodapé fala do contato profissional dele, não da clínica. */
   perfil?: "autonomo";
+  /** Envia também em HTML, com a identidade da Synapsa (o HTML sai do texto do rascunho). */
+  html?: boolean;
 }
 
 export const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;

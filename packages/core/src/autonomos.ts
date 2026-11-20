@@ -2,7 +2,7 @@
 // Abordagem fria: base legítimo interesse (contato profissional público), remetente de prospecção, limite diário próprio,
 // cada e-mail vira rascunho para o seu OK e a pessoa sai da sequência ao responder, pedir para sair ou ser recusada.
 import type { Brain } from "./brain";
-import { CAD_ESPERAS, CAD_TOTAL, montarCadencia, primeiroNomeCad } from "./cadencia";
+import { AUT_ESPERAS as CAD_ESPERAS, AUT_TOTAL as CAD_TOTAL, montarAutonomo } from "./autonomos-email";
 import { emailsResumo } from "./prospeccao-email";
 import { row, rows, run } from "./sql";
 
@@ -16,7 +16,7 @@ export function nomeAutonomo(nome: string): string {
   for (let i = 0; i < 3; i++) n = n.replace(/^(dr\.?|dra\.?|psic[oó]log[oa]|psi\.?|psic\.?|prof\.?|profa\.?)\s+/i, "").trim();
   const primeiro = n.split(/\s+/)[0] ?? "";
   if (!/^\p{L}{2,}$/u.test(primeiro) || GENERICO.test(primeiro)) return "";
-  return primeiroNomeCad(primeiro);
+  return primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
 }
 
 export interface AutonomosConfig { ativo: boolean }
@@ -46,8 +46,8 @@ function estados(brain: Brain): Map<number, Estado> {
   return m;
 }
 
-interface Alvo { id: number; nome: string; cidade: string | null; uf: string | null; email: string; nota: number; respondeu: number | null; sair: number | null }
-const alvosSql = `select p.id, p.nome, p.cidade, p.uf, p.email, p.nota, c.respondeu, c.sair from prospects p join prospect_autonomo a on a.prospect_id = p.id
+interface Alvo { id: number; nome: string; cidade: string | null; uf: string | null; email: string; nota: number; site: string | null; whatsapp_no_site: number | null; respondeu: number | null; sair: number | null }
+const alvosSql = `select p.id, p.nome, p.cidade, p.uf, p.email, p.nota, p.site, p.whatsapp_no_site, c.respondeu, c.sair from prospects p join prospect_autonomo a on a.prospect_id = p.id
   left join prospect_contato c on c.prospect_id = p.id where p.email is not null and p.status in ('qualificado', 'no_crm') order by p.nota desc, p.id`;
 
 /** Cria os rascunhos que venceram. Só roda com os autônomos ligados. Seguro de chamar várias vezes. */
@@ -74,7 +74,8 @@ export function gerarAutonomos(brain: Brain): { novos: number; followups: number
       if (agora - ult.enviadoEm < Math.max(CAD_ESPERAS[ult.etapa]!, min) * DAY) continue;
       etapa = ult.etapa + 1;
     }
-    const m = montarCadencia(nomeAutonomo(a.nome), etapa as 1 | 2 | 3 | 4 | 5, { frio: true });
+    const host = (() => { try { return a.site ? new URL(a.site.startsWith("http") ? a.site : `https://${a.site}`).hostname.replace(/^www\./, "") : null; } catch { return null; } })();
+    const m = montarAutonomo({ nome: nomeAutonomo(a.nome), cidade: a.cidade, siteHost: host, whatsapp: a.whatsapp_no_site === 1 }, etapa as 1 | 2 | 3 | 4 | 5);
     const email = a.email.toLowerCase();
     const id = brain.addProposal({
       agentId: AGENTE, kind: "prospeccao_autonomo", channel: "email", risk: "medio", impactoBrl: 79,
@@ -82,7 +83,7 @@ export function gerarAutonomos(brain: Brain): { novos: number; followups: number
       draft: m.corpo,
       why: `Psicólogo autônomo com CRP e e-mail profissional públicos no próprio site${a.cidade ? ` (${a.cidade})` : ""}. E-mail ${etapa} de ${CAD_TOTAL}. Base: legítimo interesse B2B, com saída (SAIR) no rodapé. Para quando responde, pede para sair ou você recusa.`,
       contactRef: email,
-      payload: { envio: { tipo: "email", para: email, assunto: m.assunto, remetente: "prospeccao", perfil: "autonomo" }, prospeccao: { prospectId: a.id, etapa }, base: "legitimo_interesse_b2b" },
+      payload: { envio: { tipo: "email", para: email, assunto: m.assunto, remetente: "prospeccao", perfil: "autonomo", html: true }, prospeccao: { prospectId: a.id, etapa }, base: "legitimo_interesse_b2b" },
       dedupeKey: chave(a.id, etapa),
     });
     if (id) { if (etapa === 1) { novos++; novosHoje++; } else followups++; }

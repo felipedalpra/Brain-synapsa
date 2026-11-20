@@ -141,3 +141,64 @@ describe("sequência de 5 e-mails", () => {
     expect(gerarRascunhos(brain)).toEqual({ novos: 0, followups: 0 });
   });
 });
+
+import { TEXT_RULES } from "../src/compliance";
+import { montarAutonomo, ASSINATURA, AUT_TOTAL } from "../src/autonomos-email";
+import { emailHtml } from "../src/email-html";
+import { sendEmail } from "../src/dispatch";
+
+const dados = { nome: "Maria", cidade: "Niterói", siteHost: "mariapsi.com.br", whatsapp: true };
+
+describe("texto dos e-mails (posicionamento novo)", () => {
+  const todos = ([1, 2, 3, 4, 5] as const).map((e) => ({ e, ...montarAutonomo(dados, e) }));
+  it("passa nas regras de texto da conformidade e não usa desconto, promoção nem o ângulo de abandono/adesão", () => {
+    for (const m of todos) {
+      for (const r of TEXT_RULES) expect(r.test.test(m.corpo), `e-mail ${m.e} bate na regra ${r.id}`).toBe(false);
+      expect(m.corpo, `e-mail ${m.e}`).not.toMatch(/abandon|ades[aã]o|entre (as )?sess|prontu[aá]rio|desconto|promo[cç]/i);
+      expect(m.corpo + m.assunto).not.toMatch(/RNDS|Datasus/);
+    }
+  });
+  it("todos assinam com a marca e há cinco etapas", () => {
+    expect(todos).toHaveLength(AUT_TOTAL);
+    for (const m of todos) expect(m.corpo).toContain(ASSINATURA);
+  });
+  it("personaliza com o que se sabe e cai em texto genérico quando falta", () => {
+    expect(montarAutonomo(dados, 1).corpo).toContain("em Niterói e o seu site (mariapsi.com.br)");
+    expect(montarAutonomo(dados, 1).assunto).toBe("Maria, uma ideia para a sua prática em Niterói");
+    expect(montarAutonomo(dados, 3).corpo).toContain("Vi que você atende pelo WhatsApp");
+    const vazio = montarAutonomo({ nome: "", cidade: null, siteHost: null, whatsapp: false }, 1);
+    expect(vazio.assunto).toBe("Uma ideia para a sua prática");
+    expect(vazio.corpo.startsWith("Olá.")).toBe(true);
+    expect(vazio.corpo).not.toMatch(/undefined|null|Vi o seu site/);
+    expect(montarAutonomo({ ...dados, whatsapp: false }, 3).corpo).toContain("espalhados entre WhatsApp");
+  });
+});
+
+describe("HTML com a identidade da Synapsa", () => {
+  const corpo = montarAutonomo(dados, 1).corpo;
+  const html = emailHtml(corpo, "Felipe Dalpra, Synapsa\nPara não receber mais e-mails meus, responda SAIR.");
+  it("tem a marca, as cores, o botão e a saída", () => {
+    expect(html).toContain("Synapsa");
+    expect(html).toContain("Onde a prática evolui.");
+    expect(html).toContain("#8B5CF6");
+    expect(html).toContain("#38BDF8");
+    expect(html).toContain("Falar com o Felipe no WhatsApp");
+    expect(html).toContain("responda SAIR");
+    expect(html).toContain("<ul");
+  });
+  it("escapa o que vem de fora (nome do Maps)", () => {
+    const h = emailHtml("Olá, <script>alert(1)</script>.\n\nAbraço,\nFelipe", "rodapé");
+    expect(h).not.toContain("<script>");
+    expect(h).toContain("&lt;script&gt;");
+  });
+  it("o envio manda texto e HTML juntos, com o rodapé nos dois", async () => {
+    const { brain } = mk();
+    let enviado: Record<string, unknown> = {};
+    const f = (async (_u: string, i: RequestInit) => { enviado = JSON.parse(String(i.body)); return new Response(JSON.stringify({ id: "r" }), { status: 200 }); }) as unknown as typeof fetch;
+    await sendEmail(brain, env, { id: "x1", to: "maria@x.com", subject: "Oi", body: corpo, prospeccao: true, autonomo: true, html: true }, f);
+    expect(String(enviado.text)).toContain("responda SAIR");
+    expect(String(enviado.html)).toContain("Onde a prática evolui.");
+    expect(String(enviado.html)).toContain("contato profissional que você divulga publicamente");
+    expect(String(enviado.text)).not.toContain("<");
+  });
+});

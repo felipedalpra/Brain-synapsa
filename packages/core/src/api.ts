@@ -11,7 +11,6 @@ import { sincronizarMidia } from "./midia-sync";
 import { crmPainel } from "./crm-painel";
 import { finImportarExtrato, lerExtratoInter } from "./fin-import";
 import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-email";
-import { cadenciaAtivar, cadenciaImportar, cadenciaPainel, cadenciaPausar, gerarCadencia } from "./cadencia";
 import { autonomosAtivar, autonomosPainel, gerarAutonomos } from "./autonomos";
 import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
@@ -114,7 +113,6 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/linkedin") return out(200, liPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain, svc.env));
-      if (req.method === "GET" && url.pathname === "/api/cadencia") return out(200, cadenciaPainel(brain));
       if (req.method === "GET" && url.pathname === "/api/autonomos") return out(200, autonomosPainel(brain));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
         try {
@@ -221,13 +219,6 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
           return out(200, { message: "Propriedade salva." });
         }
         return out(400, { message: "Informe o site e o número da propriedade (só dígitos), ou peça para descobrir." });
-      }
-      if (url.pathname.startsWith("/api/cadencia/")) {
-        const rota = url.pathname.slice("/api/cadencia/".length);
-        if (rota === "importar" || rota === "entrar") return out(200, cadenciaImportar(brain, rota === "entrar" ? [body] : Array.isArray(body.leads) ? body.leads : []));
-        if (rota === "ativar") return out(200, cadenciaAtivar(brain, body.ativo === true));
-        if (rota === "gerar") return out(200, gerarCadencia(brain));
-        if (rota === "pausar") { cadenciaPausar(brain, String(body.email ?? ""), body.pausar !== false); return out(200, { ok: true }); }
       }
       if (url.pathname.startsWith("/api/prospeccao/")) {
         const rota = url.pathname.slice("/api/prospeccao/".length);
