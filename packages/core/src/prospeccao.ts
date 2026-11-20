@@ -91,7 +91,7 @@ const host = (u: string | null): string | null => {
 const NAO_CLINICA = /\b(clube|caps\b|capsi|ubs\b|hospital|escola|col[eé]gio|universidade|faculdade|prefeitura|igreja|academia|cemp|detran|psic[oó]log[oa]\s+[A-ZÀ-Ú]|psiconew|consult[oó]rio\s+(de\s+)?psicologia\s+[A-ZÀ-Ú][a-zà-ú]+\s+[A-ZÀ-Ú])/i;
 export const ehAlvo = (nome: string): boolean => !NAO_CLINICA.test(nome);
 /** Autônomo: fica de fora o que é instituição ou clínica (clínica tem o fluxo próprio). */
-const NAO_AUTONOMO = /\b(clube|caps\b|capsi|ubs\b|hospital|escola|col[eé]gio|universidade|faculdade|prefeitura|igreja|academia|detran|cl[ií]nica|centro|instituto|n[uú]cleo|laborat[oó]rio)\b/i;
+const NAO_AUTONOMO = /\b(clube|caps\b|capsi|ubs\b|hospital|escola|col[eé]gio|universidade|faculdade|prefeitura|igreja|academia|detran|cl[ií]nica|centro|instituto|n[uú]cleo|laborat[oó]rio|psiquiatri\w*|multidisciplinar\w*|terapias)\b/i;
 export const ehAlvoAutonomo = (nome: string): boolean => !NAO_AUTONOMO.test(nome);
 
 /** Sites que não são o site da clínica (rede social, agenda de terceiros). Não adianta ler. */

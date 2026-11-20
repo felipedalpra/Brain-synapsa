@@ -15,7 +15,7 @@ export function nomeAutonomo(nome: string): string {
   let n = nome.split(/\s[-–|·]\s/)[0]!.trim();
   for (let i = 0; i < 3; i++) n = n.replace(/^(dr\.?|dra\.?|psic[oó]log[oa]|psi\.?|psic\.?|prof\.?|profa\.?)\s+/i, "").trim();
   const primeiro = n.split(/\s+/)[0] ?? "";
-  if (!/^\p{L}{2,}$/u.test(primeiro) || GENERICO.test(primeiro)) return "";
+  if (!/^\p{L}{2,}$/u.test(primeiro) || GENERICO.test(primeiro) || /^psic/i.test(primeiro)) return "";
   return primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
 }
 
