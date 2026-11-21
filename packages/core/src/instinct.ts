@@ -101,10 +101,20 @@ export async function sincronizar(brain: Brain, env: Env, f: typeof fetch = fetc
     const j = await chamar(env, f, ESCOPO_LER, `https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchGet?ranges=${encodeURIComponent("Dia!A2:G")}&ranges=${encodeURIComponent("Leads!A2:G")}&valueRenderOption=FORMATTED_VALUE`);
     const [d, l] = (j.valueRanges ?? []) as { values?: unknown[][] }[];
     const { dias, leads, ignoradas } = interpretar(d?.values ?? [], l?.values ?? []);
+    const antes = new Map(rows<{ chave: string; status: string }>(brain.db, "select chave, status from instinct_leads").map((x) => [x.chave, x.status]));
+    const hoje = brtDay(brain.clock());
     run(brain.db, "delete from instinct_dia");
     run(brain.db, "delete from instinct_leads");
     for (const x of dias) run(brain.db, "insert or replace into instinct_dia (dia, tipo, abordados, responderam, reunioes, contas, assinantes) values (?, ?, ?, ?, ?, ?, ?)", x.dia, x.tipo, x.abordados, x.responderam, x.reunioes, x.contas, x.assinantes);
     for (const x of leads) run(brain.db, "insert or replace into instinct_leads (chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado) values (?, ?, ?, ?, ?, ?, ?, ?)", x.chave, x.nome, x.tipo, x.cidade, x.whatsapp, x.primeira, x.status, x.atualizado);
+    // Histórico de estágios: o Instinct só informa o estágio atual; o Brain registra cada mudança que enxerga.
+    for (const x of leads) {
+      const ant = antes.get(x.chave);
+      if (ant === x.status) continue;
+      if (ant === undefined && x.status !== "abordado" && x.primeira) run(brain.db, "insert into instinct_eventos (chave, de, para, dia) values (?, null, 'abordado', ?)", x.chave, x.primeira);
+      run(brain.db, "insert into instinct_eventos (chave, de, para, dia) values (?, ?, ?, ?)", x.chave, ant ?? null, x.status, x.atualizado ?? (ant === undefined ? x.primeira : null) ?? hoje);
+    }
+    run(brain.db, "delete from instinct_eventos where chave not in (select chave from instinct_leads)");
     brain.setPolicy("instinct_estado", { ultima: brain.clock(), erro: null, ignoradas });
     brain.emit("change");
     return `Planilha lida: ${dias.length} linha(s) de dia e ${leads.length} lead(s)${ignoradas ? `; ${ignoradas} linha(s) sem data, tipo ou status foram ignoradas` : ""}.`;
@@ -138,7 +148,15 @@ export function painel(brain: Brain, env: Env) {
   const corte = brtDay(brain.clock() - 30 * 86_400_000);
   const ult30 = todas.filter((x) => x.dia > corte && x.dia <= hoje);
   const porTipo = (xs: LinhaDia[], t: string) => soma(xs.filter((x) => x.tipo === t));
-  const leads = rows<LeadInstinct>(brain.db, "select chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado from instinct_leads order by coalesce(atualizado, primeira) desc, nome limit 200");
+  const eventos = new Map<string, { de: string | null; para: string; dia: string }[]>();
+  for (const e of rows<{ chave: string; de: string | null; para: string; dia: string }>(brain.db, "select chave, de, para, dia from instinct_eventos order by dia, id")) {
+    const l = eventos.get(e.chave) ?? [];
+    l.push({ de: e.de, para: e.para, dia: e.dia });
+    eventos.set(e.chave, l);
+  }
+  const leads = rows<LeadInstinct>(brain.db, "select chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado from instinct_leads order by coalesce(atualizado, primeira) desc, nome limit 500").map((l) => ({ ...l, eventos: eventos.get(l.chave) ?? [] }));
+  const corte60 = brtDay(brain.clock() - 60 * 86_400_000);
+  const ant30 = todas.filter((x) => x.dia > corte60 && x.dia <= corte);
   const funil: Record<string, number> = {};
   for (const l of rows<{ status: string; n: number }>(brain.db, "select status, count(*) as n from instinct_leads group by status")) funil[l.status] = l.n;
   const est = brain.policy<{ ultima?: number | null; erro?: string | null; ignoradas?: number }>("instinct_estado", {});
@@ -148,7 +166,9 @@ export function painel(brain: Brain, env: Env) {
     ultimaLeitura: est.ultima ?? null, erro: est.erro ?? null, ignoradas: est.ignoradas ?? 0,
     ultimos30: { total: soma(ult30), clinicas: porTipo(ult30, "clinica"), influenciadoras: porTipo(ult30, "influenciadora") },
     acumulado: soma(todas),
-    dias: todas.slice(0, 28),
+    anteriores30: soma(ant30),
+    hoje,
+    dias: todas.slice(0, 800),
     funil, leads,
   };
 }

@@ -230,6 +230,8 @@ create table if not exists ig_posts (id text primary key, chave text unique, sta
 create table if not exists ig_progresso (post_id text primary key, filhos text not null default '[]', container text);
 create table if not exists instinct_dia (dia text not null, tipo text not null, abordados integer not null default 0, responderam integer not null default 0, reunioes integer not null default 0, contas integer not null default 0, assinantes integer not null default 0, primary key (dia, tipo));
 create table if not exists instinct_leads (chave text primary key, nome text not null, tipo text not null, cidade text, whatsapp text, primeira text, status text not null, atualizado text);
+create table if not exists instinct_eventos (id integer primary key autoincrement, chave text not null, de text, para text not null, dia text not null);
+create index if not exists instinct_eventos_chave on instinct_eventos (chave);
 create table if not exists ig_midia (id text primary key, post_id text not null, ordem integer not null, b64 text not null);
 create index if not exists ig_midia_post on ig_midia (post_id, ordem);
 create table if not exists plan_itens (id text primary key, semana text not null, tipo text not null, titulo text not null, dia integer, formato text not null default '', responsavel text not null default '', status text not null default 'pendente', pai text, ordem integer not null default 0, notas text not null default '', criado_em integer not null, concluido_em integer, veio_de text);

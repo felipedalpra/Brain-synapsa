@@ -65,4 +65,21 @@ describe("instinct (placar da prospecção)", () => {
     await expect(sincronizar(b, env, f)).rejects.toThrow(/brain@x\.iam\.gserviceaccount\.com/);
     expect(painel(b, env).erro).toMatch(/compartilhe/);
   });
+  it("registra o histórico de estágios quando o lead muda de status entre leituras", async () => {
+    const b = mk();
+    let leadRow = ["Clínica A", "Clínica", "SP", "11988887777", "10/11/2026", "abordado", "10/11/2026"];
+    const f = (async (url: string) => {
+      if (String(url).includes("oauth2")) return new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }));
+      return new Response(JSON.stringify({ valueRanges: [{ values: [] }, { values: [leadRow] }] }));
+    }) as unknown as typeof fetch;
+    const { generateKeyPairSync } = await import("node:crypto");
+    const pem = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+    const env = { GSC_SERVICE_ACCOUNT: JSON.stringify({ client_email: "brain@x.iam.gserviceaccount.com", private_key: pem }) };
+    await sincronizar(b, env, f);
+    leadRow = ["Clínica A", "Clínica", "SP", "11988887777", "10/11/2026", "reunião", "15/11/2026"];
+    await sincronizar(b, env, f);
+    await sincronizar(b, env, f);
+    const l = painel(b, env).leads[0]!;
+    expect(l.eventos.map((e) => `${e.para}@${e.dia}`)).toEqual(["abordado@2026-11-10", "reuniao@2026-11-15"]);
+  });
 });
