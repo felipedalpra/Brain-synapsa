@@ -10,6 +10,10 @@ export default {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/api/")) return brain(env).fetch(req);
 
+    // Link das tarefas da semana: página pública protegida pelo token do próprio link (sem login).
+    const t = /^\/t\/([\w-]{1,80})\/?$/.exec(url.pathname);
+    if (t && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/p/${t[1]}/pagina`));
+
     // Páginas: só depois do login. O Worker confere o cookie (assinatura), sem acordar o Durable Object.
     const auth = createAuth(env as unknown as Record<string, string | undefined>);
     const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": CSP, "x-content-type-options": "nosniff" };

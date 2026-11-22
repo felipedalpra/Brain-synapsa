@@ -44,3 +44,5 @@ export * from "./linkedin";
 export * from "./planejamento";
 export * from "./midia";
 export * from "./midia-sync";
+
+export * from "./plano-link";

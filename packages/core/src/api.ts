@@ -16,7 +16,8 @@ import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
 import { configurar as instinctConfigurar, painel as instinctPainel, preparar as instinctPreparar, sincronizar as instinctSincronizar } from "./instinct";
 import { descobrirPropriedades, gaPainel, propriedadesGa, sincronizarGa } from "./ga";
-import { planAcao, planPainel } from "./planejamento";
+import { criarLink, planAcao, planPainel } from "./planejamento";
+import { PLANO_CSP, PLANO_HTML, marcarPeloLink, pdfSemana, pegarLink, vistaDoLink } from "./plano-link";
 import { liCallback, liUrlAutorizar, liDecidir, liEditar, liGerar, liMarcarPublicado, liPainel, liPublicar } from "./linkedin";
 import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
 import { receberWebhook } from "./webhook-resend";
@@ -88,6 +89,27 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         return new Response(null, { status: 302, headers: { location: destino } });
       }
 
+      // Tarefas da semana compartilhadas com o time: o token do link é o segredo. Só lê e marca como concluída.
+      const pl = url.pathname.match(/^\/api\/p\/([\w-]{1,80})(?:\/(pdf|status|pagina))?$/);
+      if (pl) {
+        const [, token, parte] = pl as unknown as [string, string, string | undefined];
+        const sem = { "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" };
+        try {
+          if (req.method === "GET" && parte === "pagina") { pegarLink(brain, token!); return new Response(PLANO_HTML, { status: 200, headers: { ...sem, "content-type": "text/html; charset=utf-8", "content-security-policy": PLANO_CSP, "x-content-type-options": "nosniff" } }); }
+          if (req.method === "GET" && parte === "pdf") {
+            const l = pegarLink(brain, token!);
+            const bytes = pdfSemana(brain, l.semana, l.responsavel, `${url.origin}/t/${token}`);
+            return new Response(bytes, { status: 200, headers: { ...sem, "content-type": "application/pdf", "content-disposition": `attachment; filename="tarefas-${l.semana}${l.responsavel ? "-" + l.responsavel.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") : ""}.pdf"` } });
+          }
+          if (req.method === "GET" && !parte) return json(200, vistaDoLink(brain, token!), sem);
+          if (req.method === "POST" && parte === "status") return json(200, marcarPeloLink(brain, token!, await readJson(req, 2_000)), sem);
+        } catch (e) {
+          if (e instanceof BrainError) return json(e.code === "not_found" ? 404 : 400, { error: e.message }, sem);
+          throw e;
+        }
+        return json(405, { error: "método não permitido" }, sem);
+      }
+
       // Instagram: imagem pública (o Instagram precisa buscar) e entrega de posts prontos por token próprio, que só enfileira.
       if (req.method === "GET" && url.pathname.startsWith("/api/midia/")) return servirMidia(brain, url.pathname.slice("/api/midia/".length));
       if (url.pathname === "/api/instagram/entrega" || url.pathname === "/api/instagram/contexto") {
@@ -111,6 +133,11 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/instinct") return out(200, instinctPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
+      if (req.method === "GET" && url.pathname === "/api/planejamento/pdf") {
+        const sm = url.searchParams.get("semana") ?? planPainel(brain).semana, rp = url.searchParams.get("responsavel") ?? "";
+        const tk = criarLink(brain, planPainel(brain, sm).semana, rp);
+        return new Response(pdfSemana(brain, sm, rp, `${url.origin}/t/${tk}`), { status: 200, headers: { ...cors, "content-type": "application/pdf", "content-disposition": `attachment; filename="tarefas-${sm}.pdf"`, "cache-control": "no-store" } });
+      }
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain, url.searchParams.get("semana") ?? undefined));
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/linkedin") return out(200, liPainel(brain, svc.env));

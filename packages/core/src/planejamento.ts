@@ -9,9 +9,21 @@ export type PlanTipo = "post" | "tarefa";
 const STATUS = new Set<PlanStatus>(["pendente", "andamento", "concluida"]);
 const DAY = 86_400_000;
 
+/** Um link por semana e por responsável (vazio = equipe toda). O token é o segredo: quem tem o link vê e marca. */
+export function criarLink(brain: Brain, semana: string, responsavel: string): string {
+  const ja = row<{ token: string }>(brain.db, "select token from plan_links where semana = ? and responsavel = ? and revogado = 0", semana, responsavel);
+  if (ja) return ja.token;
+  const b = crypto.getRandomValues(new Uint8Array(24));
+  const token = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  run(brain.db, "insert into plan_links (token, semana, responsavel, criado_em) values (?, ?, ?, ?)", token, semana, responsavel, brain.clock());
+  brain.audit("voce", "plan_link_criado", semana, { responsavel });
+  return token;
+}
+
 export interface PlanItem {
   id: string; semana: string; tipo: PlanTipo; titulo: string; dia: number | null; formato: string; responsavel: string;
   status: PlanStatus; pai: string | null; ordem: number; notas: string; criadoEm: number; concluidoEm: number | null; veioDe: string | null;
+  concluidoPor: string | null;
   subtarefas: PlanItem[];
 }
 type Linha = { id: string; semana: string; tipo: PlanTipo; titulo: string; dia: number | null; formato: string; responsavel: string; status: PlanStatus; pai: string | null; ordem: number; notas: string; criado_em: number; concluido_em: number | null; veio_de: string | null };
@@ -27,18 +39,19 @@ export const semanaAtual = (brain: Brain): string => segundaDe(brtDay(brain.cloc
 const somaDias = (dia: string, n: number) => new Date(Date.parse(`${dia}T12:00:00Z`) + n * DAY).toISOString().slice(0, 10);
 export const responsaveis = (brain: Brain): string[] => brain.policy<string[]>("plan_responsaveis", RESPONSAVEIS_PADRAO);
 
-const ver = (l: Linha): PlanItem => ({ id: l.id, semana: l.semana, tipo: l.tipo, titulo: l.titulo, dia: l.dia, formato: l.formato, responsavel: l.responsavel, status: l.status, pai: l.pai, ordem: l.ordem, notas: l.notas, criadoEm: l.criado_em, concluidoEm: l.concluido_em, veioDe: l.veio_de, subtarefas: [] });
+const ver = (l: Linha): PlanItem => ({ id: l.id, semana: l.semana, tipo: l.tipo, titulo: l.titulo, dia: l.dia, formato: l.formato, responsavel: l.responsavel, status: l.status, pai: l.pai, ordem: l.ordem, notas: l.notas, criadoEm: l.criado_em, concluidoEm: l.concluido_em, veioDe: l.veio_de, concluidoPor: null, subtarefas: [] });
 
-function itensDa(brain: Brain, semana: string): PlanItem[] {
+export function itensDa(brain: Brain, semana: string): PlanItem[] {
   const todos = rows<Linha>(brain.db, "select * from plan_itens where semana = ? order by ordem, criado_em", semana).map(ver);
   const porId = new Map(todos.map((i) => [i.id, i]));
+  for (const m of rows<{ item_id: string; quem: string }>(brain.db, "select m.item_id, m.quem from plan_marcas m join plan_itens i on i.id = m.item_id where i.semana = ?", semana)) { const it = porId.get(m.item_id); if (it && it.status === "concluida") it.concluidoPor = m.quem; }
   for (const i of todos) if (i.pai) porId.get(i.pai)?.subtarefas.push(i);
   return todos.filter((i) => !i.pai);
 }
 
 export interface Taxa { total: number; concluidas: number; andamento: number; pendentes: number; taxa: number }
 /** O que conta para a taxa: tarefa com subtarefas conta pelas subtarefas; sem subtarefas conta ela mesma. */
-const folhas = (itens: PlanItem[]): PlanItem[] => itens.flatMap((i) => (i.subtarefas.length ? i.subtarefas : [i]));
+export const folhas = (itens: PlanItem[]): PlanItem[] => itens.flatMap((i) => (i.subtarefas.length ? i.subtarefas : [i]));
 export function taxa(itens: PlanItem[]): Taxa {
   const f = folhas(itens);
   const concluidas = f.filter((i) => i.status === "concluida").length, andamento = f.filter((i) => i.status === "andamento").length;
@@ -52,6 +65,7 @@ export interface PlanPainel {
   historico: (Taxa & { semana: string; posts: Taxa; tarefas: Taxa })[];
   acumulado: { geral: Taxa; porResponsavel: (Taxa & { nome: string })[] };
   pendentesAnterior: number;
+  links: { token: string; responsavel: string }[];
 }
 
 const porResp = (itens: PlanItem[]): (Taxa & { nome: string })[] => {
@@ -77,6 +91,7 @@ export function planPainel(brain: Brain, semanaPedida?: string): PlanPainel {
     resumo: { geral: taxa(itens), posts: taxa(posts), tarefas: taxa(tarefas), porResponsavel: porResp(itens) },
     historico, acumulado: { geral: taxa(tudo), porResponsavel: porResp(tudo) },
     pendentesAnterior: anterior.filter((i) => i.status !== "concluida" && !jaTrazidos.has(i.id)).length,
+    links: rows<{ token: string; responsavel: string }>(brain.db, "select token, responsavel from plan_links where semana = ? and revogado = 0 order by responsavel", semana),
   };
 }
 
@@ -125,11 +140,20 @@ export function planAcao(brain: Brain, body: Record<string, unknown>): PlanPaine
     if (!STATUS.has(st)) throw new BrainError("invalid", "Status inválido.");
     run(brain.db, "update plan_itens set status = ?, concluido_em = ? where id = ?", st, st === "concluida" ? agora : null, l.id);
     // marcar a tarefa-mãe como concluída (ou reabrir) leva as subtarefas junto
-    if (!l.pai && st !== "andamento") run(brain.db, "update plan_itens set status = ?, concluido_em = ? where pai = ?", st, st === "concluida" ? agora : null, l.id);
+    const filhos = !l.pai && st !== "andamento" ? rows<{ id: string }>(brain.db, "select id from plan_itens where pai = ?", l.id).map((f) => f.id) : [];
+    if (filhos.length) run(brain.db, "update plan_itens set status = ?, concluido_em = ? where pai = ?", st, st === "concluida" ? agora : null, l.id);
     sincronizarPai(brain, l.pai);
+    // quem concluiu: só aparece quando veio pelo link compartilhado; mexer pelo Central apaga a marca
+    const quem = body.via === "link" ? texto(body.quem, 60) : "";
+    for (const id of [l.id, ...filhos, ...(l.pai ? [l.pai] : [])]) {
+      const atual = row<{ status: PlanStatus }>(brain.db, "select status from plan_itens where id = ?", id);
+      if (quem && atual?.status === "concluida") run(brain.db, "insert or replace into plan_marcas (item_id, quem, em) values (?, ?, ?)", id, quem, agora);
+      else run(brain.db, "delete from plan_marcas where item_id = ?", id);
+    }
   } else if (acao === "remover") {
     const l = pegar(brain, body.id);
     semana = l.semana;
+    run(brain.db, "delete from plan_marcas where item_id = ? or item_id in (select id from plan_itens where pai = ?)", l.id, l.id);
     run(brain.db, "delete from plan_itens where id = ? or pai = ?", l.id, l.id);
     sincronizarPai(brain, l.pai);
   } else if (acao === "trazer_pendentes") {
@@ -142,6 +166,15 @@ export function planAcao(brain: Brain, body: Record<string, unknown>): PlanPaine
       run(brain.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em, veio_de) values (?, ?, ?, ?, ?, ?, ?, 'pendente', null, ?, ?, ?, ?)", novo, semana, i.tipo, i.titulo, i.dia, i.formato, i.responsavel, ++ordem, i.notas, agora, i.id);
       for (const s of i.subtarefas) if (s.status !== "concluida") run(brain.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em, veio_de) values (?, ?, ?, ?, null, '', ?, 'pendente', ?, ?, '', ?, ?)", crypto.randomUUID(), semana, s.tipo, s.titulo, s.responsavel, novo, ++ordem, agora, s.id);
     }
+  } else if (acao === "compartilhar") {
+    criarLink(brain, semana, texto(body.responsavel, 60));
+  } else if (acao === "compartilhar_todos") {
+    criarLink(brain, semana, "");
+    const nomes = new Set([...responsaveis(brain), ...folhas(itensDa(brain, semana)).map((i) => i.responsavel).filter(Boolean)]);
+    for (const n of nomes) criarLink(brain, semana, n);
+  } else if (acao === "revogar_links") {
+    run(brain.db, "update plan_links set revogado = 1 where semana = ?", semana);
+    brain.audit("voce", "plan_links_revogados", semana);
   } else throw new BrainError("invalid", "Ação desconhecida.");
   brain.emit("change");
   return planPainel(brain, semana);

@@ -57,6 +57,7 @@ function Linha({ item, agir, resp, sub = false }) {
           <div className="pl-meta">
             {item.veioDe ? <span className="pl-chip">veio da semana anterior</span> : null}
             {item.status === "andamento" ? <span className="pl-chip amb">em andamento</span> : null}
+            {item.concluidoPor ? <span className="pl-chip">concluída por {item.concluidoPor} (link)</span> : null}
             {!sub && item.subtarefas.length ? <span className="pl-chip">{feitas}/{item.subtarefas.length} subtarefas</span> : null}
           </div>
         </div>
@@ -137,12 +138,57 @@ function Historico({ d, ir }) {
   );
 }
 
+/** Links e PDF para mandar ao time: um link por pessoa (mostra só o que é dela) e um da equipe toda. */
+function Compartilhar({ d, agir }) {
+  const nomes = [...new Set([...d.responsaveis, ...d.posts.concat(d.tarefas).flatMap((i) => [i.responsavel, ...i.subtarefas.map((s) => s.responsavel)]).filter(Boolean)])];
+  const linhas = [["", "Equipe toda"], ...nomes.map((n) => [n, n])];
+  const [conf, setConf] = React.useState(false);
+  const url = (t) => `${location.origin}/t/${t}`;
+  const copiar = async (t) => {
+    try { await navigator.clipboard.writeText(url(t)); avisos.push({ kind: "ok", title: "Link copiado" }); }
+    catch { window.prompt("Copie o link:", url(t)); }
+  };
+  const msg = (nome, t) => encodeURIComponent(`${nome ? `${nome}, ` : ""}estas são as tarefas da semana (${dm(d.semana)} a ${dm(d.fim)}). Marque como concluída por aqui: ${url(t)}`);
+  const pdf = (n) => `/api/planejamento/pdf?semana=${d.semana}${n ? `&responsavel=${encodeURIComponent(n)}` : ""}`;
+  return (
+    <section className="panel pl-comp">
+      <h2>Compartilhar com o time</h2>
+      <p className="muted">Cada pessoa recebe um link só com as tarefas dela. Quem abre o link vê a lista e marca como concluída; a marca chega aqui na hora. O link não deixa editar, criar nem apagar nada.</p>
+      <ul className="pl-links">
+        {linhas.map(([n, rot]) => {
+          const l = d.links.find((x) => x.responsavel === n);
+          return (
+            <li key={n || "equipe"}>
+              <strong>{rot}</strong>
+              {l ? (
+                <>
+                  <input className="pl-input" readOnly value={url(l.token)} aria-label={`Link de ${rot}`} onFocus={(e) => e.target.select()} />
+                  <button type="button" className="btn" onClick={() => copiar(l.token)}>Copiar link</button>
+                  <a className="btn" href={`https://wa.me/?text=${msg(n, l.token)}`} target="_blank" rel="noreferrer">WhatsApp</a>
+                  <a className="btn" href={pdf(n)} download>PDF</a>
+                </>
+              ) : <button type="button" className="btn btn-go" onClick={() => agir({ acao: "compartilhar", responsavel: n })}>Gerar link</button>}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="pl-nova">
+        {d.links.length < linhas.length ? <button type="button" className="btn" onClick={() => agir({ acao: "compartilhar_todos" })}>Gerar links de todos</button> : null}
+        {d.links.length ? (conf
+          ? <button type="button" className="btn perigo" onClick={() => { agir({ acao: "revogar_links" }); setConf(false); }} onBlur={() => setConf(false)}>Confirmar: os links atuais deixam de funcionar</button>
+          : <button type="button" className="btn" onClick={() => setConf(true)}>Invalidar links desta semana</button>) : null}
+      </div>
+    </section>
+  );
+}
+
 export function Planejamento() {
   const { live } = useBrain();
   const [d, setD] = React.useState(null);
   const [erro, setErro] = React.useState(null);
   const [filtro, setFiltro] = React.useState("todas");
   const [quem, setQuem] = React.useState("");
+  const [comp, setComp] = React.useState(false);
   const [tarefa, setTarefa] = React.useState({ titulo: "", responsavel: "" });
   const [post, setPost] = React.useState({ titulo: "", dia: "0", formato: "carrossel", responsavel: "" });
   const ir = React.useCallback((semana) => {
@@ -176,6 +222,7 @@ export function Planejamento() {
               <button type="button" className="btn" aria-label="Próxima semana" onClick={() => ir(somaDias(d.semana, 7))}>›</button>
               {!d.ehAtual ? <button type="button" className="btn" onClick={() => ir(d.atual)}>Ir para esta semana</button> : <button type="button" className="btn" onClick={() => ir(somaDias(d.atual, 7))}>Planejar a próxima</button>}
             </div>
+            <button type="button" className="btn" aria-expanded={comp} onClick={() => setComp(!comp)}>{comp ? "Fechar compartilhamento" : "Compartilhar / PDF"}</button>
             {d.pendentesAnterior > 0 ? <button type="button" className="btn btn-go" onClick={() => agir({ acao: "trazer_pendentes" })}>Trazer {d.pendentesAnterior} pendente{d.pendentesAnterior > 1 ? "s" : ""} da semana anterior</button> : null}
           </div>
           <div className="kpis seo-kpis" style={{ marginTop: 14 }}>
@@ -197,6 +244,8 @@ export function Planejamento() {
           </div>
         </section>
 
+        {comp ? <Compartilhar d={d} agir={agir} /> : null}
+
         <section className="panel">
           <h2>Posts da semana</h2>
           <div className="pl-dias">
@@ -209,7 +258,7 @@ export function Planejamento() {
                     <li key={p.id} className="pl-item">
                       <div className="pl-linha">
                         <Marca item={p} agir={agir} />
-                        <div className="pl-corpo"><Titulo item={p} agir={agir} /><div className="pl-meta">{p.status === "andamento" ? <span className="pl-chip amb">em andamento</span> : null}{p.veioDe ? <span className="pl-chip">veio da semana anterior</span> : null}</div></div>
+                        <div className="pl-corpo"><Titulo item={p} agir={agir} /><div className="pl-meta">{p.status === "andamento" ? <span className="pl-chip amb">em andamento</span> : null}{p.concluidoPor ? <span className="pl-chip">concluída por {p.concluidoPor} (link)</span> : null}{p.veioDe ? <span className="pl-chip">veio da semana anterior</span> : null}</div></div>
                         <select className="pl-sel" value={p.formato} onChange={(e) => agir({ acao: "editar", id: p.id, formato: e.target.value })} aria-label="Formato">
                           <option value="">formato</option>{FORMATOS.map((f) => <option key={f} value={f}>{f}</option>)}
                         </select>

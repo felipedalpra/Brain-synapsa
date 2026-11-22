@@ -55,3 +55,33 @@ describe("planejamento semanal", () => {
     expect(h.find((x) => x.semana === "2026-11-09")).toMatchObject({ total: 2, concluidas: 1, taxa: 0.5 });
   });
 });
+
+describe("tarefas compartilhadas por link", () => {
+  it("o link mostra só o que é da pessoa, marca como concluída com o nome e o PDF sai válido", async () => {
+    const { criarLink } = await import("../src/planejamento");
+    const { marcarPeloLink, vistaDoLink, pdfSemana } = await import("../src/plano-link");
+    const b = new Brain(openDb(":memory:"), () => Date.parse("2026-11-22T15:00:00Z"));
+    seedKnownFacts(b);
+    const semana = "2026-11-23";
+    planAcao(b, { acao: "criar", semana, tipo: "tarefa", titulo: "Revisar onboarding", responsavel: "Cassio" });
+    const painel = planAcao(b, { acao: "criar", semana, tipo: "tarefa", titulo: "Gravar reel (ç ã é)", responsavel: "Felipe Augusto" });
+    const ev = painel.tarefas.find((t) => t.responsavel === "Cassio")!;
+    const tk = criarLink(b, semana, "Cassio");
+    expect(criarLink(b, semana, "Cassio")).toBe(tk);
+    const v = vistaDoLink(b, tk);
+    expect(v.tarefas.map((t) => t.titulo)).toEqual(["Revisar onboarding"]);
+    expect(() => marcarPeloLink(b, tk, { id: painel.tarefas.find((t) => t.responsavel === "Felipe Augusto")!.id, status: "concluida" })).toThrow(/não está neste link/);
+    const depois = marcarPeloLink(b, tk, { id: ev.id, status: "concluida" });
+    expect(depois.tarefas[0]!.status).toBe("concluida");
+    expect(depois.tarefas[0]!.concluidoPor).toBe("Cassio");
+    expect(planPainel(b, semana).resumo.geral.concluidas).toBe(1);
+    // mexer pelo Central apaga a marca de quem concluiu
+    planAcao(b, { acao: "status", semana, id: ev.id, status: "pendente" });
+    expect(vistaDoLink(b, tk).tarefas[0]!.concluidoPor).toBeNull();
+    const pdf = pdfSemana(b, semana, "", "https://x/t/abc");
+    expect(new TextDecoder().decode(pdf.slice(0, 8))).toBe("%PDF-1.4");
+    expect(new TextDecoder().decode(pdf)).toContain("%%EOF");
+    planAcao(b, { acao: "revogar_links", semana });
+    expect(() => vistaDoLink(b, tk)).toThrow(/não existe mais/);
+  });
+});

@@ -3478,3 +3478,11 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
   .ix-grade { grid-template-columns: minmax(0, 1fr); }
   .ix-funil-linha { grid-template-columns: 100px 1fr 34px; }
 }
+
+/* Compartilhar tarefas da semana */
+.pl-links { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pl-links li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pl-links strong { flex: 0 0 130px; }
+.pl-links .pl-input { flex: 1 1 260px; min-width: 0; }
+.pl-links a.btn { text-decoration: none; }
+.btn.perigo { color: var(--crit); border-color: var(--crit); }
