@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, publicarDevidos, liRotina, midiaRotina, LoginLimiter, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, publicarDevidos, liRotina, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -33,7 +33,7 @@ export class BrainDO extends DurableObject<Env> {
 
     const integrations = () => integrationsView(brain.db, e, brain.clock());
     const rules = ruleChat(brain, integrations);
-    const auth = createAuth(e, new LoginLimiter());
+    const auth = createAuth(e, new LoginLimiter(), Date.now, armazemUsuarios(brain));
     this.brain = brain;
     this.handle = createHandler({
       brain,

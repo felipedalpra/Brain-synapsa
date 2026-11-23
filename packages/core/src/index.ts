@@ -46,3 +46,4 @@ export * from "./midia";
 export * from "./midia-sync";
 
 export * from "./plano-link";
+export * from "./usuarios";

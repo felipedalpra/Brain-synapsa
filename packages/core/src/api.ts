@@ -17,6 +17,8 @@ import { gscPainelCompleto, sincronizarGsc } from "./gsc";
 import { configurar as instinctConfigurar, painel as instinctPainel, preparar as instinctPreparar, sincronizar as instinctSincronizar } from "./instinct";
 import { descobrirPropriedades, gaPainel, propriedadesGa, sincronizarGa } from "./ga";
 import { criarLink, planAcao, planPainel } from "./planejamento";
+import { usuarioAtual, makeSession, sessionCookie } from "./auth";
+import { listarUsuarios, trocarSenha, usuarioAcao } from "./usuarios";
 import { PLANO_CSP, PLANO_HTML, marcarPeloLink, pdfSemana, pegarLink, vistaDoLink } from "./plano-link";
 import { liCallback, liUrlAutorizar, liDecidir, liEditar, liGerar, liMarcarPublicado, liPainel, liPublicar } from "./linkedin";
 import { decidirPost, editarLegenda, igContexto, igPainel, publicarPost, receberPost, servirMidia, tokenValido } from "./instagram";
@@ -124,6 +126,21 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       const out = (status: number, body: unknown) => json(status, body, cors);
 
       if (req.method === "GET" && url.pathname === "/api/health") return out(200, { ok: true, server: "brain-server", llm: brain.llm, sse: svc.sse === true });
+      if (req.method === "GET" && url.pathname === "/api/me") return out(200, usuarioAtual(req) ?? { id: "0", nome: "Felipe", email: "", papel: "admin", dono: true, precisaTrocar: false });
+      if (url.pathname === "/api/usuarios" || url.pathname === "/api/minha-senha") {
+        const eu = usuarioAtual(req);
+        if (url.pathname === "/api/usuarios") {
+          if (eu && eu.papel !== "admin") return out(403, { error: "Só o administrador gerencia usuários." });
+          if (req.method === "GET") return out(200, { usuarios: listarUsuarios(brain) });
+          if (req.method === "POST") return out(200, await usuarioAcao(brain, await readJson(req)));
+        } else if (req.method === "POST") {
+          if (!eu || eu.dono) return out(409, { error: "A senha mestre fica nas configurações do servidor (BRAIN_PASSWORD)." });
+          const b = await readJson(req);
+          const ver = await trocarSenha(brain, eu.id, String(b.atual ?? ""), String(b.nova ?? ""));
+          const cookie = svc.env.SESSION_SECRET ? sessionCookie(await makeSession(svc.env.SESSION_SECRET, brain.clock(), eu.id, ver), url.protocol === "https:") : "";
+          return json(200, { ok: true }, { ...cors, ...(cookie ? { "set-cookie": cookie } : {}) });
+        }
+      }
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain));
       if (req.method === "GET" && url.pathname === "/api/midia-detalhe") return out(200, midiaDetalhe(brain, url.searchParams.get("tipo") ?? "", url.searchParams.get("metrica") ?? "", url.searchParams.get("de"), url.searchParams.get("ate")));

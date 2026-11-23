@@ -3486,3 +3486,21 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 .pl-links .pl-input { flex: 1 1 260px; min-width: 0; }
 .pl-links a.btn { text-decoration: none; }
 .btn.perigo { color: var(--crit); border-color: var(--crit); }
+
+/* Acessos e usuário logado */
+.eu { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+.eu button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.eu button:hover { color: var(--text); border-color: var(--line-strong); }
+.eu-nome { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.ac-form input { flex: 1 1 200px; min-width: 0; background: var(--bg-2); border: 1px solid var(--line-strong); color: var(--text); border-radius: 8px; padding: 8px 10px; }
+.ac-tab { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+.ac-tab th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.ac-tab td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.ac-tab tr.off { opacity: 0.55; }
+.ac-acoes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ac-cred { border: 1px solid var(--ok); background: rgba(95, 211, 176, 0.08); border-radius: 10px; padding: 12px 14px; margin: 8px 0 14px; display: flex; flex-direction: column; gap: 8px; }
+.ac-cred pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-2); border-radius: 8px; padding: 10px; font-size: 13px; }
+@media (max-width: 760px) { .ac-tab thead { display: none; } .ac-tab tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--line); } .ac-tab td { display: block; border: 0; padding: 3px 8px; } .ac-acoes { justify-content: flex-start; } }
+.top-dir { display: flex; align-items: center; gap: 8px; justify-self: end; }
+.eu { margin-left: 0; }

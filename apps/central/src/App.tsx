@@ -32,6 +32,8 @@ import { Equipes } from "./components/Equipes";
 import { Agentes } from "./components/Agentes";
 import { Aprovacoes } from "./components/Aprovacoes";
 import { Integracoes } from "./components/Integracoes";
+import { Acessos } from "./components/Acessos";
+import { api } from "./api";
 import { Avisos } from "./components/Avisos";
 import { Instagram } from "./components/Instagram";
 import { LinkedIn } from "./components/LinkedIn";
@@ -102,6 +104,11 @@ export const Du = [
     label: "Integra\xE7\xF5es",
     icon: Plug,
   },
+  {
+    id: "acesso",
+    label: "Acessos",
+    icon: Users,
+  },
 ];
 // Abas agrupadas por função. Os ids das telas (e os links #financeiro, #instagram…) continuam os mesmos.
 export const GRUPOS = [
@@ -109,7 +116,7 @@ export const GRUPOS = [
   { id: "g-negocio", label: "Negócio", icon: LayoutDashboard, filhos: ["dashboard", "crm", "financeiro"] },
   { id: "g-marketing", label: "Marketing", icon: Images, filhos: ["seo", "midia", "instagram", "linkedin"] },
   { id: "g-ia", label: "Agentes de IA", icon: Bot, filhos: ["equipes", "agentes"] },
-  { id: "g-config", label: "Integrações", icon: Plug, filhos: ["integracoes"] },
+  { id: "g-config", label: "Integrações", icon: Plug, filhos: ["integracoes", "acesso"] },
 ];
 export const grupoDe = (tab) => GRUPOS.find((g) => g.filhos.includes(tab)) ?? GRUPOS[0];
 export const Ts = () => window.location.hash.slice(1).split("/");
@@ -124,7 +131,11 @@ export function App() {
     [i, l] = React.useState(oc),
     [c, u] = React.useState(null),
     [v, g] = React.useState(null),
-    [x, j] = React.useState(null);
+    [x, j] = React.useState(null),
+    [eu, setEu] = React.useState(null);
+  React.useEffect(() => {
+    api.me().then(setEu).catch(() => {});
+  }, []);
   React.useEffect(() => {
     const d = () => {
       (s(rc()), l(oc()));
@@ -179,6 +190,7 @@ export function App() {
             );
           })}
         </nav>
+        <div className="top-dir">
         <button
           type="button"
           className={`kill ${e.kill ? "on" : ""}`}
@@ -189,7 +201,20 @@ export function App() {
           <Power size={16} aria-hidden />
           <span>{e.kill ? "Retomar agentes" : "Parar tudo"}</span>
         </button>
+        {eu ? (
+          <div className="eu">
+            <button type="button" className="eu-nome" title="Minha conta e acessos" onClick={() => m("acesso")}>{eu.nome}</button>
+            <button type="button" className="eu-sair" onClick={() => api.sair()}>Sair</button>
+          </div>
+        ) : null}
+        </div>
       </header>
+      {eu?.precisaTrocar && o !== "acesso" ? (
+        <p className="banner" role="status">
+          Sua senha ainda é a temporária.{" "}
+          <button type="button" className="link" onClick={() => m("acesso")}>Trocar agora</button>
+        </p>
+      ) : null}
       {e.error ? (
         <p className="banner" role="alert">
           {e.error}{" "}
@@ -250,6 +275,7 @@ export function App() {
         {o === "agentes" ? <Agentes openId={c} setOpenId={u} talkTo={f} /> : null}
         {o === "aprovacoes" ? <Aprovacoes /> : null}
         {o === "integracoes" ? <Integracoes /> : null}
+        {o === "acesso" ? <Acessos eu={eu} aoTrocar={() => api.me().then(setEu)} /> : null}
       </main>
       <Avisos
         onOpen={(d) => {

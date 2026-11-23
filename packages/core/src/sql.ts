@@ -236,6 +236,7 @@ create table if not exists ig_midia (id text primary key, post_id text not null,
 create index if not exists ig_midia_post on ig_midia (post_id, ordem);
 create table if not exists plan_itens (id text primary key, semana text not null, tipo text not null, titulo text not null, dia integer, formato text not null default '', responsavel text not null default '', status text not null default 'pendente', pai text, ordem integer not null default 0, notas text not null default '', criado_em integer not null, concluido_em integer, veio_de text);
 create index if not exists plan_semana on plan_itens (semana, ordem);
+create table if not exists usuarios (id text primary key, email text not null unique, nome text not null, hash text not null, papel text not null default 'membro', ativo integer not null default 1, versao integer not null default 1, precisa_trocar integer not null default 1, criado_em integer not null, ultimo_acesso integer);
 create table if not exists plan_links (token text primary key, semana text not null, responsavel text not null default '', criado_em integer not null, revogado integer not null default 0);
 create index if not exists plan_links_semana on plan_links (semana);
 create table if not exists plan_marcas (item_id text primary key, quem text not null, em integer not null);
