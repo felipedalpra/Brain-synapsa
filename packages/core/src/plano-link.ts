@@ -152,30 +152,50 @@ export function pdfDaVista(v: VistaPublica, linkUrl?: string): Uint8Array {
 export const pdfSemana = (brain: Brain, semana: string, responsavel: string, linkUrl?: string) => pdfDaVista(vistaPublica(brain, segundaDe(semana), responsavel), linkUrl);
 
 // ---------- Página do link ----------
-export const PLANO_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+export const PLANO_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 export const PLANO_HTML = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Tarefas da semana · Synapsa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f6f7fb;--card:#fff;--fg:#141a33;--mut:#667091;--line:#dfe3f0;--ok:#1f9d79;--warn:#d98a1f;--acc:#5667d6}
-@media (prefers-color-scheme:dark){:root{--bg:#0a1126;--card:#0e1630;--fg:#e7ecfb;--mut:#93a0c8;--line:#26305a;--ok:#5fd3b0;--warn:#f0b86e;--acc:#7c9ce8}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:20px max(16px,env(safe-area-inset-left)) 60px}
-main{max-width:720px;margin:0 auto}h1{font-size:22px;margin:0 0 2px}h2{font-size:15px;margin:26px 0 8px;color:var(--mut);font-weight:600}
-.sub{color:var(--mut);font-size:14px;margin:0 0 14px}.barra{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:6px 0 4px}.barra i{display:block;height:100%;background:var(--ok)}
-.top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}a.pdf{color:var(--acc);font-size:14px}
-.quem{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:14px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.quem input{flex:1 1 180px;min-width:0;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
-ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}ul ul{margin:8px 0 0 34px}
-li>.it{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:flex-start}
-li li>.it{padding:9px 10px}
-button.cx{flex:none;width:28px;height:28px;border-radius:8px;border:2px solid var(--mut);background:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;padding:0}
-button.cx.c{background:var(--ok);border-color:var(--ok)}button.cx.a{border-color:var(--warn)}button.cx:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
-.t{min-width:0;flex:1}.t b{font-weight:600;overflow-wrap:anywhere}.t.f b{text-decoration:line-through;color:var(--mut);font-weight:500}
-.m{color:var(--mut);font-size:13px;margin-top:2px}.erro{color:#c0394b;margin:12px 0}.vazio{color:var(--mut)}
-@media print{.quem,a.pdf,button.cx{display:none}body{background:#fff;color:#000}}
+:root{--bg:#060a18;--bg2:#0a1126;--panel:#0e1630;--panel2:#141f40;--line:rgba(138,156,214,.16);--line2:rgba(138,156,214,.34);--text:#e7ecfb;--mut:#93a0c8;--blue:#6a8bd7;--indigo:#5667d6;--ok:#5fd3b0;--warn:#f0b86e;--crit:#f2808e;--core2:#7c9ce8;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.5 "Hanken Grotesk","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;
+background-image:radial-gradient(1100px 700px at 30% -10%,rgba(86,103,214,.22),transparent 60%),linear-gradient(rgba(138,156,214,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(138,156,214,.045) 1px,transparent 1px);background-size:auto,44px 44px,44px 44px;background-attachment:fixed;
+padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right)) 60px max(16px,env(safe-area-inset-left))}
+main{max-width:720px;margin:0 auto}
+.marca{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.marca svg{flex:none}.marca span{font:600 17px/1 "Chakra Petch","Segoe UI",sans-serif;letter-spacing:.2px}.marca em{font-style:normal;color:var(--mut);font-size:13px;margin-left:auto}
+.cab{background:linear-gradient(160deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px}
+h1{font:700 26px/1.15 "Chakra Petch","Segoe UI",sans-serif;margin:0 0 4px}
+h2{font:600 14px/1 "Chakra Petch","Segoe UI",sans-serif;letter-spacing:.4px;margin:28px 0 10px;color:var(--mut)}
+.sub{color:var(--mut);font-size:14px;margin:0}
+.top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+a.pdf{display:inline-flex;align-items:center;padding:8px 14px;border-radius:10px;border:1px solid var(--line2);color:var(--text);text-decoration:none;font-weight:500;font-size:14px;transition:background .15s}
+a.pdf:hover{background:#8a9cd61a}
+.barra{height:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:16px 0 8px}
+.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--indigo),var(--ok));border-radius:6px;transition:width .4s}
+#res{color:var(--text);font-weight:500}
+.quem{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:14px 0 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--mut);font-size:14px}
+.quem input{flex:1 1 180px;min-width:0;padding:9px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--text);font:inherit}
+.quem input:focus{outline:2px solid var(--core2);outline-offset:1px}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}ul ul{margin:8px 0 0 30px}
+li>.it{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;gap:13px;align-items:flex-start;transition:border-color .15s,background .15s}
+li>.it:hover{border-color:var(--line2);background:var(--panel2)}
+li li>.it{padding:10px 12px;background:var(--bg2)}
+button.cx{flex:none;width:28px;height:28px;border-radius:9px;border:2px solid var(--line2);background:transparent;color:#04201a;font-size:17px;font-weight:700;line-height:1;cursor:pointer;padding:0;transition:background .15s,border-color .15s}
+button.cx:hover{border-color:var(--ok)}
+button.cx.c{background:var(--ok);border-color:var(--ok)}button.cx.a{border-color:var(--warn);color:var(--warn)}button.cx:focus-visible{outline:2px solid var(--core2);outline-offset:2px}
+.t{min-width:0;flex:1}.t b{font-weight:600;overflow-wrap:anywhere}.t.f b{text-decoration:line-through;text-decoration-color:var(--mut);color:var(--mut);font-weight:500}
+.m{color:var(--mut);font-size:13px;margin-top:2px}.erro{color:var(--crit);background:rgba(242,128,142,.1);border:1px solid rgba(242,128,142,.35);border-radius:10px;padding:8px 12px;margin:14px 0 0}.vazio{color:var(--mut)}
+.rodape{margin-top:36px;text-align:center;color:var(--mut);font-size:12.5px}
+@media print{body{background:#fff;color:#000}.quem,a.pdf,button.cx{display:none}}
 </style></head><body><main>
-<div class="top"><div><h1>Tarefas da semana</h1><p class="sub" id="sub"></p></div><a class="pdf" id="pdf" href="#">Baixar PDF</a></div>
-<div class="barra"><i id="prog" style="width:0"></i></div><p class="sub" id="res"></p>
+<div class="marca"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><defs><radialGradient id="o" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#eaf1ff"/><stop offset=".45" stop-color="#7c9ce8"/><stop offset="1" stop-color="#5667d6"/></radialGradient></defs><circle cx="17" cy="17" r="15" fill="url(#o)"/><circle cx="17" cy="17" r="15" fill="none" stroke="#8a9cd6" stroke-opacity=".5"/><circle cx="12.5" cy="15" r="2.2" fill="#0a1126"/><circle cx="21.5" cy="15" r="2.2" fill="#0a1126"/></svg><span>Central Synapsa</span><em>Time</em></div>
+<section class="cab"><div class="top"><div><h1>Tarefas da semana</h1><p class="sub" id="sub"></p></div><a class="pdf" id="pdf" href="#">Baixar PDF</a></div>
+<div class="barra"><i id="prog" style="width:0"></i></div><p class="sub" id="res"></p></section>
 <div class="quem" id="quem" hidden><label for="nome">Seu nome, para registrar quem concluiu:</label><input id="nome" maxlength="60" autocomplete="name" placeholder="Ex.: Cassio"></div>
 <p class="erro" id="erro" hidden></p><div id="lista"></div>
+<p class="rodape">Synapsa. Onde a prática evolui.</p>
 </main><script>
 (function(){
 var token=location.pathname.split("/").filter(Boolean).pop();
