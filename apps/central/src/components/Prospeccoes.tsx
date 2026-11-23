@@ -661,6 +661,16 @@ export function ProspeccaoPainel() {
                           >
                             Pediu SAIR
                           </button>{" "}
+                          <button
+                            className="btn"
+                            disabled={j}
+                            title="Apaga os dados desta pessoa (LGPD) e mantém só o e-mail na lista de bloqueio"
+                            onClick={() => {
+                              if (window.confirm("Esquecer esta clínica? Apaga nome, contatos e mensagens dela. Não dá para desfazer.")) p(() => api.lgpdEsquecer(k.id), "Dados apagados (LGPD)");
+                            }}
+                          >
+                            Esquecer
+                          </button>{" "}
                         </>
                       ) : k.respondeu ? (
                         <span className="muted">{"Sequ\xEAncia parada "}</span>

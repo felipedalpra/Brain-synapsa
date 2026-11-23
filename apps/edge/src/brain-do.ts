@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, publicarDevidos, liRotina, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, publicarDevidos, liRotina, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -69,6 +69,7 @@ export class BrainDO extends DurableObject<Env> {
     try { await liRotina(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao gerar pela Central */ }
     // Meta e Instagram: uma leitura por dia para a análise de Anúncios e Instagram sempre ter dado fresco.
     try { await midiaRotina(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o aviso aparece ao atualizar pela Central */ }
+    try { aplicarRetencao(this.brain); } catch { /* retenção LGPD: erro aqui não para a rotina */ }
     const started = this.runner.tick();
     await this.runner.idle();
     return { ...rec, started };

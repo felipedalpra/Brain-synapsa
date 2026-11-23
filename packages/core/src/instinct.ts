@@ -1,3 +1,4 @@
+import { esquecido } from "./lgpd";
 // Instinct (agente de WhatsApp do Felipe): ele acha os leads, aborda e conversa. O Brain NÃO manda nele.
 // O Instinct só preenche uma planilha do Google com o placar; o Brain lê (somente leitura dos dados) e mostra o funil.
 import { BrainError, brtDay, type Brain } from "./brain";
@@ -106,7 +107,7 @@ export async function sincronizar(brain: Brain, env: Env, f: typeof fetch = fetc
     run(brain.db, "delete from instinct_dia");
     run(brain.db, "delete from instinct_leads");
     for (const x of dias) run(brain.db, "insert or replace into instinct_dia (dia, tipo, abordados, responderam, reunioes, contas, assinantes) values (?, ?, ?, ?, ?, ?, ?)", x.dia, x.tipo, x.abordados, x.responderam, x.reunioes, x.contas, x.assinantes);
-    for (const x of leads) run(brain.db, "insert or replace into instinct_leads (chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado) values (?, ?, ?, ?, ?, ?, ?, ?)", x.chave, x.nome, x.tipo, x.cidade, x.whatsapp, x.primeira, x.status, x.atualizado);
+    for (const x of leads.filter((l) => !esquecido(brain, "instinct", l.chave) && !esquecido(brain, "whatsapp", l.whatsapp ?? ""))) run(brain.db, "insert or replace into instinct_leads (chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado) values (?, ?, ?, ?, ?, ?, ?, ?)", x.chave, x.nome, x.tipo, x.cidade, x.whatsapp, x.primeira, x.status, x.atualizado);
     // Histórico de estágios: o Instinct só informa o estágio atual; o Brain registra cada mudança que enxerga.
     for (const x of leads) {
       const ant = antes.get(x.chave);

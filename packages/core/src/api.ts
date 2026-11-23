@@ -28,6 +28,7 @@ import { sincronizarFaturasStripe } from "./fin-stripe";
 import { sincronizarAssinaturasStripe } from "./handlers";
 import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finClassificarExtrato, finIgnorarExtrato, finPagarConta, finDetalhe, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
 import { TEAMS, AGENTS } from "@brain/shared";
+import { esquecerContato, aplicarRetencao, POLITICA_HTML } from "./lgpd";
 
 export interface Services {
   brain: Brain;
@@ -121,8 +122,12 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         return json(405, { error: "método não permitido" });
       }
 
+      // Política de privacidade: pública (vai no rodapé dos e-mails).
+      if (req.method === "GET" && url.pathname === "/api/privacidade") return new Response(POLITICA_HTML(svc.env.PRIVACY_CONTACT ?? "contato@synapsa.chat"), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=3600", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" } });
+
       const denied = await svc.authorize?.(req, url);
       if (denied) return denied;
+      brain.operador = usuarioAtual(req)?.nome ?? null;
       const out = (status: number, body: unknown) => json(status, body, cors);
 
       if (req.method === "GET" && url.pathname === "/api/health") return out(200, { ok: true, server: "brain-server", llm: brain.llm, sse: svc.sse === true });
@@ -266,6 +271,13 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         }
         return out(400, { message: "Informe o site e o número da propriedade (só dígitos), ou peça para descobrir." });
       }
+      if (url.pathname === "/api/lgpd/esquecer") {
+        const eu = usuarioAtual(req);
+        if (eu && eu.papel !== "admin") return out(403, { error: "Só o administrador apaga dados de contatos." });
+        if (!body.confirmar) return out(409, { error: "Confirme a exclusão: isso não dá para desfazer." });
+        return out(200, esquecerContato(brain, { prospectId: body.prospectId ? Number(body.prospectId) : undefined, email: body.email ? String(body.email) : undefined, whatsapp: body.whatsapp ? String(body.whatsapp) : undefined }, "voce", body.bloquear !== false));
+      }
+      if (url.pathname === "/api/lgpd/retencao") return out(200, { removidos: aplicarRetencao(brain) });
       if (url.pathname.startsWith("/api/prospeccao/")) {
         const rota = url.pathname.slice("/api/prospeccao/".length);
         const f = (u: string | URL | Request, i?: RequestInit) => (svc.fetch ?? fetch)(u as string, i);

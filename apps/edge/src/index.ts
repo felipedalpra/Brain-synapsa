@@ -41,6 +41,8 @@ async function tratar(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/api/")) return brain(env).fetch(req);
 
+    if (url.pathname === "/privacidade" && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/privacidade`));
+
     // Link das tarefas da semana: página pública protegida pelo token do próprio link (sem login).
     const t = /^\/t\/([\w-]{1,80})\/?$/.exec(url.pathname);
     if (t && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/p/${t[1]}/pagina`));

@@ -100,6 +100,7 @@ create table if not exists envios (
   detail text,
   at integer not null
 );
+create table if not exists lgpd_esquecidos (tipo text not null, valor text not null, em integer not null, primary key (tipo, valor));
 create table if not exists prospect_autonomo (prospect_id integer primary key);
 create table if not exists email_suppression (
   email text primary key,

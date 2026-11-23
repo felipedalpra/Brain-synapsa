@@ -11,10 +11,12 @@ export function suppress(brain: Brain, email: string, reason: string): void {
   run(brain.db, "insert into email_suppression (email, reason, at) values (?, ?, ?) on conflict(email) do update set reason = excluded.reason, at = excluded.at", email.trim().toLowerCase(), reason, brain.clock());
 }
 
+export const politicaUrl = (env: Env) => env.PRIVACY_URL ?? `${(env.BRAIN_PUBLIC_URL ?? "https://synapsa-brain.felipeodriosolladalpra.workers.dev").replace(/\/$/, "")}/privacidade`;
+
 /** Rodapé fixo: identifica quem manda e dá a saída. Sem isso o Brain não envia. */
 export const rodapeLinhas = (env: Env, prospeccao = false, autonomo = false) =>
   `${env.RESEND_SENDER_NAME ?? "Felipe Dalpra"}, Synapsa\n` +
-  (prospeccao ? `${autonomo ? "Escrevi para o contato profissional que você divulga publicamente." : "Escrevi para o contato que a sua clínica divulga publicamente."} Para não receber mais e-mails meus, responda SAIR.` : "Para não receber mais e-mails meus, responda SAIR.");
+  (prospeccao ? `${autonomo ? "Escrevi para o contato profissional que você divulga publicamente." : "Escrevi para o contato que a sua clínica divulga publicamente."} Para não receber mais e-mails meus, responda SAIR. Privacidade e seus dados: ${politicaUrl(env)}` : "Para não receber mais e-mails meus, responda SAIR.");
 export const footer = (env: Env, prospeccao = false, autonomo = false) => `\n\n--\n${rodapeLinhas(env, prospeccao, autonomo)}`;
 
 export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: string; subject: string; body: string; prospeccao?: boolean; autonomo?: boolean; html?: boolean }, f: typeof fetch = fetch): Promise<string> {

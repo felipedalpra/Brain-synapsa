@@ -81,6 +81,7 @@ export const api = {
       },
       9e4,
     ),
+  lgpdEsquecer: (prospectId) => post("/api/lgpd/esquecer", { prospectId, confirmar: true }),
   prospeccaoContato: (e, a) =>
     post("/api/prospeccao/contato", {
       id: e,

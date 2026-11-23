@@ -99,8 +99,11 @@ export class Brain extends Emitter {
     this.emit("change");
   }
 
+  /** Nome de quem está logado na requisição em curso; troca o ator genérico "voce" pelo usuário real. */
+  operador: string | null = null;
+
   audit(actor: string, action: string, ref?: string, detail?: unknown): void {
-    run(this.db, "insert into audit_log (at, actor, action, ref, detail) values (?, ?, ?, ?, ?)", this.clock(), actor, action, ref ?? null, detail === undefined ? null : JSON.stringify(detail));
+    run(this.db, "insert into audit_log (at, actor, action, ref, detail) values (?, ?, ?, ?, ?)", this.clock(), actor === "voce" && this.operador ? this.operador : actor, action, ref ?? null, detail === undefined ? null : JSON.stringify(detail));
   }
 
   log(agentId: Activity["agentId"], text: string, tone: Activity["tone"] = "normal"): void {
