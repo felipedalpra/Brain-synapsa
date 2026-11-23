@@ -4,7 +4,7 @@ var REGRAS = "Regras: nunca ofere\xE7a desconto, nunca prometa resultado cl\xEDn
 var ENTREGA = 'Entregue pelo relatorio: "resumo" com 1 ou 2 frases e "entrega" com o documento completo, pronto para usar (t\xEDtulos curtos, listas, n\xFAmeros com a fonte).';
 var PROXIMAS = 'Termine com "Pr\xF3ximas 3 a\xE7\xF5es" por impacto em R$.';
 var PROPOR = "Texto que vai sair para algu\xE9m: deixe na fila com a ferramenta propor (texto_pronto). Nada sai sem o meu OK.";
-var QTD = (n3, ...mais) => ({ label: "Quantidade", padrao: n3, opcoes: [n3, ...mais] });
+var QTD = (n4, ...mais) => ({ label: "Quantidade", padrao: n4, opcoes: [n4, ...mais] });
 var c = (agentId, id, label, hint, task, campos, web = false) => ({
   id: `${agentId}:${id}`,
   agentId,
@@ -562,6 +562,30 @@ var AGENTS = [
     "note": null
   },
   {
+    "id": "instinct",
+    "area": "aquisicao",
+    "ready": "parcial",
+    "name": "Instinct (WhatsApp)",
+    "mission": "Prospectar cl\xEDnicas e influenciadoras no WhatsApp, abordar e marcar reuni\xE3o. Roda fora do Brain, no n\xFAmero do Felipe.",
+    "metric": "Taxa de resposta e reuni\xF5es marcadas por semana",
+    "needs": 'A planilha "Instinct - Funil de prospec\xE7\xE3o", preenchida pelo pr\xF3prio Instinct.',
+    "triggers": [
+      "Leitura di\xE1ria da planilha \xE0s 7h"
+    ],
+    "subs": [],
+    "auto": [
+      "Ler o placar da planilha",
+      "Calcular as taxas por tipo de lead"
+    ],
+    "aprova": [],
+    "humano": [
+      "A prospec\xE7\xE3o e as conversas ficam com o Instinct e com voc\xEA"
+    ],
+    "limits": "O Brain n\xE3o escolhe os leads nem manda mensagem pelo Instinct. S\xF3 l\xEA o placar.",
+    "learns": "Taxa de resposta, de reuni\xE3o e de convers\xE3o por tipo de lead.",
+    "note": "Agente externo."
+  },
+  {
     "id": "prospeccao",
     "area": "aquisicao",
     "ready": "pronto",
@@ -1112,7 +1136,7 @@ var TEAMS = [
 
 // packages/shared/src/jarvis.ts
 var norm = (s2) => s2.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-var brl = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n3 % 1 ? 2 : 0 });
+var brl = (n4) => n4.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n4 % 1 ? 2 : 0 });
 var ALIASES = {
   chief: ["chief", "chefe de gabinete"],
   ativacao: ["ativacao do freemium", "freemium"],
@@ -1157,7 +1181,7 @@ function ago(now, at) {
   return `h\xE1 ${h} h`;
 }
 function respond(input, v) {
-  const M = v.metrics;
+  const M2 = v.metrics;
   const q = norm(input).trim();
   const pending = v.proposals.filter((p) => p.status === "pendente");
   const agent = findAgent(input);
@@ -1192,7 +1216,7 @@ function respond(input, v) {
     const low = pending.filter((p) => p.risk === "baixo");
     if (v.kill) return { text: "O bot\xE3o de emerg\xEAncia est\xE1 ligado, ent\xE3o nenhuma aprova\xE7\xE3o passa." };
     if (low.length === 0) return { text: "N\xE3o h\xE1 propostas de baixo risco esperando." };
-    const total = low.reduce((n3, p) => n3 + p.impactoBrl, 0);
+    const total = low.reduce((n4, p) => n4 + p.impactoBrl, 0);
     return {
       text: `S\xE3o ${low.length} propostas de baixo risco, somando ${brl(total)} de impacto. Aprovar n\xE3o envia nada: voc\xEA copia e manda cada mensagem. Confirma?`,
       confirm: { label: `Aprovar ${low.length}`, action: { type: "approve_low_risk" } }
@@ -1207,18 +1231,18 @@ function respond(input, v) {
     };
   }
   if (/(desconto|reajuste|renova)/.test(q)) {
-    const linhas = M.descontos.map((d) => `${d.quando}: ${d.contas} conta(s) sobem de ${brl(d.de)} para ${brl(d.para)}`).join("; ");
+    const linhas = M2.descontos.map((d) => `${d.quando}: ${d.contas} conta(s) sobem de ${brl(d.de)} para ${brl(d.para)}`).join("; ");
     return { text: `Fins de desconto \xE0 vista: ${linhas}. Quem entrou com R$ 79 tamb\xE9m sobe para R$ 119 seis meses depois. O Brain abre um contato 30 dias antes de cada uma, para voc\xEA ligar. Nenhum agente oferece desconto.` };
   }
   if (/(mrr|receita|faturamento|meta|1200|caixa)/.test(q)) {
-    const { total, goal, stripe, pix, manual, essencialPrice } = M.mrr;
+    const { total, goal, stripe, pix, manual, essencialPrice } = M2.mrr;
     const falta = Math.max(0, goal - total);
     const partes = [`${brl(stripe)} no Stripe`, `${brl(pix)} por Pix`, ...manual ? [`${brl(manual)} lan\xE7ados \xE0 m\xE3o`] : []].join(", ");
-    const limite = M.funil ? ` H\xE1 ${M.funil.noLimite} profissionais no limite de pacientes agora.` : "";
-    return { text: `MRR de ${brl(total)}: ${partes}. Faltam ${brl(falta)} para os ${brl(goal)} de ${M.mrr.goalDate}, o que s\xE3o cerca de ${Math.ceil(falta / essencialPrice)} Essenciais a ${brl(essencialPrice)}.${limite}` };
+    const limite = M2.funil ? ` H\xE1 ${M2.funil.noLimite} profissionais no limite de pacientes agora.` : "";
+    return { text: `MRR de ${brl(total)}: ${partes}. Faltam ${brl(falta)} para os ${brl(goal)} de ${M2.mrr.goalDate}, o que s\xE3o cerca de ${Math.ceil(falta / essencialPrice)} Essenciais a ${brl(essencialPrice)}.${limite}` };
   }
   if (/(funil|ativa|cadastro|conversao|limite)/.test(q)) {
-    const f = M.funil;
+    const f = M2.funil;
     if (!f) return { text: "Ainda n\xE3o tenho o funil: a plataforma n\xE3o est\xE1 mandando cadastros e uso para o Brain. Quando o PR do mvp-v2 entrar, eu passo a responder isso." };
     return { text: `Funil de hoje: ${f.cadastros} cadastros, ${f.ativados} ativados, ${f.noLimite} no limite de 5 pacientes e ${f.pagantes} pagantes. Os ${f.noLimite} no limite s\xE3o a convers\xE3o mais pr\xF3xima. O Momento de Pagar j\xE1 tem convite pronto para a fila.` };
   }
@@ -1228,8 +1252,8 @@ function respond(input, v) {
     return { text: `${by("conectado").length} integra\xE7\xF5es ligadas, ${by("pronto").length} com credencial pronta esperando o Worker, ${by("manual").length} manual e ${by("pendente").length} pendentes${pendentes ? ` (${pendentes})` : ""}. As que travam mais agentes s\xE3o Plataforma e Supabase.` };
   }
   if (/(custo|gasto|token|\bia\b)/.test(q)) {
-    const dia5 = Object.values(v.runtime).reduce((n3, r) => n3 + r.costBrl, 0);
-    return { text: `Hoje os agentes custaram ${brl(dia5)}. No m\xEAs: ${brl(M.llmSpentMonthBrl)} de ${brl(M.llmCapMonthlyBrl)} de teto, ${Math.round(M.llmSpentMonthBrl / M.llmCapMonthlyBrl * 100)}% usado.` };
+    const dia5 = Object.values(v.runtime).reduce((n4, r) => n4 + r.costBrl, 0);
+    return { text: `Hoje os agentes custaram ${brl(dia5)}. No m\xEAs: ${brl(M2.llmSpentMonthBrl)} de ${brl(M2.llmCapMonthlyBrl)} de teto, ${Math.round(M2.llmSpentMonthBrl / M2.llmCapMonthlyBrl * 100)}% usado.` };
   }
   if (/(fila|aprova|pendente|propost|decis)/.test(q)) {
     if (pending.length === 0) return { text: "Fila vazia. Nada espera por voc\xEA." };
@@ -1243,9 +1267,9 @@ function respond(input, v) {
     return { text: `24 agentes em 5 times (${teams}). Trabalhando agora: ${work.map((a) => a.name).join(", ") || "ningu\xE9m"}. ${paused.length ? `Pausados: ${paused.map((a) => a.name).join(", ")}.` : "Nenhum pausado."}` };
   }
   if (/(o que (aconteceu|rolou|fizeram)|resumo|hoje|enquanto|briefing|novidade)/.test(q)) {
-    const recent = Object.values(v.runtime).reduce((n3, r) => n3 + r.runsToday, 0);
+    const recent = Object.values(v.runtime).reduce((n4, r) => n4 + r.runsToday, 0);
     const alert = pending.filter((p) => p.risk !== "baixo").length;
-    return { text: `Enquanto voc\xEA esteve fora: ${recent} execu\xE7\xF5es dos agentes, MRR em ${brl(M.mrr.total)}, ${pending.length} propostas na fila (${alert} pedem aten\xE7\xE3o).${v.kill ? " O bot\xE3o de emerg\xEAncia est\xE1 ligado." : ""} Abra a aba Hoje para a linha do tempo.` };
+    return { text: `Enquanto voc\xEA esteve fora: ${recent} execu\xE7\xF5es dos agentes, MRR em ${brl(M2.mrr.total)}, ${pending.length} propostas na fila (${alert} pedem aten\xE7\xE3o).${v.kill ? " O bot\xE3o de emerg\xEAncia est\xE1 ligado." : ""} Abra a aba Hoje para a linha do tempo.` };
   }
   return {
     text: 'Posso resumir o dia, mostrar o MRR e o funil, listar a fila, checar integra\xE7\xF5es e custo. Tamb\xE9m executo: "pe\xE7a ao Guardi\xE3o para conciliar a base", "pause a M\xEDdia Paga", "aprove as de baixo risco", "pare tudo".'
@@ -1526,8 +1550,8 @@ function endingDiscounts(rows2, now, windowDays) {
   }
   return out.sort((a, b) => a.days_left - b.days_left);
 }
-function round2(n3) {
-  return Math.round(n3 * 100) / 100;
+function round2(n4) {
+  return Math.round(n4 * 100) / 100;
 }
 
 // packages/core/src/envio.ts
@@ -1643,6 +1667,7 @@ create table if not exists envios (
   detail text,
   at integer not null
 );
+create table if not exists prospect_autonomo (prospect_id integer primary key);
 create table if not exists email_suppression (
   email text primary key,
   reason text not null,
@@ -1769,10 +1794,19 @@ create table if not exists ga_agg (site text not null, tipo text not null, perio
 create table if not exists li_posts (id text primary key, chave text unique, status text not null, categoria text not null, texto text not null, criado_em integer not null, decidido_em integer, publicado_em integer, manual integer not null default 0, urn text, permalink text, erro text);
 create table if not exists li_token (id integer primary key check (id = 1), access_token text not null, refresh_token text, expira_em integer not null, atualizado_em integer not null);
 create table if not exists ig_posts (id text primary key, chave text unique, status text not null, tema text not null, pilar text not null default '', maturidade text not null default 'educativo', legenda text not null, textos text not null default '', creditos text not null default '', agendado_para integer not null, criado_em integer not null, decidido_em integer, publicado_em integer, media_id text, permalink text, erro text);
+create table if not exists ig_progresso (post_id text primary key, filhos text not null default '[]', container text);
+create table if not exists instinct_dia (dia text not null, tipo text not null, abordados integer not null default 0, responderam integer not null default 0, reunioes integer not null default 0, contas integer not null default 0, assinantes integer not null default 0, primary key (dia, tipo));
+create table if not exists instinct_leads (chave text primary key, nome text not null, tipo text not null, cidade text, whatsapp text, primeira text, status text not null, atualizado text);
+create table if not exists instinct_eventos (id integer primary key autoincrement, chave text not null, de text, para text not null, dia text not null);
+create index if not exists instinct_eventos_chave on instinct_eventos (chave);
 create table if not exists ig_midia (id text primary key, post_id text not null, ordem integer not null, b64 text not null);
 create index if not exists ig_midia_post on ig_midia (post_id, ordem);
 create table if not exists plan_itens (id text primary key, semana text not null, tipo text not null, titulo text not null, dia integer, formato text not null default '', responsavel text not null default '', status text not null default 'pendente', pai text, ordem integer not null default 0, notas text not null default '', criado_em integer not null, concluido_em integer, veio_de text);
 create index if not exists plan_semana on plan_itens (semana, ordem);
+create table if not exists usuarios (id text primary key, email text not null unique, nome text not null, hash text not null, papel text not null default 'membro', ativo integer not null default 1, versao integer not null default 1, precisa_trocar integer not null default 1, criado_em integer not null, ultimo_acesso integer);
+create table if not exists plan_links (token text primary key, semana text not null, responsavel text not null default '', criado_em integer not null, revogado integer not null default 0);
+create index if not exists plan_links_semana on plan_links (semana);
+create table if not exists plan_marcas (item_id text primary key, quem text not null, em integer not null);
 create table if not exists prospect_runs (
   id integer primary key autoincrement,
   tipo text not null,
@@ -2983,8 +3017,8 @@ function applyAction(brain2, a, actor = "voce") {
     case "crm":
       throw new BrainError("invalid", "A\xE7\xE3o do CRM roda pela rota ass\xEDncrona.");
     case "approve_low_risk": {
-      const n3 = brain2.approveLowRisk(actor);
-      return `${n3} propostas de baixo risco aprovadas. Nada foi enviado: falta voc\xEA copiar e mandar cada mensagem.`;
+      const n4 = brain2.approveLowRisk(actor);
+      return `${n4} propostas de baixo risco aprovadas. Nada foi enviado: falta voc\xEA copiar e mandar cada mensagem.`;
     }
   }
 }
@@ -3011,16 +3045,64 @@ var isAction = (x) => {
   }
 };
 
+// packages/core/src/email-html.ts
+var VIOLETA = "#8B5CF6";
+var AZUL = "#38BDF8";
+var TINTA = "#1F2937";
+var SUAVE = "#6B7280";
+var FONTE_TITULO = "Poppins, 'Segoe UI', Helvetica, Arial, sans-serif";
+var FONTE_TEXTO = "Lato, 'Segoe UI', Helvetica, Arial, sans-serif";
+var esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var URL_SO = /^https?:\/\/\S+$/;
+var URL_EM = /(https?:\/\/[^\s<]+[^\s<.,;:)!?])/g;
+function rotuloBotao(url) {
+  if (/wa\.me/i.test(url)) return "Falar com o Felipe no WhatsApp";
+  if (/synapsa\.chat\/psicologos/i.test(url)) return "Ver o diret\xF3rio de psic\xF3logos";
+  if (/synapsa\.com\.br\/clinicas/i.test(url)) return "Conhecer a Synapsa para cl\xEDnicas";
+  return "Conhecer a Synapsa";
+}
+var linkar = (t) => esc(t).replace(URL_EM, (u) => `<a href="${u}" style="color:${VIOLETA};text-decoration:underline">${u.replace(/^https?:\/\//, "")}</a>`);
+var botao = (url) => `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:6px 0 18px"><tr><td style="border-radius:999px;background:${VIOLETA}"><a href="${esc(url)}" style="display:inline-block;padding:13px 26px;font:700 15px ${FONTE_TITULO};color:#ffffff;text-decoration:none">${rotuloBotao(url)}</a></td></tr></table>`;
+function emailHtml(corpo2, rodape) {
+  const blocos = corpo2.trim().split(/\n{2,}/);
+  const partes = [];
+  const p = (t) => `<p style="margin:0 0 16px;font:400 16px/1.65 ${FONTE_TEXTO};color:${TINTA}">${t}</p>`;
+  for (const b of blocos) {
+    const linhas = b.split("\n").map((l) => l.trimEnd());
+    if (linhas.every((l) => l.startsWith("- "))) {
+      partes.push(`<ul style="margin:0 0 16px;padding-left:22px;font:400 16px/1.65 ${FONTE_TEXTO};color:${TINTA}">${linhas.map((l) => `<li style="margin:0 0 6px">${linkar(l.slice(2))}</li>`).join("")}</ul>`);
+    } else if (linhas.length === 1 && URL_SO.test(linhas[0])) {
+      partes.push(botao(linhas[0]));
+    } else if (linhas[0].startsWith("Abra\xE7o,")) {
+      const [saudacao, nome, ...marca] = linhas;
+      partes.push(`<p style="margin:22px 0 0;font:400 16px/1.5 ${FONTE_TEXTO};color:${TINTA}">${esc(saudacao)}<br><strong>${esc(nome ?? "")}</strong></p>`);
+      if (marca.length) partes.push(`<p style="margin:4px 0 0;font:600 14px ${FONTE_TITULO};color:${VIOLETA}">${esc(marca.join(" "))}</p>`);
+    } else {
+      partes.push(p(linhas.map(linkar).join("<br>")));
+    }
+  }
+  const pre = esc(corpo2.replace(/\s+/g, " ").slice(0, 110));
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet"></head>
+<body style="margin:0;padding:0;background:#F5F3FF"><span style="display:none;max-height:0;overflow:hidden;opacity:0">${pre}</span>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F5F3FF"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="background:${VIOLETA};background-image:linear-gradient(135deg,${VIOLETA},${AZUL});padding:26px 36px"><div style="font:700 26px ${FONTE_TITULO};color:#ffffff;letter-spacing:-0.3px">Synapsa</div><div style="font:400 13px ${FONTE_TEXTO};color:rgba(255,255,255,0.9);margin-top:2px">Onde a pr\xE1tica evolui.</div></td></tr>
+<tr><td style="padding:34px 36px 12px">${partes.join("")}</td></tr>
+<tr><td style="padding:18px 36px 26px;border-top:1px solid #EDE9FE;font:400 12px/1.6 ${FONTE_TEXTO};color:${SUAVE}">${esc(rodape).replace(/\n/g, "<br>")}</td></tr>
+</table></td></tr></table></body></html>`;
+}
+
 // packages/core/src/dispatch.ts
 var DAY = 864e5;
 function suppress(brain2, email, reason) {
   run(brain2.db, "insert into email_suppression (email, reason, at) values (?, ?, ?) on conflict(email) do update set reason = excluded.reason, at = excluded.at", email.trim().toLowerCase(), reason, brain2.clock());
 }
-var footer = (env, prospeccao = false) => `
+var rodapeLinhas = (env, prospeccao = false, autonomo = false) => `${env.RESEND_SENDER_NAME ?? "Felipe Dalpra"}, Synapsa
+` + (prospeccao ? `${autonomo ? "Escrevi para o contato profissional que voc\xEA divulga publicamente." : "Escrevi para o contato que a sua cl\xEDnica divulga publicamente."} Para n\xE3o receber mais e-mails meus, responda SAIR.` : "Para n\xE3o receber mais e-mails meus, responda SAIR.");
+var footer = (env, prospeccao = false, autonomo = false) => `
 
 --
-${env.RESEND_SENDER_NAME ?? "Felipe Dalpra"}, Synapsa
-` + (prospeccao ? "Escrevi para o contato que a sua cl\xEDnica divulga publicamente. Para n\xE3o receber mais e-mails meus, responda SAIR." : "Para n\xE3o receber mais e-mails meus, responda SAIR.");
+${rodapeLinhas(env, prospeccao, autonomo)}`;
 async function sendEmail(brain2, env, p, f = fetch) {
   const from = p.prospeccao ? env.RESEND_FROM_PROSPECCAO : env.RESEND_FROM;
   if (!env.RESEND_API_KEY || !from) throw new BrainError("invalid", "Falta RESEND_API_KEY e RESEND_FROM nos secrets do Brain.");
@@ -3040,7 +3122,8 @@ async function sendEmail(brain2, env, p, f = fetch) {
       from,
       to: [to],
       subject: p.subject.slice(0, 200),
-      text: p.body + footer(env, p.prospeccao === true),
+      text: p.body + footer(env, p.prospeccao === true, p.autonomo === true),
+      ...p.html ? { html: emailHtml(p.body, rodapeLinhas(env, p.prospeccao === true, p.autonomo === true)) } : {},
       ...replyTo ? { reply_to: replyTo } : {},
       headers: { "List-Unsubscribe": `<mailto:${replyTo ?? "sair@synapsa.chat"}?subject=SAIR>` }
     })
@@ -3089,7 +3172,7 @@ async function sendApproved(brain2, env, proposalId, f = fetch) {
     const hoje = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and e.at > ? and pr.kind like 'prospeccao%'", brain2.clock() - DAY)?.n ?? 0;
     if (hoje >= cap2) throw new BrainError("invalid", `Limite de ${cap2} e-mails de prospec\xE7\xE3o por dia atingido. Ele sobe aos poucos para proteger o dom\xEDnio novo.`);
   }
-  const msg2 = e.tipo === "email" ? await sendEmail(brain2, env, { id: p.id, to: e.para ?? "", subject: e.assunto ?? "", body: p.draft, prospeccao: prosp }, f) : await publishInstagram(brain2, env, { id: p.id, imageUrl: e.imagemUrl ?? "", caption: p.draft }, f);
+  const msg2 = e.tipo === "email" ? await sendEmail(brain2, env, { id: p.id, to: e.para ?? "", subject: e.assunto ?? "", body: p.draft, prospeccao: prosp, autonomo: e.perfil === "autonomo", html: e.html === true }, f) : await publishInstagram(brain2, env, { id: p.id, imageUrl: e.imagemUrl ?? "", caption: p.draft }, f);
   brain2.audit("voce", "enviou", `${e.tipo}:${p.id}`);
   brain2.emit("change");
   return msg2;
@@ -3346,7 +3429,7 @@ async function fetchPixels(version, adAccountId, token) {
   return r.data.map((p) => ({ pixel_id: p.id, nome: p.name ?? p.id, ultimo_disparo: p.last_fired_time ?? null, indisponivel: p.is_unavailable === true }));
 }
 async function fetchPixelEventos(version, pixelId, token, deMs, ateMs) {
-  const soma2 = /* @__PURE__ */ new Map();
+  const soma3 = /* @__PURE__ */ new Map();
   for (let ini = deMs; ini < ateMs; ini += 7 * 864e5) {
     const fim = Math.min(ateMs, ini + 7 * 864e5);
     const r = await graphGet(
@@ -3357,10 +3440,10 @@ async function fetchPixelEventos(version, pixelId, token, deMs, ateMs) {
     );
     for (const b of r.data ?? []) for (const e of b.data ?? []) {
       const k = `${dia(Date.parse(b.start_time))}|${e.value}`;
-      soma2.set(k, (soma2.get(k) ?? 0) + (Number(e.count) || 0));
+      soma3.set(k, (soma3.get(k) ?? 0) + (Number(e.count) || 0));
     }
   }
-  return [...soma2.entries()].map(([k, total]) => {
+  return [...soma3.entries()].map(([k, total]) => {
     const [day, evento] = k.split("|");
     return { day, evento, total };
   });
@@ -3402,9 +3485,570 @@ async function fetchIgDia(version, igId, token, day) {
   return { day, reach, profile_views, link_taps, interacoes };
 }
 
+// packages/core/src/gsc-analise.ts
+var sem = (s2) => s2.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+var LEGAL = /politica|termos|cookies|privacidade|forgot|login|cadastro|entrar/;
+var ACENTOS = { psicologos: "psic\xF3logos", psicologo: "psic\xF3logo", clinicas: "cl\xEDnicas", clinica: "cl\xEDnica", politica: "pol\xEDtica", calculadora: "calculadora", precos: "pre\xE7os", paulo: "paulo", sao: "s\xE3o", brasilia: "bras\xEDlia", goiania: "goi\xE2nia", florianopolis: "florian\xF3polis", belem: "bel\xE9m", vitoria: "vit\xF3ria" };
+var titulo = (slug, acentuar = false) => slug.split("-").filter(Boolean).map((p, i) => {
+  const w = acentuar ? ACENTOS[p] ?? p : p;
+  return ["de", "da", "do", "dos", "das", "e", "para"].includes(p) && i > 0 ? w : w[0].toUpperCase() + w.slice(1);
+}).join(" ");
+function classificarPagina(url) {
+  let caminho = url;
+  try {
+    caminho = new URL(url).pathname;
+  } catch {
+  }
+  caminho = caminho.replace(/\/+$/, "") || "/";
+  const m = caminho.match(/^\/psicologo\/([^/]+)$/);
+  if (m) return { tipo: "perfil", caminho, rotulo: titulo(decodeURIComponent(m[1])) };
+  if (caminho === "/") return { tipo: "home", caminho, rotulo: "P\xE1gina inicial" };
+  if (/^\/psicologos(\/|$)/.test(caminho)) return { tipo: "listagem", caminho, rotulo: caminho === "/psicologos" ? "Lista de psic\xF3logos" : `Lista: ${titulo(caminho.split("/").pop() ?? "", true)}` };
+  if (LEGAL.test(caminho)) return { tipo: "legal", caminho, rotulo: titulo(caminho.split("/").pop() ?? "", true) };
+  if (/\/(clinicas|software-para-psicologos|calculadora|funcionalidades|precos|planos)/.test(caminho)) return { tipo: "produto", caminho, rotulo: titulo(caminho.split("/").pop() ?? "", true) };
+  return { tipo: "outra", caminho, rotulo: titulo(caminho.split("/").pop() ?? "", true) };
+}
+var ROTULO_CATEGORIA = {
+  marca: "Marca (Synapsa e erros de grafia)",
+  concorrente: "Concorrentes",
+  software: "Software e gest\xE3o para psic\xF3logos",
+  psicologo_local: "Psic\xF3logo + cidade",
+  psicologo_tema: "Psic\xF3logo + tema (ansiedade, casal\u2026)",
+  psicologo_geral: "Psic\xF3logo (gen\xE9rica, online, perto de mim)",
+  outra: "Outras"
+};
+var TEMAS = {
+  ansiedade: /ansied|panico|estresse/,
+  depress\u00E3o: /depress|tristeza/,
+  TDAH: /tdah|deficit de atencao/,
+  autismo: /autis|tea\b/,
+  casal: /casal|conjugal|relacionamento/,
+  infantil: /infantil|crianca/,
+  adolescente: /adolescen/,
+  luto: /\bluto\b/,
+  burnout: /burnout|esgotamento/,
+  trauma: /trauma|tept/,
+  TCC: /\btcc\b|cognitivo/,
+  "online": /online|on-line|virtual|\bvideo/,
+  conv\u00EAnio: /convenio|plano de saude|unimed/,
+  "pre\xE7o/social": /valor|preco|barato|gratuit|social|quanto custa/
+};
+var CAPITAIS = ["S\xE3o Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre", "Curitiba", "Bras\xEDlia", "Salvador", "Fortaleza", "Recife", "Goi\xE2nia", "Florian\xF3polis", "Campinas", "Manaus", "Bel\xE9m", "Vit\xF3ria"];
+var SIGLA_CIDADE = { bh: "belo horizonte", sp: "s\xE3o paulo", rj: "rio de janeiro", poa: "porto alegre", bsb: "bras\xEDlia", cwb: "curitiba" };
+var CIDADES_N = new Map(CAPITAIS.map((c2) => [sem(c2), c2]));
+var MARCA_EXTRA = /* @__PURE__ */ new Set(["sicpsa", "napsaicare", "psynaps", "synapsa", "sinapsa"]);
+var CONCORRENTES = /consultapsi|zenklub|psicoplanner|psicomanager|amigopsi|vittude|psicologia viva|scippa|simplepractice|tangerino/;
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j2 = 1; j2 <= b.length; j2++) d[0][j2] = j2;
+  for (let i = 1; i <= a.length; i++) for (let j2 = 1; j2 <= b.length; j2++) d[i][j2] = Math.min(d[i - 1][j2] + 1, d[i][j2 - 1] + 1, d[i - 1][j2 - 1] + (a[i - 1] === b[j2 - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+var NAO_E_MARCA = /* @__PURE__ */ new Set(["sinapse", "sinapses", "sinapsis", "synapse", "synapses"]);
+var ehMarca = (q) => sem(q).split(/\s+/).some((t) => t.length >= 5 && !NAO_E_MARCA.has(t) && (MARCA_EXTRA.has(t) || lev(t, "synapsa") <= (t.length >= 6 && "sp".includes(t[0]) ? 3 : 2)));
+function classificarBusca(busca) {
+  const q = sem(busca);
+  if (ehMarca(busca)) return { categoria: "marca" };
+  if (CONCORRENTES.test(q)) return { categoria: "concorrente" };
+  const psi = /psicolog|terapeuta|terapia|tratamento|atendimento|consulta/.test(q);
+  const softwareTipo = sem(q).split(/\s+/).some((t) => t.length >= 5 && lev(t, "software") <= 2);
+  const tema = Object.entries(TEMAS).find(([, re]) => re.test(q))?.[0];
+  if (softwareTipo && !psi) return { categoria: "software" };
+  if (/(software|sistema|programa|plataforma|app|aplicativo|prontuario|agenda|gestao|gerenciar|controle financeiro|planejamento financeiro|clinica de psicologia)/.test(q) && (psi || /clinica/.test(q))) return { categoria: "software" };
+  if (!psi) return { categoria: "outra" };
+  let cidade;
+  for (const [n4, c2] of CIDADES_N) if (new RegExp(`\\b${n4}\\b`).test(q)) cidade = c2;
+  if (!cidade) {
+    for (const [s2, c2] of Object.entries(SIGLA_CIDADE)) if (new RegExp(`\\b${s2}\\b`).test(q)) cidade = CIDADES_N.get(c2) ?? titulo(c2.replace(/ /g, "-"));
+  }
+  if (!cidade) {
+    const resto = q.replace(/psic[a-z]*|terapeuta[s]?|terapia/g, " ").replace(/\b(em|de|do|da|no|na|para|pra|com|e|a|o|perto|mim|proximo|online|melhor|melhores|bom|boa|tratamento|atendimento|consulta)\b/g, " ").replace(new RegExp(`\\w*(?:${Object.values(TEMAS).map((r) => r.source).join("|")})\\w*`, "g"), " ").replace(/\s+/g, " ").trim();
+    if (resto && !/^(associados|clinica|consultorio|centro|instituto|especialista|especializado|especializada|tratamento|perto|proximo)$/.test(resto) && resto.split(" ").length <= 3 && !Object.values(TEMAS).some((r) => r.test(resto))) cidade = titulo(resto.replace(/ /g, "-"));
+  }
+  if (cidade) return { categoria: "psicologo_local", cidade, tema };
+  if (tema && tema !== "online") return { categoria: "psicologo_tema", tema };
+  return { categoria: "psicologo_geral", tema };
+}
+var somar = (a) => {
+  const clicks = a.reduce((t, x) => t + x.clicks, 0), impressions = a.reduce((t, x) => t + x.impressions, 0);
+  return { clicks, impressions, ctr: impressions ? clicks / impressions : 0, position: impressions ? a.reduce((t, x) => t + x.position * x.impressions, 0) / impressions : 0 };
+};
+function porCategoria(qs) {
+  const g = /* @__PURE__ */ new Map();
+  for (const q of qs) {
+    const c2 = classificarBusca(q.chave).categoria;
+    g.set(c2, [...g.get(c2) ?? [], q]);
+  }
+  return [...g].map(([categoria2, l]) => ({ categoria: categoria2, rotulo: ROTULO_CATEGORIA[categoria2], buscas: l.length, ...somar(l) })).sort((a, b) => b.impressions - a.impressions);
+}
+function cobertura(qs) {
+  const cid = /* @__PURE__ */ new Map(), tem = /* @__PURE__ */ new Map();
+  for (const c2 of CAPITAIS) cid.set(c2, []);
+  for (const t of Object.keys(TEMAS)) tem.set(t, []);
+  for (const q of qs) {
+    const i = classificarBusca(q.chave);
+    if (i.cidade) cid.set(i.cidade, [...cid.get(i.cidade) ?? [], q]);
+    if (i.tema && i.categoria !== "marca") tem.set(i.tema, [...tem.get(i.tema) ?? [], q]);
+  }
+  const monta = (m) => [...m].map(([nome, l]) => ({ nome, buscas: l.length, melhor: l.length ? [...l].sort((a, b) => a.position - b.position)[0].chave : null, ...somar(l) })).sort((a, b) => b.impressions - a.impressions || b.buscas - a.buscas || a.nome.localeCompare(b.nome));
+  return { cidades: monta(cid), temas: monta(tem) };
+}
+function oportunidades(qs, paginaDaBusca = /* @__PURE__ */ new Map()) {
+  return qs.filter((q) => classificarBusca(q.chave).categoria !== "marca" && q.impressions >= 3 && q.ctr < 0.05 && q.position >= 3).map((q) => {
+    const info = classificarBusca(q.chave);
+    const pagina = paginaDaBusca.get(q.chave);
+    const onde = pagina ? ` (hoje aparece com ${pagina.replace(/^https?:\/\/(www\.)?/, "")})` : "";
+    let acao;
+    if (q.position <= 10) acao = `Primeira p\xE1gina, mas sem clique${onde}: reescreva t\xEDtulo e descri\xE7\xE3o para pedir o clique.`;
+    else if (q.position <= 20) acao = `Segunda p\xE1gina${onde}: reforce o conte\xFAdo da p\xE1gina e ponha links internos apontando para ela com essa busca no texto.`;
+    else if (pagina && classificarPagina(pagina).tipo === "listagem" && classificarPagina(pagina).caminho !== "/psicologos") acao = `A p\xE1gina da lista (${classificarPagina(pagina).caminho}) j\xE1 existe, mas est\xE1 na posi\xE7\xE3o ${Math.round(q.position)}: reforce o texto da p\xE1gina, os perfis listados e os links internos para ela.`;
+    else if (info.categoria === "psicologo_local") acao = `Fora do alcance${onde}: falta uma p\xE1gina que responda a essa cidade (lista de psic\xF3logos de ${info.cidade ?? "l\xE1"} ou perfis com a cidade no t\xEDtulo).`;
+    else acao = `Longe do topo${onde}: precisa de p\xE1gina pr\xF3pria para esse assunto.`;
+    return { ...q, acao, categoria: info.categoria, pagina };
+  }).sort((a, b) => b.impressions * (b.position <= 20 ? 2 : 1) - a.impressions * (a.position <= 20 ? 2 : 1) || b.impressions - a.impressions).slice(0, 15);
+}
+var n = (x) => Math.round(x).toLocaleString("pt-BR");
+function recados(e) {
+  const r = [];
+  if (e.atual.impressions === 0) return ["Ainda sem impress\xF5es nesse per\xEDodo."];
+  const visiveis = e.marca.clicks + e.naoMarca.clicks;
+  const shareMarca = visiveis ? e.marca.clicks / visiveis : 0;
+  if (e.tipoSite === "site") {
+    if (visiveis >= 5) r.push(`Dos ${n(e.atual.clicks)} cliques, o Google detalha a busca de ${n(visiveis)}; ${Math.round(shareMarca * 100)}% deles (${n(e.marca.clicks)}) v\xEAm de gente que j\xE1 procurou "Synapsa" pelo nome. Quem busca por necessidade (software, gest\xE3o, programa para psic\xF3logos) trouxe ${n(e.naoMarca.clicks)} cliques em ${n(e.naoMarca.impressions)} impress\xF5es. Para crescer, o ganho est\xE1 a\xED.`);
+    const soft = e.categorias.find((c2) => c2.categoria === "software");
+    if (soft && soft.impressions >= 5) r.push(`Buscas de software para psic\xF3logos: ${n(soft.impressions)} impress\xF5es, posi\xE7\xE3o m\xE9dia ${soft.position.toFixed(1)} e ${n(soft.clicks)} cliques. \xC9 o p\xFAblico que compra; vale uma p\xE1gina por inten\xE7\xE3o ("software para psic\xF3logos", "gest\xE3o financeira para psic\xF3logos", "prontu\xE1rio").`);
+  } else if (e.perfis) {
+    const p = e.perfis;
+    r.push(`${n(p.comImpressao)} perfis apareceram no Google, ${n(p.comClique)} receberam clique${p.semImpressao.length ? ` e ${n(p.semImpressao.length)} ainda n\xE3o apareceram em nenhuma busca` : ""}.`);
+    if (e.naoMarca.impressions) r.push(`Buscas por psic\xF3logo (sem contar a marca): ${n(e.naoMarca.impressions)} impress\xF5es, posi\xE7\xE3o m\xE9dia ${e.naoMarca.position.toFixed(0)}. Acima da posi\xE7\xE3o 10 quase ningu\xE9m clica; o diret\xF3rio ainda est\xE1 fora da disputa por "psic\xF3logo em <cidade>".`);
+  }
+  const lacunas = e.cobertura.cidades.filter((c2) => c2.impressions === 0).slice(0, 5).map((c2) => c2.nome);
+  if (e.tipoSite === "diretorio" && lacunas.length) r.push(`Capitais sem nenhuma presen\xE7a nas buscas: ${lacunas.join(", ")}. Priorize as cidades onde voc\xEA j\xE1 tem psic\xF3logos cadastrados.`);
+  const top = e.ops[0];
+  if (top) r.push(`Maior oportunidade: "${top.chave}" (${n(top.impressions)} impress\xF5es, posi\xE7\xE3o ${top.position.toFixed(0)}). ${top.acao}`);
+  const grafias = e.categorias.find((c2) => c2.categoria === "marca");
+  if (grafias && grafias.buscas >= 4) r.push(`A marca \xE9 buscada de ${n(grafias.buscas)} jeitos diferentes (sinapsa, psynaps, sanapsy\u2026). Vale garantir "Synapsa" no t\xEDtulo e no texto das p\xE1ginas principais e ter um perfil no Google Meu Neg\xF3cio.`);
+  return r;
+}
+
+// packages/core/src/gsc.ts
+var DAY2 = 864e5;
+var ESCOPO = "https://www.googleapis.com/auth/webmasters.readonly";
+var SITES_PADRAO = [
+  { id: "site", rotulo: "synapsa.com.br", siteUrl: "sc-domain:synapsa.com.br", tipo: "site" },
+  // O diretório vive em www.synapsa.chat/psicologos (lista) e /psicologo/<nome> (perfil). A home do synapsa.chat entra junto: é onde a marca é buscada.
+  { id: "diretorio", rotulo: "Diret\xF3rio de psic\xF3logos (synapsa.chat)", siteUrl: "sc-domain:synapsa.chat", tipo: "diretorio", sitemap: "https://www.synapsa.chat/sitemap.xml" }
+];
+var sitesGsc = (brain2) => {
+  const p = brain2.policy("gsc_sites", null);
+  return Array.isArray(p) && p.length ? p : SITES_PADRAO;
+};
+function lerChave(env) {
+  const raw = env.GSC_SERVICE_ACCOUNT?.trim();
+  if (!raw) return null;
+  try {
+    const j2 = JSON.parse(raw);
+    return j2.client_email && j2.private_key ? j2 : null;
+  } catch {
+    return null;
+  }
+}
+var b64url = (b) => {
+  const u = typeof b === "string" ? new TextEncoder().encode(b) : b instanceof Uint8Array ? b : new Uint8Array(b);
+  let s2 = "";
+  for (const x of u) s2 += String.fromCharCode(x);
+  return btoa(s2).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+var cache = /* @__PURE__ */ new Map();
+async function tokenGoogle(chave3, agora, f = fetch, escopo = ESCOPO) {
+  const guardado2 = cache.get(escopo);
+  if (guardado2 && guardado2.ate > agora + 6e4) return guardado2.token;
+  const iat = Math.floor(agora / 1e3);
+  const aud = chave3.token_uri ?? "https://oauth2.googleapis.com/token";
+  const corpo2 = `${b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64url(JSON.stringify({ iss: chave3.client_email, scope: escopo, aud, iat, exp: iat + 3600 }))}`;
+  const pem = chave3.private_key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, "");
+  const der = Uint8Array.from(atob(pem), (c2) => c2.charCodeAt(0));
+  const k = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", k, new TextEncoder().encode(corpo2));
+  const r = await f(aud, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${corpo2}.${b64url(sig)}` }) });
+  const j2 = await r.json().catch(() => ({}));
+  if (!r.ok || !j2.access_token) throw new BrainError("integration", `Google recusou a chave da conta de servi\xE7o: ${j2.error_description ?? r.status}`);
+  cache.set(escopo, { token: j2.access_token, ate: agora + (j2.expires_in ?? 3600) * 1e3 });
+  return j2.access_token;
+}
+async function consultar(token, site, body, f) {
+  const filtro = site.pagina ? { dimensionFilterGroups: [{ filters: [{ dimension: "page", operator: "contains", expression: site.pagina }] }] } : {};
+  const todas = [];
+  for (let startRow = 0; startRow < 1e5; startRow += 25e3) {
+    const r = await f(`https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site.siteUrl)}/searchAnalytics/query`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ rowLimit: 25e3, ...body, ...filtro, startRow, dataState: "final" })
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new BrainError("integration", r.status === 403 ? `Sem acesso a ${site.siteUrl}: adicione o e-mail da conta de servi\xE7o como usu\xE1rio dessa propriedade no Search Console.` : `Search Console (${site.siteUrl}): ${e.error?.message ?? r.status}`);
+    }
+    const pg = (await r.json()).rows ?? [];
+    todas.push(...pg);
+    if (pg.length < 25e3 || typeof body.rowLimit === "number") break;
+  }
+  return todas;
+}
+var dia2 = (ms2) => brtDay(ms2);
+var SEM_FILTRO_PAGINA = "";
+async function lerSitemap(url, f, nivel = 0) {
+  const r = await f(url, { headers: { "user-agent": "SynapsaBrain/1.0" } });
+  if (!r.ok) return [];
+  const xml = await r.text();
+  const locs = [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1].replace(/&amp;/g, "&"));
+  if (/<sitemapindex/i.test(xml) && nivel < 2) return (await Promise.all(locs.slice(0, 8).map((u) => lerSitemap(u, f, nivel + 1).catch(() => [])))).flat();
+  return locs;
+}
+async function sincronizarGsc(brain2, env, f = fetch, opt = {}) {
+  const chave3 = lerChave(env);
+  if (!chave3) return "Search Console n\xE3o configurado (falta o segredo GSC_SERVICE_ACCOUNT).";
+  const agora = brain2.clock();
+  const hoje = dia2(agora);
+  if (!opt.forcar && brain2.policy("gsc_ultima_sync", "") === hoje) return "Search Console j\xE1 sincronizado hoje.";
+  const token = await tokenGoogle(chave3, agora, f);
+  const fim = dia2(agora - 2 * DAY2);
+  const fimMs = Date.parse(`${fim}T12:00:00Z`);
+  const janela = { atual: [dia2(fimMs - 27 * DAY2), fim], anterior: [dia2(fimMs - 55 * DAY2), dia2(fimMs - 28 * DAY2)] };
+  const falhas = [];
+  let linhas = 0;
+  for (const s2 of sitesGsc(brain2)) {
+    try {
+      const ult = row(brain2.db, "select max(dia) as d from gsc_dia where site = ?", s2.id)?.d;
+      const ini = ult ? dia2(Date.parse(`${ult}T12:00:00Z`) - 4 * DAY2) : dia2(agora - 90 * DAY2);
+      const diario = await consultar(token, s2, { startDate: ini, endDate: fim, dimensions: ["date"], rowLimit: 500 }, f);
+      const ultP = row(brain2.db, "select max(dia) as d from gsc_pagina_dia where site = ?", s2.id)?.d;
+      const iniP = ultP ? dia2(Date.parse(`${ultP}T12:00:00Z`) - 4 * DAY2) : dia2(agora - 90 * DAY2);
+      const porPagina = await consultar(token, s2, { startDate: iniP, endDate: fim, dimensions: ["date", "page"] }, f);
+      const agg = [];
+      for (const periodo of ["atual", "anterior"]) {
+        const [startDate, endDate] = janela[periodo];
+        for (const dim of ["query", "page", "device", "country"])
+          for (const r of await consultar(token, s2, { startDate, endDate, dimensions: [dim], rowLimit: dim === "query" || dim === "page" ? 1e3 : 50 }, f)) agg.push({ tipo: dim, periodo, k1: r.keys[0], k2: SEM_FILTRO_PAGINA, r });
+      }
+      for (const r of await consultar(token, s2, { startDate: janela.atual[0], endDate: janela.atual[1], dimensions: ["page", "query"], rowLimit: 5e3 }, f)) agg.push({ tipo: "page_query", periodo: "atual", k1: r.keys[0], k2: r.keys[1], r });
+      let perfis = null;
+      if (s2.sitemap) perfis = (await lerSitemap(s2.sitemap, f).catch(() => [])).filter((u) => classificarPagina(u).tipo === "perfil");
+      for (const r of diario) {
+        run(brain2.db, "insert into gsc_dia (site, dia, clicks, impressions, ctr, position) values (?, ?, ?, ?, ?, ?) on conflict(site, dia) do update set clicks = excluded.clicks, impressions = excluded.impressions, ctr = excluded.ctr, position = excluded.position", s2.id, r.keys[0], r.clicks, r.impressions, r.ctr, r.position);
+        linhas++;
+      }
+      for (const r of porPagina) run(brain2.db, "insert into gsc_pagina_dia (site, pagina, dia, clicks, impressions, position) values (?, ?, ?, ?, ?, ?) on conflict(site, pagina, dia) do update set clicks = excluded.clicks, impressions = excluded.impressions, position = excluded.position", s2.id, r.keys[1], r.keys[0], r.clicks, r.impressions, r.position);
+      run(brain2.db, "delete from gsc_agg where site = ?", s2.id);
+      for (const a of agg) run(brain2.db, "insert or replace into gsc_agg (site, tipo, periodo, chave, chave2, clicks, impressions, ctr, position) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", s2.id, a.tipo, a.periodo, a.k1, a.k2, a.r.clicks, a.r.impressions, a.r.ctr, a.r.position);
+      if (perfis && perfis.length) brain2.setPolicy(`gsc_perfis_${s2.id}`, perfis);
+    } catch (e) {
+      falhas.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  if (falhas.length === 0) brain2.setPolicy("gsc_ultima_sync", hoje);
+  else brain2.setPolicy("gsc_ultimo_erro", falhas.join(" | ").slice(0, 400));
+  if (falhas.length === 0) brain2.setPolicy("gsc_ultimo_erro", null);
+  brain2.audit("sistema", "gsc_sincronizou", `${linhas} dias`, { falhas: falhas.length });
+  brain2.emit("change");
+  return falhas.length ? `Search Console com problema: ${falhas.join(" | ")}` : `Search Console sincronizado (${linhas} dias atualizados).`;
+}
+var soma = (a) => {
+  const clicks = a.reduce((t, x) => t + x.clicks, 0), impressions = a.reduce((t, x) => t + x.impressions, 0);
+  return { clicks, impressions, ctr: impressions ? clicks / impressions : 0, position: impressions ? a.reduce((t, x) => t + x.position * x.impressions, 0) / impressions : 0 };
+};
+function gscPainel(brain2, env) {
+  const sites = sitesGsc(brain2).map((s2) => {
+    const tipoSite = s2.tipo ?? (s2.id === "diretorio" ? "diretorio" : "site");
+    const dias = rows(brain2.db, "select dia, clicks, impressions, ctr, position from gsc_dia where site = ? order by dia desc limit 90", s2.id).reverse();
+    const ult = dias.slice(-28), ant = dias.slice(-56, -28);
+    const agg = rows(brain2.db, "select tipo, periodo, chave, chave2, clicks, impressions, ctr, position from gsc_agg where site = ?", s2.id);
+    const de = (tipo, periodo) => agg.filter((a) => a.tipo === tipo && a.periodo === periodo);
+    const antQ = new Map(de("query", "anterior").map((a) => [a.chave, a]));
+    const antP = new Map(de("page", "anterior").map((a) => [a.chave, a]));
+    const qAtual = de("query", "atual").map((a) => ({ chave: a.chave, clicks: a.clicks, impressions: a.impressions, ctr: a.ctr, position: a.position }));
+    const pq = de("page_query", "atual");
+    const paginaDaBusca = /* @__PURE__ */ new Map();
+    for (const a of [...pq].sort((x, y) => y.impressions - x.impressions)) if (!paginaDaBusca.has(a.chave2)) paginaDaBusca.set(a.chave2, a.chave);
+    const queries = [...qAtual].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 300).map((q) => {
+      const i = classificarBusca(q.chave);
+      const a = antQ.get(q.chave);
+      return { ...q, anterior: { clicks: a?.clicks ?? 0, impressions: a?.impressions ?? 0 }, categoria: i.categoria, cidade: i.cidade, tema: i.tema };
+    });
+    const marcaQ = qAtual.filter((q) => ehMarca(q.chave)), naoQ = qAtual.filter((q) => !ehMarca(q.chave));
+    const marca = soma(marcaQ), naoMarca = soma(naoQ);
+    const categorias = porCategoria(qAtual);
+    const cob = cobertura(qAtual);
+    const ops = oportunidades(qAtual, paginaDaBusca);
+    const serieP = /* @__PURE__ */ new Map();
+    const iniSerie = dias.length ? dia2(Date.parse(`${dias[dias.length - 1].dia}T12:00:00Z`) - 27 * DAY2) : "0000-00-00";
+    for (const r of rows(brain2.db, "select pagina, dia, clicks, impressions from gsc_pagina_dia where site = ? and dia >= ?", s2.id, iniSerie)) {
+      const m = serieP.get(r.pagina) ?? /* @__PURE__ */ new Map();
+      m.set(r.dia, { clicks: r.clicks, impressions: r.impressions });
+      serieP.set(r.pagina, m);
+    }
+    const diasJanela = dias.length ? Array.from({ length: 28 }, (_, i) => dia2(Date.parse(`${iniSerie}T12:00:00Z`) + i * DAY2)) : [];
+    const buscasPorPagina = /* @__PURE__ */ new Map();
+    for (const a of pq) buscasPorPagina.set(a.chave, [...buscasPorPagina.get(a.chave) ?? [], { busca: a.chave2, clicks: a.clicks, impressions: a.impressions, position: a.position }]);
+    const paginas = de("page", "atual").sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 400).map((a) => {
+      const info = classificarPagina(a.chave);
+      const m = serieP.get(a.chave);
+      const p = antP.get(a.chave);
+      return {
+        url: a.chave,
+        ...info,
+        clicks: a.clicks,
+        impressions: a.impressions,
+        ctr: a.ctr,
+        position: a.position,
+        anterior: { clicks: p?.clicks ?? 0, impressions: p?.impressions ?? 0 },
+        serie: diasJanela.map((d) => ({ dia: d, ...m?.get(d) ?? { clicks: 0, impressions: 0 } })),
+        buscas: (buscasPorPagina.get(a.chave) ?? []).sort((x, y) => y.impressions - x.impressions).slice(0, 8),
+        status: a.clicks > 0 ? "clique" : "visto"
+      };
+    });
+    let perfis = null;
+    if (tipoSite === "diretorio") {
+      const vistos = paginas.filter((p) => p.tipo === "perfil");
+      const mapa = brain2.policy(`gsc_perfis_${s2.id}`, null);
+      const caminhosVistos = new Set(vistos.map((p) => p.caminho));
+      const sem2 = (mapa ?? []).map((u) => classificarPagina(u)).filter((i) => !caminhosVistos.has(i.caminho));
+      const unicos = [...new Map(sem2.map((i) => [i.caminho, i])).values()].sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+      perfis = { total: vistos.length + (mapa ? unicos.length : 0), esperados: mapa ? new Set(mapa.map((u) => classificarPagina(u).caminho)).size : null, comImpressao: vistos.length, comClique: vistos.filter((p) => p.clicks > 0).length, semImpressao: unicos.map((i) => ({ url: i.caminho, nome: i.rotulo })) };
+    }
+    const atual = soma(ult.map((x) => ({ ...x })));
+    const base = {
+      id: s2.id,
+      rotulo: s2.rotulo,
+      siteUrl: s2.siteUrl,
+      tipo: tipoSite,
+      ultimoDia: dias.at(-1)?.dia ?? null,
+      serie: dias.map((x) => ({ dia: x.dia, clicks: x.clicks, impressions: x.impressions, position: x.position })),
+      atual,
+      anterior: soma(ant.map((x) => ({ ...x }))),
+      marca,
+      naoMarca,
+      queries,
+      paginas,
+      oportunidades: ops,
+      categorias,
+      cobertura: cob,
+      dispositivos: de("device", "atual").map((a) => ({ chave: a.chave, clicks: a.clicks, impressions: a.impressions, ctr: a.ctr, position: a.position })).sort((a, b) => b.impressions - a.impressions),
+      paises: de("country", "atual").map((a) => ({ chave: a.chave, clicks: a.clicks, impressions: a.impressions, ctr: a.ctr, position: a.position })).sort((a, b) => b.impressions - a.impressions).slice(0, 12),
+      recados: [],
+      perfis
+    };
+    base.recados = recados({ rotuloSite: s2.rotulo, tipoSite, atual, marca, naoMarca, categorias, ops, cobertura: cob, perfis: perfis ? { total: perfis.total, esperados: perfis.esperados, comImpressao: perfis.comImpressao, comClique: perfis.comClique, semImpressao: [] } : void 0 });
+    return base;
+  });
+  const cl = row(brain2.db, "select sum(clicks) as c, sum(impressions) as i from gsc_agg where site = 'site' and tipo = 'page' and periodo = 'atual' and chave like '%/clinicas%'");
+  return {
+    configurado: !!lerChave(env),
+    ultimoErro: brain2.policy("gsc_ultimo_erro", null),
+    ultimaSync: brain2.policy("gsc_ultima_sync", null),
+    sites,
+    clinicas: cl && cl.i != null ? { clicks: cl.c ?? 0, impressions: cl.i } : null,
+    funil: null
+  };
+}
+async function gscPainelCompleto(brain2, env, f = fetch) {
+  const p = gscPainel(brain2, env);
+  const site = p.sites.find((s2) => s2.tipo === "site");
+  const c2 = crmClient(env, f);
+  if (!site || !c2 || !site.ultimoDia) return p;
+  try {
+    const fim = Date.parse(`${site.ultimoDia}T23:59:59-03:00`), ini = fim - 28 * DAY2;
+    const leads = (await c2.all("/leads", {}, 5)).data.filter((l) => {
+      const t = Date.parse(String(l.created_at));
+      return t >= ini && t <= fim;
+    });
+    p.funil = {
+      periodo: `${dia2(ini)} a ${site.ultimoDia}`,
+      cliquesGoogle: site.atual.clicks,
+      leads: leads.length,
+      leadsGoogle: leads.filter((l) => ["google", "landing_page"].includes(String(l.origin))).length,
+      clientes: leads.filter((l) => l.status === "cliente_ativo").length
+    };
+  } catch {
+  }
+  return p;
+}
+
+// packages/core/src/instinct.ts
+var ESCOPO_LER = "https://www.googleapis.com/auth/spreadsheets.readonly";
+var ESCOPO_ESCREVER = "https://www.googleapis.com/auth/spreadsheets";
+var PLANILHA_PADRAO = "1qS7vSVuU-5mLeo9E5hqfvIipZ_T3N1X0D0EOXFEKIeo";
+var COLUNAS_DIA = ["Data", "Tipo", "Abordados", "Responderam", "Reuni\xF5es marcadas", "Viraram conta gratuita", "Viraram assinante"];
+var COLUNAS_LEADS = ["Nome", "Tipo", "Cidade", "WhatsApp", "Primeira abordagem", "Status", "Atualizado em"];
+var planilhaId = (brain2) => {
+  const p = brain2.policy("instinct_planilha", {}).id;
+  return typeof p === "string" && p ? p : PLANILHA_PADRAO;
+};
+var extrairId = (txt) => /\/d\/([\w-]{20,})/.exec(txt)?.[1] ?? (/^[\w-]{20,}$/.test(txt.trim()) ? txt.trim() : null);
+var n2 = (v) => {
+  const x = Number(String(v ?? "").replace(/\./g, "").replace(",", ".").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(x) ? x : 0;
+};
+function dataIso(v) {
+  const s2 = String(v ?? "").trim();
+  let m = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/.exec(s2);
+  if (m) return `${m[3].length === 2 ? "20" + m[3] : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s2);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+var tipoDe = (v) => {
+  const s2 = String(v ?? "").toLowerCase();
+  return /cl[ií]nic/.test(s2) ? "clinica" : /influenc/.test(s2) ? "influenciadora" : null;
+};
+function statusDe(v) {
+  const s2 = String(v ?? "").toLowerCase().trim();
+  if (!s2) return null;
+  if (/assin/.test(s2)) return "assinante";
+  if (/conta|gratu|cadastr/.test(s2)) return "conta gratuita";
+  if (/reuni|demo|marcad/.test(s2)) return "reuniao";
+  if (/respond|retorn/.test(s2)) return "respondeu";
+  if (/sem interesse|recus|n[aã]o quer|descart|sair|bloque/.test(s2)) return "sem interesse";
+  return /abord|enviad|cont[ae]t/.test(s2) ? "abordado" : "abordado";
+}
+function interpretar(dia5, leads) {
+  let ignoradas = 0;
+  const dias = [];
+  for (const r of dia5) {
+    if (!r.some((c2) => String(c2 ?? "").trim())) continue;
+    const d = dataIso(r[0]), t = tipoDe(r[1]);
+    if (!d || !t) {
+      ignoradas++;
+      continue;
+    }
+    dias.push({ dia: d, tipo: t, abordados: n2(r[2]), responderam: n2(r[3]), reunioes: n2(r[4]), contas: n2(r[5]), assinantes: n2(r[6]) });
+  }
+  const vistos = /* @__PURE__ */ new Map();
+  for (const r of leads) {
+    if (!r.some((c2) => String(c2 ?? "").trim())) continue;
+    const nome = String(r[0] ?? "").trim(), t = tipoDe(r[1]), st = statusDe(r[5]);
+    if (!nome || !t || !st) {
+      ignoradas++;
+      continue;
+    }
+    const whats = String(r[3] ?? "").replace(/\D/g, "").replace(/^55(\d{10,11})$/, "$1");
+    const chave3 = whats.length >= 10 ? whats : `${t}:${nome.toLowerCase()}`;
+    vistos.set(chave3, { chave: chave3, nome: nome.slice(0, 120), tipo: t, cidade: String(r[2] ?? "").trim().slice(0, 60), whatsapp: whats, primeira: dataIso(r[4]), status: st, atualizado: dataIso(r[6]) });
+  }
+  return { dias, leads: [...vistos.values()], ignoradas };
+}
+async function chamar(env, f, escopo, url, init = {}) {
+  const chave3 = lerChave(env);
+  if (!chave3) throw new BrainError("invalid", "Falta a conta de servi\xE7o do Google (GSC_SERVICE_ACCOUNT).");
+  const tk = await tokenGoogle(chave3, Date.now(), f, escopo);
+  const r = await f(url, { ...init, headers: { authorization: `Bearer ${tk}`, "content-type": "application/json", ...init.headers ?? {} } });
+  const j2 = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (r.status === 403 || r.status === 404) throw new BrainError("integration", `Sem acesso \xE0 planilha: compartilhe com ${chave3.client_email} (editor) e ligue a API do Google Sheets no projeto da conta de servi\xE7o. ${j2.error?.message ?? ""}`.trim());
+    throw new BrainError("integration", `Google Sheets: ${j2.error?.message ?? r.status}`);
+  }
+  return j2;
+}
+async function preparar(brain2, env, f = fetch) {
+  const id = planilhaId(brain2);
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${id}`;
+  const meta = await chamar(env, f, ESCOPO_ESCREVER, `${base}?fields=sheets.properties`);
+  const abas = (meta.sheets ?? []).map((s2) => s2.properties);
+  const reqs = [];
+  if (!abas.some((a) => a.title === "Dia")) {
+    if (abas.length === 1 && /^(sheet1|planilha1|p[aá]gina1)$/i.test(abas[0].title)) reqs.push({ updateSheetProperties: { properties: { sheetId: abas[0].sheetId, title: "Dia", gridProperties: { frozenRowCount: 1 } }, fields: "title,gridProperties.frozenRowCount" } });
+    else reqs.push({ addSheet: { properties: { title: "Dia", gridProperties: { frozenRowCount: 1 } } } });
+  }
+  if (!abas.some((a) => a.title === "Leads")) reqs.push({ addSheet: { properties: { title: "Leads", gridProperties: { frozenRowCount: 1 } } } });
+  if (reqs.length) await chamar(env, f, ESCOPO_ESCREVER, `${base}:batchUpdate`, { method: "POST", body: JSON.stringify({ requests: reqs }) });
+  await chamar(env, f, ESCOPO_ESCREVER, `${base}/values:batchUpdate`, { method: "POST", body: JSON.stringify({ valueInputOption: "RAW", data: [{ range: "Dia!A1:G1", values: [COLUNAS_DIA] }, { range: "Leads!A1:G1", values: [COLUNAS_LEADS] }] }) });
+  brain2.audit("sistema", "instinct_planilha_preparada", id);
+  return "Abas Dia e Leads prontas.";
+}
+async function sincronizar(brain2, env, f = fetch) {
+  const id = planilhaId(brain2);
+  try {
+    const j2 = await chamar(env, f, ESCOPO_LER, `https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchGet?ranges=${encodeURIComponent("Dia!A2:G")}&ranges=${encodeURIComponent("Leads!A2:G")}&valueRenderOption=FORMATTED_VALUE`);
+    const [d, l] = j2.valueRanges ?? [];
+    const { dias, leads, ignoradas } = interpretar(d?.values ?? [], l?.values ?? []);
+    const antes = new Map(rows(brain2.db, "select chave, status from instinct_leads").map((x) => [x.chave, x.status]));
+    const hoje = brtDay(brain2.clock());
+    run(brain2.db, "delete from instinct_dia");
+    run(brain2.db, "delete from instinct_leads");
+    for (const x of dias) run(brain2.db, "insert or replace into instinct_dia (dia, tipo, abordados, responderam, reunioes, contas, assinantes) values (?, ?, ?, ?, ?, ?, ?)", x.dia, x.tipo, x.abordados, x.responderam, x.reunioes, x.contas, x.assinantes);
+    for (const x of leads) run(brain2.db, "insert or replace into instinct_leads (chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado) values (?, ?, ?, ?, ?, ?, ?, ?)", x.chave, x.nome, x.tipo, x.cidade, x.whatsapp, x.primeira, x.status, x.atualizado);
+    for (const x of leads) {
+      const ant = antes.get(x.chave);
+      if (ant === x.status) continue;
+      if (ant === void 0 && x.status !== "abordado" && x.primeira) run(brain2.db, "insert into instinct_eventos (chave, de, para, dia) values (?, null, 'abordado', ?)", x.chave, x.primeira);
+      run(brain2.db, "insert into instinct_eventos (chave, de, para, dia) values (?, ?, ?, ?)", x.chave, ant ?? null, x.status, x.atualizado ?? (ant === void 0 ? x.primeira : null) ?? hoje);
+    }
+    run(brain2.db, "delete from instinct_eventos where chave not in (select chave from instinct_leads)");
+    brain2.setPolicy("instinct_estado", { ultima: brain2.clock(), erro: null, ignoradas });
+    brain2.emit("change");
+    return `Planilha lida: ${dias.length} linha(s) de dia e ${leads.length} lead(s)${ignoradas ? `; ${ignoradas} linha(s) sem data, tipo ou status foram ignoradas` : ""}.`;
+  } catch (e) {
+    const msg2 = e instanceof Error ? e.message : String(e);
+    const ant = brain2.policy("instinct_estado", {});
+    brain2.setPolicy("instinct_estado", { ultima: ant.ultima ?? null, erro: msg2.slice(0, 300), ignoradas: 0 });
+    throw e;
+  }
+}
+function configurar(brain2, txt) {
+  const id = extrairId(txt);
+  if (!id) throw new BrainError("invalid", "N\xE3o achei o id da planilha nesse link.");
+  brain2.setPolicy("instinct_planilha", { id });
+  brain2.audit("voce", "instinct_planilha", id);
+  return { planilha: id };
+}
+var taxa = (a, b) => b > 0 ? Math.round(a / b * 1e3) / 10 : null;
+var soma2 = (xs) => {
+  const s2 = { abordados: 0, responderam: 0, reunioes: 0, contas: 0, assinantes: 0 };
+  for (const x of xs) {
+    s2.abordados += x.abordados;
+    s2.responderam += x.responderam;
+    s2.reunioes += x.reunioes;
+    s2.contas += x.contas;
+    s2.assinantes += x.assinantes;
+  }
+  return { ...s2, taxaResposta: taxa(s2.responderam, s2.abordados), taxaReuniao: taxa(s2.reunioes, s2.abordados), taxaConversao: taxa(s2.contas + s2.assinantes, s2.abordados) };
+};
+function painel(brain2, env) {
+  const todas = rows(brain2.db, "select dia, tipo, abordados, responderam, reunioes, contas, assinantes from instinct_dia order by dia desc, tipo");
+  const hoje = brtDay(brain2.clock());
+  const corte = brtDay(brain2.clock() - 30 * 864e5);
+  const ult30 = todas.filter((x) => x.dia > corte && x.dia <= hoje);
+  const porTipo = (xs, t) => soma2(xs.filter((x) => x.tipo === t));
+  const eventos = /* @__PURE__ */ new Map();
+  for (const e of rows(brain2.db, "select chave, de, para, dia from instinct_eventos order by dia, id")) {
+    const l = eventos.get(e.chave) ?? [];
+    l.push({ de: e.de, para: e.para, dia: e.dia });
+    eventos.set(e.chave, l);
+  }
+  const leads = rows(brain2.db, "select chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado from instinct_leads order by coalesce(atualizado, primeira) desc, nome limit 500").map((l) => ({ ...l, eventos: eventos.get(l.chave) ?? [] }));
+  const corte60 = brtDay(brain2.clock() - 60 * 864e5);
+  const ant30 = todas.filter((x) => x.dia > corte60 && x.dia <= corte);
+  const funil = {};
+  for (const l of rows(brain2.db, "select status, count(*) as n from instinct_leads group by status")) funil[l.status] = l.n;
+  const est = brain2.policy("instinct_estado", {});
+  const id = planilhaId(brain2);
+  return {
+    planilha: { id, url: `https://docs.google.com/spreadsheets/d/${id}/edit`, conta: lerChave(env)?.client_email ?? null },
+    ultimaLeitura: est.ultima ?? null,
+    erro: est.erro ?? null,
+    ignoradas: est.ignoradas ?? 0,
+    ultimos30: { total: soma2(ult30), clinicas: porTipo(ult30, "clinica"), influenciadoras: porTipo(ult30, "influenciadora") },
+    acumulado: soma2(todas),
+    anteriores30: soma2(ant30),
+    hoje,
+    dias: todas.slice(0, 800),
+    funil,
+    leads
+  };
+}
+
 // packages/core/src/data.ts
-var FONTES = ["resumo", "receita", "clientes", "anuncios", "instagram", "execucoes", "propostas", "entregas", ...FONTES_CRM];
-var r2 = (n3) => Math.round(n3 * 100) / 100;
+var FONTES = ["resumo", "receita", "clientes", "anuncios", "instagram", "execucoes", "propostas", "entregas", "instinct", ...FONTES_CRM];
+var r2 = (n4) => Math.round(n4 * 100) / 100;
 var ACTIVE2 = ["active", "trialing", "past_due"];
 var metaEnv = (env) => {
   const token = env.META_SYSTEM_USER_TOKEN;
@@ -3455,7 +4099,7 @@ function receita(brain2, dias) {
   const hist = rows(brain2.db, "select day, source, mrr_brl, subs_count from mrr_daily where day >= ? order by day, source", since(dias, now));
   const subs = rows(brain2.db, "select source, external_id, label, status, list_price_brl, effective_price_brl, discount_ends_at, origin from subscriptions");
   const ativos = subs.filter((s2) => ACTIVE2.includes(s2.status));
-  const reajuste = ativos.filter((s2) => s2.discount_ends_at).reduce((n3, s2) => n3 + (s2.list_price_brl - s2.effective_price_brl), 0);
+  const reajuste = ativos.filter((s2) => s2.discount_ends_at).reduce((n4, s2) => n4 + (s2.list_price_brl - s2.effective_price_brl), 0);
   return {
     mrr_atual: m.mrr,
     falta_para_meta_brl: r2(Math.max(0, m.mrr.goal - m.mrr.total)),
@@ -3547,7 +4191,7 @@ function instagramGuardado(brain2, dias) {
   const hist = rows(brain2.db, "select day, followers, reach, profile_views from instagram_daily where day >= ? order by day", since(dias, now));
   const posts = brain2.policy("cache_ig_posts", null);
   const novos = brain2.policy("cache_ig_novos", null);
-  const eng = posts?.posts.length ? posts.posts.reduce((n3, p) => n3 + (p.curtidas ?? 0) + (p.comentarios ?? 0), 0) / posts.posts.length : null;
+  const eng = posts?.posts.length ? posts.posts.reduce((n4, p) => n4 + (p.curtidas ?? 0) + (p.comentarios ?? 0), 0) / posts.posts.length : null;
   return {
     seguidores_hoje: hist.at(-1)?.followers ?? null,
     historico_guardado: hist,
@@ -3603,6 +4247,9 @@ async function consultarDados(ctx, fonte, opts = {}) {
       return propostas(ctx.brain);
     case "entregas":
       return entregas(ctx.brain, opts.equipe);
+    case "instinct":
+      if (opts.atualizar === true) await sincronizar(ctx.brain, ctx.env, ctx.fetchFn);
+      return painel(ctx.brain, ctx.env);
     case "crm_resumo":
     case "crm_leads":
     case "crm_atividades":
@@ -3615,7 +4262,7 @@ async function consultarDados(ctx, fonte, opts = {}) {
 }
 var DADOS_TOOL = {
   name: "consultar_dados",
-  description: "Dados reais e atuais do neg\xF3cio. fonte: receita (MRR, hist\xF3rico, clientes ativos, fins de desconto, proje\xE7\xE3o), clientes (lista de assinaturas Stripe e Pix), anuncios (Meta Ads por campanha: gasto, cliques, leads, custo por lead), instagram (seguidores, alcance, posts recentes com curtidas e coment\xE1rios), execucoes (o que cada agente fez), propostas (fila e hist\xF3rico), entregas (documentos completos que os agentes produziram), crm_resumo (CRM: leads, funil, convers\xE3o, atividades atrasadas), crm_leads (lista de leads do CRM, com filtros), crm_atividades, crm_reunioes, crm_funil. O CRM \xE9 s\xF3 leitura e n\xE3o devolve telefone nem e-mail. Use atualizar=true para ler de novo da Meta agora. Sempre consulte antes de dizer que n\xE3o tem um dado.",
+  description: "Dados reais e atuais do neg\xF3cio. fonte: receita (MRR, hist\xF3rico, clientes ativos, fins de desconto, proje\xE7\xE3o), clientes (lista de assinaturas Stripe e Pix), anuncios (Meta Ads por campanha: gasto, cliques, leads, custo por lead), instagram (seguidores, alcance, posts recentes com curtidas e coment\xE1rios), execucoes (o que cada agente fez), propostas (fila e hist\xF3rico), instinct (placar da prospec\xE7\xE3o no WhatsApp feita pelo Instinct, agente externo do Felipe: abordados, responderam, reuni\xF5es, contas gratuitas e assinantes por dia e por tipo de lead, funil e lista de leads; atualizar=true rel\xEA a planilha agora), entregas (documentos completos que os agentes produziram), crm_resumo (CRM: leads, funil, convers\xE3o, atividades atrasadas), crm_leads (lista de leads do CRM, com filtros), crm_atividades, crm_reunioes, crm_funil. O CRM \xE9 s\xF3 leitura e n\xE3o devolve telefone nem e-mail. Use atualizar=true para ler de novo da Meta agora. Sempre consulte antes de dizer que n\xE3o tem um dado.",
   input_schema: {
     type: "object",
     properties: {
@@ -3746,7 +4393,7 @@ async function sincronizarMidia(brain2, env, opts = {}) {
     });
     await parte("Pixel", async () => {
       const px = await fetchPixels(version, acct, token);
-      let n3 = 0;
+      let n4 = 0;
       for (const p of px.slice(0, 5)) {
         run(brain2.db, `insert into meta_pixel (pixel_id, nome, ultimo_disparo, indisponivel, atualizado_em) values (?, ?, ?, ?, ?) on conflict(pixel_id) do update set nome = excluded.nome, ultimo_disparo = excluded.ultimo_disparo, indisponivel = excluded.indisponivel, atualizado_em = excluded.atualizado_em`, p.pixel_id, p.nome, p.ultimo_disparo, p.indisponivel ? 1 : 0, now);
         const ev = await fetchPixelEventos(version, p.pixel_id, token, now - Math.min(dias, 90) * 864e5, now).catch((e) => {
@@ -3754,7 +4401,7 @@ async function sincronizarMidia(brain2, env, opts = {}) {
         });
         for (const e of ev) {
           run(brain2.db, "insert into meta_pixel_dia (day, pixel_id, evento, total) values (?, ?, ?, ?) on conflict(day, pixel_id, evento) do update set total = excluded.total", e.day, p.pixel_id, e.evento, e.total);
-          n3++;
+          n4++;
         }
       }
       return px.length;
@@ -3769,17 +4416,17 @@ async function sincronizarMidia(brain2, env, opts = {}) {
   if (igId) {
     await parte("Instagram por dia", async () => {
       const tem = new Set(rows(brain2.db, "select day from ig_dia where reach is not null").map((r) => r.day));
-      let n3 = 0;
+      let n4 = 0;
       for (let i = 1; i <= 30; i++) {
         const d = brtDay(now - i * 864e5);
         if (i > 3 && tem.has(d)) continue;
         const r = await fetchIgDia(version, igId, token, d);
         run(brain2.db, "insert into ig_dia (day, reach, profile_views, link_taps, interacoes, novos, updated_at) values (?, ?, ?, ?, ?, null, ?) on conflict(day) do update set reach = excluded.reach, profile_views = excluded.profile_views, link_taps = excluded.link_taps, interacoes = excluded.interacoes, updated_at = excluded.updated_at", r.day, r.reach, r.profile_views, r.link_taps, r.interacoes, now);
-        n3++;
+        n4++;
       }
       const novos = brain2.policy("cache_ig_novos", null)?.novos ?? [];
       for (const v of novos) run(brain2.db, "insert into ig_dia (day, novos, updated_at) values (?, ?, ?) on conflict(day) do update set novos = excluded.novos", v.day, v.novos, now);
-      return n3;
+      return n4;
     });
   }
   brain2.setPolicy("midia_diagnostico", { at: now, itens: out });
@@ -3788,8 +4435,8 @@ async function sincronizarMidia(brain2, env, opts = {}) {
 }
 
 // packages/core/src/midia.ts
-var r22 = (n3) => Math.round(n3 * 100) / 100;
-var r1 = (n3) => Math.round(n3 * 10) / 10;
+var r22 = (n4) => Math.round(n4 * 100) / 100;
+var r1 = (n4) => Math.round(n4 * 10) / 10;
 var mediana = (xs) => {
   const o = [...xs].sort((a, b) => a - b);
   const m = Math.floor(o.length / 2);
@@ -3797,7 +4444,7 @@ var mediana = (xs) => {
 };
 var media = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 var DIAS = ["domingo", "segunda", "ter\xE7a", "quarta", "quinta", "sexta", "s\xE1bado"];
-var brl2 = (n3) => `R$ ${n3.toFixed(2).replace(".", ",")}`;
+var brl2 = (n4) => `R$ ${n4.toFixed(2).replace(".", ",")}`;
 var AMOSTRA_MIN = 3;
 var PREMISSAS_PADRAO = { conversaoLeadCliente: 0.1, retencaoMeses: 12, razaoLtvCac: 3 };
 function lerPremissas(brain2) {
@@ -3820,7 +4467,7 @@ function salvarPremissas(brain2, entrada) {
   brain2.audit("voce", "midia_premissas", "premissas de an\xFAncio", novo);
   return novo;
 }
-var somaDias = (d, n3) => new Date(Date.parse(`${d}T12:00:00Z`) + n3 * 864e5).toISOString().slice(0, 10);
+var somaDias = (d, n4) => new Date(Date.parse(`${d}T12:00:00Z`) + n4 * 864e5).toISOString().slice(0, 10);
 var difDias = (a, b) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 864e5);
 var dataValida = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
 function periodoDe(brain2, de, ate) {
@@ -3833,9 +4480,9 @@ function periodoDe(brain2, de, ate) {
   return { de: ini, ate: fim, dias, anterior: { de: somaDias(ini, -dias), ate: somaDias(ini, -1) } };
 }
 var formato = (t) => t === "CAROUSEL_ALBUM" ? "Carrossel" : t === "VIDEO" || t === "REELS" ? "Reel" : t === "IMAGE" ? "Imagem" : t ?? "Outro";
-function grupo(posts, chave2) {
+function grupo(posts, chave3) {
   const m = /* @__PURE__ */ new Map();
-  for (const p of posts) m.set(chave2(p), [...m.get(chave2(p)) ?? [], p]);
+  for (const p of posts) m.set(chave3(p), [...m.get(chave3(p)) ?? [], p]);
   return [...m.entries()].map(([nome, ps]) => ({
     nome,
     posts: ps.length,
@@ -3889,18 +4536,18 @@ function analiseInstagram(brain2, per = periodoDe(brain2)) {
     per.anterior.de,
     per.anterior.ate
   );
-  const soma2 = (xs) => xs.reduce((n3, v) => n3 + (v ?? 0), 0);
+  const soma3 = (xs) => xs.reduce((n4, v) => n4 + (v ?? 0), 0);
   const temDia = (k) => dd.some((r) => r[k] !== null);
   const segPeriodo = seg.filter((r) => r.day >= per.de && r.day <= per.ate && r.followers !== null);
   const segIni = segPeriodo[0]?.followers ?? null, segFim = segPeriodo.at(-1)?.followers ?? null;
-  const visitas = temDia("profile_views") ? soma2(dd.map((r) => r.profile_views)) : null;
-  const toques = temDia("link_taps") ? soma2(dd.map((r) => r.link_taps)) : null;
+  const visitas = temDia("profile_views") ? soma3(dd.map((r) => r.profile_views)) : null;
+  const toques = temDia("link_taps") ? soma3(dd.map((r) => r.link_taps)) : null;
   const liquido = (de, ate) => {
     const ls = seg.filter((r) => r.day >= de && r.day <= ate && r.followers !== null);
     return ls.length >= 2 ? ls.at(-1).followers - ls[0].followers : null;
   };
-  const novos = temDia("novos") ? soma2(dd.map((r) => r.novos)) : liquido(per.de, per.ate);
-  const novosAnt = ddAnt.some((r) => r.novos !== null) ? soma2(ddAnt.map((r) => r.novos)) : liquido(per.anterior.de, per.anterior.ate);
+  const novos = temDia("novos") ? soma3(dd.map((r) => r.novos)) : liquido(per.de, per.ate);
+  const novosAnt = ddAnt.some((r) => r.novos !== null) ? soma3(ddAnt.map((r) => r.novos)) : liquido(per.anterior.de, per.anterior.ate);
   if (!posts.length) {
     leitura.push({ nivel: "atencao", titulo: "Ainda n\xE3o tenho m\xE9tricas por post", detalhe: "Toque em \u201CAtualizar dados\u201D. Se continuar vazio, o token da Meta precisa da permiss\xE3o instagram_manage_insights." });
   } else {
@@ -3941,10 +4588,10 @@ function analiseInstagram(brain2, per = periodoDe(brain2)) {
     }
   }
   if (visitas !== null && toques !== null && visitas >= 50) {
-    const taxa3 = toques / visitas * 100;
-    if (taxa3 < 8)
-      leitura.push({ nivel: "fazer", titulo: `S\xF3 ${r1(taxa3)}% de quem visita o perfil toca no link da bio`, detalhe: `${visitas} visitas ao perfil e ${toques} toques no link no per\xEDodo. Reescreva a bio com uma frase de benef\xEDcio para o psic\xF3logo e uma chamada clara antes do link: \xE9 o passo entre o Instagram e o seu site.` });
-    else leitura.push({ nivel: "ok", titulo: `${r1(taxa3)}% das visitas ao perfil viram toque no link`, detalhe: `${visitas} visitas e ${toques} toques no per\xEDodo.` });
+    const taxa4 = toques / visitas * 100;
+    if (taxa4 < 8)
+      leitura.push({ nivel: "fazer", titulo: `S\xF3 ${r1(taxa4)}% de quem visita o perfil toca no link da bio`, detalhe: `${visitas} visitas ao perfil e ${toques} toques no link no per\xEDodo. Reescreva a bio com uma frase de benef\xEDcio para o psic\xF3logo e uma chamada clara antes do link: \xE9 o passo entre o Instagram e o seu site.` });
+    else leitura.push({ nivel: "ok", titulo: `${r1(taxa4)}% das visitas ao perfil viram toque no link`, detalhe: `${visitas} visitas e ${toques} toques no per\xEDodo.` });
   }
   if (recentes14 < 6)
     leitura.push({ nivel: recentes14 < 3 ? "atencao" : "ok", titulo: `${recentes14} posts nos \xFAltimos 14 dias`, detalhe: recentes14 < 6 ? "Abaixo de 3 por semana. Const\xE2ncia pesa mais no alcance do que acertar o formato perfeito." : "" });
@@ -3961,18 +4608,18 @@ function analiseInstagram(brain2, per = periodoDe(brain2)) {
     periodo: {
       posts: noPeriodo.length,
       alcance_post_medio: noPeriodo.length ? Math.round(media(noPeriodo.map((p) => p.alcance)) ?? 0) : null,
-      salvos: noPeriodo.reduce((n3, p) => n3 + p.salvos, 0),
-      compartilhamentos: noPeriodo.reduce((n3, p) => n3 + p.compartilhados, 0),
+      salvos: noPeriodo.reduce((n4, p) => n4 + p.salvos, 0),
+      compartilhamentos: noPeriodo.reduce((n4, p) => n4 + p.compartilhados, 0),
       interacao_pct: noPeriodo.length ? r1((media(noPeriodo.map((p) => p.taxaInteracao)) ?? 0) * 100) : null,
       seguidores_inicio: segIni,
       seguidores_fim: segFim,
       seguidores_novos: novos,
       seguidores_novos_anterior: novosAnt,
       visitas_perfil: visitas,
-      visitas_perfil_anterior: ddAnt.some((r) => r.profile_views !== null) ? soma2(ddAnt.map((r) => r.profile_views)) : null,
+      visitas_perfil_anterior: ddAnt.some((r) => r.profile_views !== null) ? soma3(ddAnt.map((r) => r.profile_views)) : null,
       toques_link: toques,
-      toques_link_anterior: ddAnt.some((r) => r.link_taps !== null) ? soma2(ddAnt.map((r) => r.link_taps)) : null,
-      alcance_diario_medio: temDia("reach") ? Math.round(soma2(dd.map((r) => r.reach)) / Math.max(1, dd.filter((r) => r.reach !== null).length)) : null,
+      toques_link_anterior: ddAnt.some((r) => r.link_taps !== null) ? soma3(ddAnt.map((r) => r.link_taps)) : null,
+      alcance_diario_medio: temDia("reach") ? Math.round(soma3(dd.map((r) => r.reach)) / Math.max(1, dd.filter((r) => r.reach !== null).length)) : null,
       posts_14d: recentes14
     },
     serie: dd.map((r) => ({ day: r.day, alcance: r.reach, visitas: r.profile_views, toques: r.link_taps, novos: r.novos })),
@@ -4000,7 +4647,7 @@ function campanhasEm(brain2, de, ate) {
 function economiaDe(brain2) {
   const premissas = lerPremissas(brain2);
   const ativos = rows(brain2.db, "select effective_price_brl as preco from subscriptions where status in ('active','trialing','past_due')");
-  const ticket = ativos.length ? ativos.reduce((n3, a) => n3 + a.preco, 0) / ativos.length : null;
+  const ticket = ativos.length ? ativos.reduce((n4, a) => n4 + a.preco, 0) / ativos.length : null;
   const ltv = ticket ? ticket * premissas.retencaoMeses : null;
   const cacMax = ltv ? ltv / premissas.razaoLtvCac : null;
   const cplMax = cacMax ? cacMax * premissas.conversaoLeadCliente : null;
@@ -4178,16 +4825,16 @@ var FUNIL = ["PageView", "ViewContent", "Scroll50", "CTA_Click", "OpenForm", "In
 function analisePixel(brain2, per = periodoDe(brain2)) {
   const now = brain2.clock();
   const pixels = rows(brain2.db, "select pixel_id, nome, ultimo_disparo, indisponivel from meta_pixel order by nome");
-  const soma2 = (de, ate) => Object.fromEntries(rows(brain2.db, "select evento, sum(total) as t from meta_pixel_dia where day >= ? and day <= ? group by evento", de, ate).map((r) => [r.evento, r.t]));
-  const atual = soma2(per.de, per.ate);
-  const ant = soma2(per.anterior.de, per.anterior.ate);
+  const soma3 = (de, ate) => Object.fromEntries(rows(brain2.db, "select evento, sum(total) as t from meta_pixel_dia where day >= ? and day <= ? group by evento", de, ate).map((r) => [r.evento, r.t]));
+  const atual = soma3(per.de, per.ate);
+  const ant = soma3(per.anterior.de, per.anterior.ate);
   const eventos = Object.keys({ ...atual, ...ant }).map((e) => ({ evento: e, total: atual[e] ?? 0, anterior: ant[e] ?? 0, variacao: delta(atual[e] ?? 0, ant[e] ?? 0) })).sort((a, b) => b.total - a.total);
   const ordemFunil = FUNIL.filter((e) => atual[e] !== void 0);
   const funil = ordemFunil.map((e, i) => ({ evento: e, total: atual[e], do_anterior_pct: i === 0 ? null : atual[ordemFunil[i - 1]] > 0 ? r1(atual[e] / atual[ordemFunil[i - 1]] * 100) : null }));
   const topo = eventos.filter((e) => e.total > 0).slice(0, 4).map((e) => e.evento);
   const serie = rows(brain2.db, "select day, evento, sum(total) as total from meta_pixel_dia where day >= ? and day <= ? group by day, evento order by day", per.de, per.ate).filter((r) => topo.includes(r.evento));
   const ads = totais(campanhasEm(brain2, per.de, per.ate));
-  const cliquesLink = campanhasEm(brain2, per.de, per.ate).reduce((n3, c2) => n3 + c2.link_clicks, 0);
+  const cliquesLink = campanhasEm(brain2, per.de, per.ate).reduce((n4, c2) => n4 + c2.link_clicks, 0);
   const leitura = [];
   if (!pixels.length) {
     leitura.push({ nivel: "atencao", titulo: "Nenhum pixel encontrado na conta de an\xFAncios", detalhe: "Sem pixel, a Meta n\xE3o enxerga o que acontece no seu site: n\xE3o d\xE1 para medir lead, nem otimizar an\xFAncio para convers\xE3o. Se voc\xEA j\xE1 instalou um, o token precisa de ads_read, ou o pixel est\xE1 em outra conta." });
@@ -4203,11 +4850,11 @@ function analisePixel(brain2, per = periodoDe(brain2)) {
     if (pv > 0 && ld === 0 && !atual.CompleteRegistration && !atual.Subscribe && !atual.Purchase)
       leitura.push({ nivel: "fazer", titulo: "O pixel v\xEA visitas, mas nenhuma convers\xE3o", detalhe: `${pv} visitas e nenhum evento de Lead, cadastro ou compra no per\xEDodo. Sem isso, os an\xFAncios n\xE3o aprendem quem vira cliente. Configure o evento Lead na p\xE1gina de agradecimento ou no clique de \u201CAgendar demonstra\xE7\xE3o\u201D.` });
     if (pv >= 200 && ld > 0) {
-      const taxa3 = ld / pv * 100;
+      const taxa4 = ld / pv * 100;
       leitura.push({
-        nivel: taxa3 < 1 ? "fazer" : "ok",
-        titulo: `${taxa3 < 0.1 ? "Menos de 0,1" : r1(taxa3)}% das visitas viram lead`,
-        detalhe: `${ld} leads em ${pv} visitas no per\xEDodo.${taxa3 < 1 ? " Um site de capta\xE7\xE3o costuma converter de 1% a 5%. Com esse volume de visita, o problema \xE9 a p\xE1gina (promessa, chamada, formul\xE1rio) ou a qualidade do tr\xE1fego, n\xE3o a falta de gente." : ""}`
+        nivel: taxa4 < 1 ? "fazer" : "ok",
+        titulo: `${taxa4 < 0.1 ? "Menos de 0,1" : r1(taxa4)}% das visitas viram lead`,
+        detalhe: `${ld} leads em ${pv} visitas no per\xEDodo.${taxa4 < 1 ? " Um site de capta\xE7\xE3o costuma converter de 1% a 5%. Com esse volume de visita, o problema \xE9 a p\xE1gina (promessa, chamada, formul\xE1rio) ou a qualidade do tr\xE1fego, n\xE3o a falta de gente." : ""}`
       });
     } else if (pv > 0 && ld > 0) leitura.push({ nivel: "ok", titulo: `${r1(ld / pv * 100)}% das visitas viram lead`, detalhe: `${ld} leads em ${pv} visitas no per\xEDodo.` });
     if (pv >= 200 && form > 0 && form / pv < 0.01)
@@ -4228,14 +4875,14 @@ function analisePublicos(brain2, per = periodoDe(brain2)) {
   const linhas = rows(brain2.db, "select tipo, chave, sum(spend) as spend, sum(impressions) as impressions, sum(clicks) as clicks, sum(leads) as leads from meta_quebra_dia where day >= ? and day <= ? group by tipo, chave order by spend desc", per.de, per.ate);
   const porTipo = (t) => {
     const ls = linhas.filter((l) => l.tipo === t);
-    const total = ls.reduce((n3, l) => n3 + l.spend, 0);
+    const total = ls.reduce((n4, l) => n4 + l.spend, 0);
     return ls.map((l) => ({ chave: l.chave, gasto: r22(l.spend), parte_pct: total ? r1(l.spend / total * 100) : 0, impressoes: l.impressions, cliques: l.clicks, ctr_pct: l.impressions ? r22(l.clicks / l.impressions * 100) : null, leads: l.leads, cpl: l.leads ? r22(l.spend / l.leads) : null }));
   };
   const out = { posicionamento: porTipo("posicionamento"), idade_genero: porTipo("idade_genero"), dispositivo: porTipo("dispositivo") };
   const leitura = [];
   const rotulo = { posicionamento: "posicionamento", idade_genero: "p\xFAblico", dispositivo: "dispositivo" };
   for (const [tipo, ls] of Object.entries(out)) {
-    const gastoTotal = ls.reduce((n3, l) => n3 + l.gasto, 0);
+    const gastoTotal = ls.reduce((n4, l) => n4 + l.gasto, 0);
     for (const l of ls.filter((x) => x.leads === 0 && x.parte_pct >= 15 && x.gasto >= 30).slice(0, 2))
       leitura.push({ nivel: "fazer", titulo: `Tire ${rotulo[tipo]} \u201C${l.chave}\u201D`, detalhe: `${l.parte_pct}% da verba (${brl2(l.gasto)}) e nenhum lead.` });
     const comLead = ls.filter((x) => x.leads >= 3 && x.cpl !== null).sort((a, b) => a.cpl - b.cpl);
@@ -4334,19 +4981,19 @@ var ms = (iso) => {
 };
 var str = (v) => typeof v === "string" && v ? v : null;
 var numOrNull = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
-var r12 = (n3) => Math.round(n3 * 10) / 10;
+var r12 = (n4) => Math.round(n4 * 10) / 10;
 function semanaDe(t) {
   const d = /* @__PURE__ */ new Date(`${brtDay(t)}T12:00:00-03:00`);
   const dow = (d.getUTCDay() + 6) % 7;
   return brtDay(d.getTime() - dow * DIA);
 }
-var cache = null;
+var cache2 = null;
 var CACHE_MS = 6e4;
 async function crmPainel(env, agora, f, opts = {}) {
   const c2 = crmClient(env, f);
   if (!c2) return vazio(agora, "O CRM n\xE3o est\xE1 conectado: faltam SYNAPSA_CRM_API_KEY e SYNAPSA_CRM_API_BASE_URL nos secrets do Brain.");
-  const chave2 = String(env.SYNAPSA_CRM_API_BASE_URL ?? env.CRM_API_BASE_URL);
-  if (!opts.atualizar && cache && cache.chave === chave2 && agora - cache.at < CACHE_MS) return cache.painel;
+  const chave3 = String(env.SYNAPSA_CRM_API_BASE_URL ?? env.CRM_API_BASE_URL);
+  if (!opts.atualizar && cache2 && cache2.chave === chave3 && agora - cache2.at < CACHE_MS) return cache2.painel;
   try {
     const [leadsR, reunioesR, atividadesR, stages, overview2, funnel] = await Promise.all([
       c2.all("/leads", {}, 5),
@@ -4356,9 +5003,9 @@ async function crmPainel(env, agora, f, opts = {}) {
       c2.overview({ stale_days: STALE_DIAS }),
       c2.funnel()
     ]);
-    const painel = montar({ agora, leads: leadsR.data, reunioes: reunioesR.data, atividades: atividadesR.data, truncado: leadsR.truncado || reunioesR.truncado || atividadesR.truncado, stages: stages.data, overview: overview2.data, funnel: funnel.data ?? {} });
-    cache = { chave: chave2, at: agora, painel };
-    return painel;
+    const painel2 = montar({ agora, leads: leadsR.data, reunioes: reunioesR.data, atividades: atividadesR.data, truncado: leadsR.truncado || reunioesR.truncado || atividadesR.truncado, stages: stages.data, overview: overview2.data, funnel: funnel.data ?? {} });
+    cache2 = { chave: chave3, at: agora, painel: painel2 };
+    return painel2;
   } catch (e) {
     if (e instanceof CrmError) throw new Error(`${e.message}${e.requestId ? ` (request_id ${e.requestId})` : ""}`);
     throw e;
@@ -4420,15 +5067,15 @@ function montar(e) {
   const clientes2 = porEtapa("cliente_ativo");
   const perdidos = porEtapa("perdido");
   const prioridade = (l) => (ETAPA_PESO[l.status] ?? 0) * 10 + (CLASSE_PESO[String(l.classification)] ?? 0) * 5 + (numOrNull(l.lead_score) ?? 0) / 10 + Math.min(diasSem(l) ?? 0, 30) / 3;
-  const frase = (l) => {
+  const frase2 = (l) => {
     const d = diasSem(l);
     const partes = [rotuloEtapa(l.status)];
     if (l.classification) partes.push(String(l.classification).replace("_", " "));
     if (d !== null) partes.push(d === 0 ? "contato hoje" : `${d} dia${d > 1 ? "s" : ""} sem contato`);
     return partes.join(" \xB7 ");
   };
-  const oportunidades2 = abertos.filter((l) => (ETAPA_PESO[l.status] ?? 0) >= 2).sort((a, b) => prioridade(b) - prioridade(a)).slice(0, 10).map((l) => resumo2(l, frase(l)));
-  const parados = abertos.filter((l) => (diasSem(l) ?? 0) >= STALE_DIAS).sort((a, b) => (ETAPA_PESO[b.status] ?? 0) - (ETAPA_PESO[a.status] ?? 0) || (diasSem(b) ?? 0) - (diasSem(a) ?? 0)).slice(0, 10).map((l) => resumo2(l, frase(l)));
+  const oportunidades2 = abertos.filter((l) => (ETAPA_PESO[l.status] ?? 0) >= 2).sort((a, b) => prioridade(b) - prioridade(a)).slice(0, 10).map((l) => resumo2(l, frase2(l)));
+  const parados = abertos.filter((l) => (diasSem(l) ?? 0) >= STALE_DIAS).sort((a, b) => (ETAPA_PESO[b.status] ?? 0) - (ETAPA_PESO[a.status] ?? 0) || (diasSem(b) ?? 0) - (diasSem(a) ?? 0)).slice(0, 10).map((l) => resumo2(l, frase2(l)));
   const totalParados = abertos.filter((l) => (diasSem(l) ?? 0) >= STALE_DIAS).length;
   const followupsTodos = abertos.filter((l) => typeof l.follow_up_date === "string" && l.follow_up_date <= hoje).sort((a, b) => String(a.follow_up_date).localeCompare(String(b.follow_up_date)));
   const followups = followupsTodos.slice(0, 10).map((l) => resumo2(l, `Follow-up marcado para ${String(l.follow_up_date).split("-").reverse().join("/")}${l.next_action ? ` \xB7 ${l.next_action}` : ""}`));
@@ -4549,11 +5196,11 @@ function montar(e) {
 
 // packages/core/src/fin-import.ts
 var MESES = ["janeiro", "fevereiro", "mar\xE7o", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-var r23 = (n3) => Math.round(n3 * 100) / 100;
+var r23 = (n4) => Math.round(n4 * 100) / 100;
 var brNum = (t) => {
   const neg = /-/.test(t);
-  const n3 = Number(t.replace(/[^\d,]/g, "").replace(",", "."));
-  return neg ? -n3 : n3;
+  const n4 = Number(t.replace(/[^\d,]/g, "").replace(",", "."));
+  return neg ? -n4 : n4;
 };
 function limpa(tipo, resto) {
   const r = resto.replace(/^"|"$/g, "").replace(/^Cp\s*:\s*\d+-/i, "").trim();
@@ -4615,8 +5262,8 @@ function finImportarExtrato(db, agora, lido, adicionar) {
   const novos = [];
   for (const it of lido.itens) {
     const k = `${it.data}|${r23(it.valor)}`;
-    const n3 = usados.get(k) ?? 0;
-    if (n3 > 0) usados.set(k, n3 - 1);
+    const n4 = usados.get(k) ?? 0;
+    if (n4 > 0) usados.set(k, n4 - 1);
     else novos.push(it);
   }
   if (novos.length) adicionar(novos);
@@ -4626,13 +5273,13 @@ function finImportarExtrato(db, agora, lido, adicionar) {
 }
 
 // packages/core/src/prospeccao-email.ts
-var DAY2 = 864e5;
+var DAY3 = 864e5;
 var ETAPAS = [0, 3, 7];
 var AGENTE = "prospeccao";
 function nomeCurto(nome) {
-  let n3 = nome.split(/\s[-–|·]\s/)[0].trim();
-  if (n3.length > 4 && n3 === n3.toUpperCase()) n3 = n3.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_m, a, b) => a + b.toUpperCase());
-  return n3.slice(0, 60);
+  let n4 = nome.split(/\s[-–|·]\s/)[0].trim();
+  if (n4.length > 4 && n4 === n4.toUpperCase()) n4 = n4.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_m, a, b) => a + b.toUpperCase());
+  return n4.slice(0, 60);
 }
 var SITE_CLINICAS = "synapsa.com.br/clinicas";
 function montarEmail(a, etapa) {
@@ -4697,7 +5344,7 @@ function criar(brain2, a, etapa) {
   return id !== null;
 }
 function atualizarPendentes(brain2) {
-  let n3 = 0;
+  let n4 = 0;
   for (const r of rows(brain2.db, "select id, draft, payload from proposals where status = 'pendente' and kind = 'prospeccao_email'")) {
     try {
       const pl = JSON.parse(r.payload);
@@ -4710,11 +5357,11 @@ function atualizarPendentes(brain2) {
       if (m.corpo === r.draft && m.assunto === pl.envio.assunto) continue;
       pl.envio.assunto = m.assunto;
       run(brain2.db, "update proposals set draft = ?, payload = ? where id = ?", m.corpo, JSON.stringify(pl), r.id);
-      n3++;
+      n4++;
     } catch {
     }
   }
-  return n3;
+  return n4;
 }
 var suprimido = (brain2, email) => !!row(brain2.db, "select 1 as x from email_suppression where email = ?", email.toLowerCase());
 function gerarRascunhos(brain2) {
@@ -4724,7 +5371,7 @@ function gerarRascunhos(brain2) {
   const alvos = rows(
     brain2.db,
     `select p.id, p.nome, p.cidade, p.crp_count, p.email, c.respondeu, c.sair from prospects p left join prospect_contato c on c.prospect_id = p.id
-     where p.email is not null and p.crp_count >= 4 and p.status in ('qualificado', 'no_crm') order by p.nota desc, p.id`
+     where p.email is not null and p.crp_count >= 4 and p.status in ('qualificado', 'no_crm') and p.id not in (select prospect_id from prospect_autonomo) order by p.nota desc, p.id`
   );
   const enviados = /* @__PURE__ */ new Map();
   for (const r of rows(brain2.db, "select pr.dedupe_key as k, e.at as at from proposals pr join envios e on e.proposal_id = pr.id where e.status = 'enviado' and pr.dedupe_key like 'prosp-%'")) enviados.set(r.k, r.at);
@@ -4735,11 +5382,11 @@ function gerarRascunhos(brain2) {
       continue;
     }
     const t0 = enviados.get(chave(a.id, 0));
-    if (!enviados.has(chave(a.id, 1)) && agora - t0 >= ETAPAS[1] * DAY2) {
+    if (!enviados.has(chave(a.id, 1)) && agora - t0 >= ETAPAS[1] * DAY3) {
       if (criar(brain2, a, 1)) followups++;
       continue;
     }
-    if (enviados.has(chave(a.id, 1)) && !enviados.has(chave(a.id, 2)) && agora - t0 >= ETAPAS[2] * DAY2) {
+    if (enviados.has(chave(a.id, 1)) && !enviados.has(chave(a.id, 2)) && agora - t0 >= ETAPAS[2] * DAY3) {
       if (criar(brain2, a, 2)) followups++;
     }
   }
@@ -4752,7 +5399,7 @@ function marcarContato(brain2, prospectId, acao) {
   const agora = brain2.clock();
   run(brain2.db, "insert into prospect_contato (prospect_id, respondeu, sair, atualizado_em) values (?, ?, ?, ?) on conflict(prospect_id) do update set respondeu = max(respondeu, excluded.respondeu), sair = max(sair, excluded.sair), atualizado_em = excluded.atualizado_em", prospectId, acao === "respondeu" ? 1 : 0, acao === "sair" ? 1 : 0, agora);
   if (acao === "sair" && p.email) run(brain2.db, "insert into email_suppression (email, reason, at) values (?, 'pediu para sair', ?) on conflict(email) do update set reason = excluded.reason, at = excluded.at", p.email.toLowerCase(), agora);
-  for (const r of rows(brain2.db, "select id from proposals where status = 'pendente' and dedupe_key like ?", `prosp-${prospectId}-e%`)) brain2.decide(r.id, "rejeitada", "sistema");
+  for (const r of rows(brain2.db, "select id from proposals where status = 'pendente' and (dedupe_key like ? or dedupe_key like ?)", `prosp-${prospectId}-e%`, `aut-${prospectId}-e%`)) brain2.decide(r.id, "rejeitada", "sistema");
   brain2.audit("voce", acao === "sair" ? "prospeccao_sair" : "prospeccao_respondeu", String(prospectId));
   brain2.emit("change");
 }
@@ -4769,7 +5416,7 @@ function rascunhosPendentes(brain2) {
   });
 }
 function emailsResumo(brain2) {
-  const hoje = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and e.at > ? and pr.kind like 'prospeccao%'", brain2.clock() - DAY2)?.n ?? 0;
+  const hoje = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and e.at > ? and pr.kind like 'prospeccao%'", brain2.clock() - DAY3)?.n ?? 0;
   const total = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and pr.kind like 'prospeccao%'")?.n ?? 0;
   return { enviadosHoje: hoje, capDia: Number(brain2.policy("prospect_email_daily_cap", 10)), enviadosTotal: total };
 }
@@ -4781,7 +5428,7 @@ async function aprovarEEnviar(brain2, env, ids, f = fetch) {
   if (sobra === 0) return { enviados, parou: `Limite de ${r0.capDia} e-mails de prospec\xE7\xE3o por dia atingido. Ele sobe aos poucos para proteger o dom\xEDnio novo.` };
   for (const id of ids.slice(0, sobra)) {
     const p = row(brain2.db, "select status, kind from proposals where id = ?", id);
-    if (!p || p.kind !== "prospeccao_email") continue;
+    if (!p || p.kind !== "prospeccao_email" && p.kind !== "prospeccao_autonomo") continue;
     try {
       if (p.status === "pendente") brain2.decide(id, "aprovada");
       await sendApproved(brain2, env, id, f);
@@ -4794,8 +5441,260 @@ async function aprovarEEnviar(brain2, env, ids, f = fetch) {
   return ids.length > sobra ? { enviados, parou: `Enviei ${enviados}: o limite de hoje \xE9 ${r0.capDia}. Os outros ficam na fila para amanh\xE3.` } : { enviados };
 }
 
+// packages/core/src/autonomos-email.ts
+var AUT_ESPERAS = [0, 2, 2, 3, 3];
+var AUT_TOTAL = AUT_ESPERAS.length;
+var ASSINATURA = "Synapsa. Onde a pr\xE1tica evolui.";
+var SITE = "https://synapsa.com.br";
+var DIRETORIO = "https://synapsa.chat/psicologos";
+var frase = (n4, t) => n4 ? `${n4}, ${t}` : t.charAt(0).toUpperCase() + t.slice(1);
+var emCidade = (c2) => c2 ? ` em ${c2}` : "";
+function montarAutonomo(d, etapa) {
+  const n4 = d.nome;
+  const abre = n4 ? `Ol\xE1, ${n4}.` : "Ol\xE1.";
+  const fecha = `Abra\xE7o,
+Felipe
+${ASSINATURA}`;
+  if (etapa === 1) return {
+    assunto: frase(n4, `uma ideia para a sua pr\xE1tica${emCidade(d.cidade)}`),
+    corpo: `${abre}
+
+Sou o Felipe, fundador da Synapsa. Vi o seu trabalho${emCidade(d.cidade)}${d.siteHost ? ` e o seu site (${d.siteHost})` : ""}, e achei que vale a conversa.
+
+A Synapsa \xE9 o ecossistema de desenvolvimento profissional do psic\xF3logo: acompanha cada fase da carreira, de ser encontrado por novos pacientes a organizar a pr\xE1tica e evoluir com dados.
+
+Para come\xE7ar, voc\xEA cria uma conta gratuita e j\xE1 recebe:
+
+- um perfil p\xFAblico, com a sua marca, para os pacientes te encontrarem;
+- agenda e formul\xE1rio de entrada de pacientes;
+- gest\xE3o b\xE1sica da pr\xE1tica, com at\xE9 5 pacientes.
+
+Quando a sua pr\xE1tica crescer, o plano Essencial libera a plataforma inteira.
+
+Faz sentido eu te mostrar em 15 minutos? \xC9 s\xF3 responder este e-mail. Se preferir ver antes, a plataforma est\xE1 aqui:
+
+${SITE}
+
+${fecha}`
+  };
+  if (etapa === 2) return {
+    assunto: frase(n4, "o paciente certo precisa te encontrar"),
+    corpo: `${abre}
+
+Quem procura um psic\xF3logo costuma comparar perfis antes de escolher. ${d.siteHost ? `O seu site j\xE1 mostra CRP e contato, o que passa confian\xE7a. O que o perfil da Synapsa soma \xE9` : "O perfil da Synapsa existe para isso:"} uma p\xE1gina com a sua marca, listada no nosso diret\xF3rio de psic\xF3logos, com agenda e formul\xE1rio de entrada no mesmo lugar.
+
+O paciente te encontra, escolhe um hor\xE1rio e se cadastra sem ficar trocando mensagens. Para voc\xEA, \xE9 um canal a mais de novos pacientes, que funciona sem depender s\xF3 de indica\xE7\xE3o.
+
+D\xE1 para ver como fica o diret\xF3rio aqui:
+
+${DIRETORIO}
+
+Se quiser o seu perfil no ar, \xE9 s\xF3 responder este e-mail.
+
+${fecha}`
+  };
+  if (etapa === 3) return {
+    assunto: frase(n4, "quanto da sua semana vai para o administrativo?"),
+    corpo: `${abre}
+
+${d.whatsapp ? "Vi que voc\xEA atende pelo WhatsApp. Se hoje a agenda, a confirma\xE7\xE3o e a cobran\xE7a passam por ele, \xE9 a\xED que a semana escorre." : "Agenda, confirma\xE7\xE3o, cobran\xE7a e controle financeiro costumam ficar espalhados entre WhatsApp, planilha e caderno."}
+
+A Synapsa centraliza a pr\xE1tica em um s\xF3 lugar:
+
+- agenda com sess\xF5es e reagendamentos;
+- cadastro dos pacientes, com a ficha de entrada preenchida pelo pr\xF3prio paciente;
+- financeiro: o que foi cobrado, o que entrou e o que est\xE1 pendente.
+
+Menos tempo com burocracia, mais tempo para atender (e para descansar).
+
+Quantas horas por semana v\xE3o para isso hoje? Se quiser, te mostro como ficaria em 15 minutos. \xC9 s\xF3 responder este e-mail, ou conhecer a plataforma aqui:
+
+${SITE}
+
+${fecha}`
+  };
+  if (etapa === 4) return {
+    assunto: frase(n4, "a evolu\xE7\xE3o dos seus pacientes, em dados"),
+    corpo: `${abre}
+
+Quem tem muitos pacientes sabe: acompanhar a evolu\xE7\xE3o de cada um s\xF3 na mem\xF3ria ou em anota\xE7\xF5es soltas n\xE3o escala.
+
+Na Synapsa a evolu\xE7\xE3o fica registrada com dados, em um hist\xF3rico por paciente. Voc\xEA enxerga o caminho percorrido e decide o pr\xF3ximo passo com base no que foi medido.
+
+A decis\xE3o cl\xEDnica continua sendo sua. A plataforma organiza a informa\xE7\xE3o.
+
+Hoje, como voc\xEA acompanha a evolu\xE7\xE3o dos seus pacientes?
+
+Se quiser ver como funciona, veja como funciona aqui:
+
+${SITE}
+
+${fecha}`
+  };
+  return {
+    assunto: frase(n4, "\xFAltimo e-mail, e um convite"),
+    corpo: `${abre}
+
+N\xE3o quero lotar a sua caixa, ent\xE3o este \xE9 o meu \xFAltimo e-mail.
+
+Em resumo: a Synapsa te ajuda a ser encontrado, a organizar a pr\xE1tica e a evoluir com dados. Voc\xEA come\xE7a com uma conta gratuita (perfil p\xFAblico, agenda, ficha de entrada e gest\xE3o b\xE1sica com at\xE9 5 pacientes) e, quando precisar de mais, o plano Essencial libera tudo.
+
+Se fizer sentido, \xE9 s\xF3 responder este e-mail ou conhecer a plataforma:
+
+${SITE}
+
+Se n\xE3o for o momento, tudo bem. Para n\xE3o receber mais nada, responda SAIR.
+
+${fecha}`
+  };
+}
+
+// packages/core/src/autonomos.ts
+var DAY4 = 864e5;
+var AGENTE2 = "prospeccao";
+var GENERICO = /^(consult[oó]rio|espa[cç]o|cl[ií]nica|atendimento|psicologia|psic[oó]log[oa]s|centro|instituto|n[uú]cleo|terapia)$/i;
+function nomeAutonomo(nome) {
+  let n4 = nome.split(/\s[-–|·]\s/)[0].trim();
+  for (let i = 0; i < 3; i++) n4 = n4.replace(/^(dr\.?|dra\.?|psic[oó]log[oa]|psi\.?|psic\.?|prof\.?|profa\.?)\s+/i, "").trim();
+  const primeiro = n4.split(/\s+/)[0] ?? "";
+  if (!/^\p{L}{2,}$/u.test(primeiro) || GENERICO.test(primeiro) || /^psic/i.test(primeiro)) return "";
+  return primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
+}
+var autonomosConfig = (brain2) => ({ ativo: brain2.policy("prospect_autonomos", {}).ativo === true });
+function autonomosAtivar(brain2, ativo) {
+  brain2.setPolicy("prospect_autonomos", { ativo });
+  brain2.audit("voce", ativo ? "autonomos_on" : "autonomos_off");
+  brain2.emit("change");
+  return autonomosConfig(brain2);
+}
+var chave2 = (id, etapa) => `aut-${id}-e${etapa}`;
+var minDias = (brain2) => Math.max(0, Number(brain2.policy("contact_policy", { min_days_between: 3 }).min_days_between ?? 3));
+var suprimido2 = (brain2, email) => !!row(brain2.db, "select 1 as x from email_suppression where email = ?", email.toLowerCase());
+function estados(brain2) {
+  const m = /* @__PURE__ */ new Map();
+  for (const r of rows(brain2.db, "select pr.dedupe_key as k, pr.status as st, (select max(e.at) from envios e where e.proposal_id = pr.id and e.status = 'enviado') as at from proposals pr where pr.dedupe_key like 'aut-%'")) {
+    const x = /^aut-(\d+)-e(\d)$/.exec(r.k);
+    if (!x) continue;
+    const id = Number(x[1]), etapa = Number(x[2]);
+    const cur = m.get(id);
+    if (!cur || etapa > cur.etapa) m.set(id, { etapa, status: r.st, enviadoEm: r.at });
+  }
+  return m;
+}
+var alvosSql = `select p.id, p.nome, p.cidade, p.uf, p.email, p.nota, p.site, p.whatsapp_no_site, c.respondeu, c.sair from prospects p join prospect_autonomo a on a.prospect_id = p.id
+  left join prospect_contato c on c.prospect_id = p.id where p.email is not null and p.status in ('qualificado', 'no_crm') order by p.nota desc, p.id`;
+function gerarAutonomos(brain2) {
+  if (!autonomosConfig(brain2).ativo) return { novos: 0, followups: 0 };
+  const agora = brain2.clock();
+  const min = minDias(brain2);
+  const st = estados(brain2);
+  const limiteNovos = Math.max(1, Number(brain2.policy("autonomo_novos_dia", 10)));
+  let novosHoje = row(brain2.db, "select count(*) as n from proposals where dedupe_key like 'aut-%-e1' and created_at > ?", agora - DAY4)?.n ?? 0;
+  let novos = 0, followups = 0;
+  for (const a of rows(brain2.db, alvosSql)) {
+    const parou = !!(a.respondeu || a.sair) || suprimido2(brain2, a.email);
+    const ult = st.get(a.id);
+    if (parou) {
+      if (ult && ult.status === "pendente") for (const r of rows(brain2.db, "select id from proposals where status = 'pendente' and dedupe_key like ?", `aut-${a.id}-e%`)) brain2.decide(r.id, "rejeitada", "sistema");
+      continue;
+    }
+    let etapa;
+    if (!ult) {
+      if (novosHoje >= limiteNovos) continue;
+      etapa = 1;
+    } else {
+      if (ult.status === "rejeitada" || ult.etapa >= AUT_TOTAL || ult.enviadoEm === null) continue;
+      if (agora - ult.enviadoEm < Math.max(AUT_ESPERAS[ult.etapa], min) * DAY4) continue;
+      etapa = ult.etapa + 1;
+    }
+    const host2 = (() => {
+      try {
+        return a.site ? new URL(a.site.startsWith("http") ? a.site : `https://${a.site}`).hostname.replace(/^www\./, "") : null;
+      } catch {
+        return null;
+      }
+    })();
+    const m = montarAutonomo({ nome: nomeAutonomo(a.nome), cidade: a.cidade, siteHost: host2, whatsapp: a.whatsapp_no_site === 1 }, etapa);
+    const email = a.email.toLowerCase();
+    const id = brain2.addProposal({
+      agentId: AGENTE2,
+      kind: "prospeccao_autonomo",
+      channel: "email",
+      risk: "medio",
+      impactoBrl: 79,
+      title: `Aut\xF4nomo ${etapa}/${AUT_TOTAL}: ${nomeAutonomo(a.nome) || a.nome.slice(0, 40)}`,
+      draft: m.corpo,
+      why: `Psic\xF3logo aut\xF4nomo com CRP e e-mail profissional p\xFAblicos no pr\xF3prio site${a.cidade ? ` (${a.cidade})` : ""}. E-mail ${etapa} de ${AUT_TOTAL}. Base: leg\xEDtimo interesse B2B, com sa\xEDda (SAIR) no rodap\xE9. Para quando responde, pede para sair ou voc\xEA recusa.`,
+      contactRef: email,
+      payload: { envio: { tipo: "email", para: email, assunto: m.assunto, remetente: "prospeccao", perfil: "autonomo", html: true }, prospeccao: { prospectId: a.id, etapa }, base: "legitimo_interesse_b2b" },
+      dedupeKey: chave2(a.id, etapa)
+    });
+    if (id) {
+      if (etapa === 1) {
+        novos++;
+        novosHoje++;
+      } else followups++;
+    }
+  }
+  if (novos + followups) brain2.emit("change");
+  return { novos, followups };
+}
+function autonomosPainel(brain2) {
+  const min = minDias(brain2);
+  const st = estados(brain2);
+  const cont = (sql) => row(brain2.db, sql)?.n ?? 0;
+  const porEtapa = Array.from({ length: AUT_TOTAL + 1 }, () => 0);
+  let responderam = 0, sairam = 0;
+  const leads = rows(brain2.db, alvosSql).map((a) => {
+    const ult = st.get(a.id);
+    const enviada = ult && ult.enviadoEm !== null ? ult.etapa : ult && ult.etapa > 1 ? ult.etapa - 1 : 0;
+    porEtapa[enviada] = (porEtapa[enviada] ?? 0) + 1;
+    let situacao, proximo = null;
+    if (a.respondeu) {
+      responderam++;
+      situacao = "respondeu";
+    } else if (a.sair || suprimido2(brain2, a.email)) {
+      sairam++;
+      situacao = "pediu para sair";
+    } else if (ult?.status === "rejeitada") situacao = "rascunho recusado ou barrado";
+    else if (ult && ult.etapa >= AUT_TOTAL && ult.enviadoEm !== null) situacao = "sequ\xEAncia conclu\xEDda";
+    else if (!ult) {
+      situacao = "aguardando o 1\xBA e-mail";
+      proximo = 0;
+    } else if (ult.enviadoEm === null) situacao = `e-mail ${ult.etapa} esperando o seu OK`;
+    else {
+      situacao = `${ult.etapa} de ${AUT_TOTAL} enviados`;
+      proximo = ult.enviadoEm + Math.max(AUT_ESPERAS[ult.etapa], min) * DAY4;
+    }
+    return { id: a.id, nome: a.nome, cidade: a.cidade, email: a.email, etapa: enviada, situacao, proximo };
+  });
+  const pendentes = rows(brain2.db, "select id, draft, payload from proposals where status = 'pendente' and kind = 'prospeccao_autonomo' order by created_at, id limit 100").flatMap((r) => {
+    try {
+      const pl = JSON.parse(r.payload);
+      const pid = pl.prospeccao?.prospectId;
+      return pid && pl.envio?.para ? [{ id: r.id, nome: row(brain2.db, "select nome from prospects where id = ?", pid)?.nome ?? "", para: pl.envio.para, assunto: pl.envio.assunto ?? "", corpo: r.draft ?? "", etapa: pl.prospeccao?.etapa ?? 1 }] : [];
+    } catch {
+      return [];
+    }
+  });
+  return {
+    ativo: autonomosConfig(brain2).ativo,
+    descobertos: cont("select count(*) as n from prospect_autonomo"),
+    qualificados: cont("select count(*) as n from prospects p join prospect_autonomo a on a.prospect_id = p.id where p.status in ('qualificado','no_crm')"),
+    revisar: cont("select count(*) as n from prospects p join prospect_autonomo a on a.prospect_id = p.id where p.status = 'revisar'"),
+    comEmailSemCrp: cont("select count(*) as n from prospects p join prospect_autonomo a on a.prospect_id = p.id where p.status = 'revisar' and p.email is not null"),
+    porEtapa,
+    concluidos: porEtapa[AUT_TOTAL] ?? 0,
+    responderam,
+    sairam,
+    emails: emailsResumo(brain2),
+    pendentes,
+    leads: leads.slice(0, 150)
+  };
+}
+
 // packages/core/src/prospeccao-whatsapp.ts
-var DAY3 = 864e5;
+var DAY5 = 864e5;
 var DIAS_FOLLOWUP = 4;
 function numeroWhatsapp(tel) {
   let d = String(tel ?? "").replace(/\D/g, "");
@@ -4810,14 +5709,14 @@ function numeroWhatsapp(tel) {
   return { numero: `55${d}`, celular };
 }
 function mensagemWhatsapp(nome, etapa) {
-  const n3 = nomeCurto(nome);
-  return etapa === 0 ? `Ol\xE1, tudo bem? Aqui \xE9 o Felipe, da Synapsa. Ajudamos cl\xEDnicas de psicologia como a ${n3} a centralizar toda a opera\xE7\xE3o num s\xF3 lugar, tirar processos manuais e automatizar as tarefas administrativas, para a equipe ganhar tempo. Posso te mostrar em uma demonstra\xE7\xE3o de 30 minutos? Mais detalhes em ${SITE_CLINICAS}` : `Oi! S\xF3 retomando minha mensagem sobre a ${n3}. Se fizer sentido ver a demonstra\xE7\xE3o de 30 minutos, \xE9 s\xF3 me avisar o melhor dia e hor\xE1rio. Se n\xE3o for o momento, sem problema algum.`;
+  const n4 = nomeCurto(nome);
+  return etapa === 0 ? `Ol\xE1, tudo bem? Aqui \xE9 o Felipe, da Synapsa. Ajudamos cl\xEDnicas de psicologia como a ${n4} a centralizar toda a opera\xE7\xE3o num s\xF3 lugar, tirar processos manuais e automatizar as tarefas administrativas, para a equipe ganhar tempo. Posso te mostrar em uma demonstra\xE7\xE3o de 30 minutos? Mais detalhes em ${SITE_CLINICAS}` : `Oi! S\xF3 retomando minha mensagem sobre a ${n4}. Se fizer sentido ver a demonstra\xE7\xE3o de 30 minutos, \xE9 s\xF3 me avisar o melhor dia e hor\xE1rio. Se n\xE3o for o momento, sem problema algum.`;
 }
 var linkWhatsapp = (numero, texto2) => `https://wa.me/${numero}?text=${encodeURIComponent(texto2)}`;
 var capDia = (brain2) => Math.max(1, Math.min(30, Number(brain2.policy("prospect_whatsapp_daily", 10)) || 10));
 function enviadosHoje(brain2) {
   const dia5 = brtDay(brain2.clock());
-  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY3).filter((r) => brtDay(r.enviado_em) === dia5).length;
+  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY5).filter((r) => brtDay(r.enviado_em) === dia5).length;
 }
 function painelWhatsapp(brain2) {
   const cap2 = capDia(brain2);
@@ -4828,22 +5727,22 @@ function painelWhatsapp(brain2) {
     brain2.db,
     `select p.id, p.nome, p.cidade, p.telefone, p.whatsapp_no_site, p.nota from prospects p
      left join prospect_contato c on c.prospect_id = p.id
-     where p.status in ('qualificado','no_crm') and p.telefone is not null and coalesce(c.respondeu, 0) = 0 and coalesce(c.sair, 0) = 0
+     where p.status in ('qualificado','no_crm') and p.telefone is not null and p.id not in (select prospect_id from prospect_autonomo) and coalesce(c.respondeu, 0) = 0 and coalesce(c.sair, 0) = 0
      order by p.nota desc, p.id desc limit 300`
   );
   const fila = [];
   for (const p of ps) {
-    const n3 = numeroWhatsapp(p.telefone);
-    if (!n3 || !(n3.celular || p.whatsapp_no_site === 1)) continue;
+    const n4 = numeroWhatsapp(p.telefone);
+    if (!n4 || !(n4.celular || p.whatsapp_no_site === 1)) continue;
     const feitas = rows(brain2.db, "select etapa, enviado_em, pulado from prospect_whatsapp where prospect_id = ?", p.id);
     const e0 = feitas.find((x) => x.etapa === 0);
     const e1 = feitas.find((x) => x.etapa === 1);
     let etapa = null;
     if (!e0) etapa = 0;
-    else if (!e1 && e0.pulado === 0 && agora - e0.enviado_em >= DIAS_FOLLOWUP * DAY3) etapa = 1;
+    else if (!e1 && e0.pulado === 0 && agora - e0.enviado_em >= DIAS_FOLLOWUP * DAY5) etapa = 1;
     if (etapa === null) continue;
     const texto2 = mensagemWhatsapp(p.nome, etapa);
-    fila.push({ prospectId: p.id, nome: p.nome, cidade: p.cidade, telefone: p.telefone, etapa, texto: texto2, link: linkWhatsapp(n3.numero, texto2), nota: p.nota });
+    fila.push({ prospectId: p.id, nome: p.nome, cidade: p.cidade, telefone: p.telefone, etapa, texto: texto2, link: linkWhatsapp(n4.numero, texto2), nota: p.nota });
   }
   fila.sort((a, b) => b.etapa - a.etapa || b.nota - a.nota);
   return { fila: fila.slice(0, restante), enviadosHoje: feitos, capDia: cap2, restanteHoje: restante };
@@ -4856,397 +5755,8 @@ function marcarWhatsapp(brain2, prospectId, etapa, acao) {
   brain2.emit("change");
 }
 
-// packages/core/src/gsc-analise.ts
-var sem = (s2) => s2.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-var LEGAL = /politica|termos|cookies|privacidade|forgot|login|cadastro|entrar/;
-var ACENTOS = { psicologos: "psic\xF3logos", psicologo: "psic\xF3logo", clinicas: "cl\xEDnicas", clinica: "cl\xEDnica", politica: "pol\xEDtica", calculadora: "calculadora", precos: "pre\xE7os", paulo: "paulo", sao: "s\xE3o", brasilia: "bras\xEDlia", goiania: "goi\xE2nia", florianopolis: "florian\xF3polis", belem: "bel\xE9m", vitoria: "vit\xF3ria" };
-var titulo = (slug, acentuar = false) => slug.split("-").filter(Boolean).map((p, i) => {
-  const w = acentuar ? ACENTOS[p] ?? p : p;
-  return ["de", "da", "do", "dos", "das", "e", "para"].includes(p) && i > 0 ? w : w[0].toUpperCase() + w.slice(1);
-}).join(" ");
-function classificarPagina(url) {
-  let caminho = url;
-  try {
-    caminho = new URL(url).pathname;
-  } catch {
-  }
-  caminho = caminho.replace(/\/+$/, "") || "/";
-  const m = caminho.match(/^\/psicologo\/([^/]+)$/);
-  if (m) return { tipo: "perfil", caminho, rotulo: titulo(decodeURIComponent(m[1])) };
-  if (caminho === "/") return { tipo: "home", caminho, rotulo: "P\xE1gina inicial" };
-  if (/^\/psicologos(\/|$)/.test(caminho)) return { tipo: "listagem", caminho, rotulo: caminho === "/psicologos" ? "Lista de psic\xF3logos" : `Lista: ${titulo(caminho.split("/").pop() ?? "", true)}` };
-  if (LEGAL.test(caminho)) return { tipo: "legal", caminho, rotulo: titulo(caminho.split("/").pop() ?? "", true) };
-  if (/\/(clinicas|software-para-psicologos|calculadora|funcionalidades|precos|planos)/.test(caminho)) return { tipo: "produto", caminho, rotulo: titulo(caminho.split("/").pop() ?? "", true) };
-  return { tipo: "outra", caminho, rotulo: titulo(caminho.split("/").pop() ?? "", true) };
-}
-var ROTULO_CATEGORIA = {
-  marca: "Marca (Synapsa e erros de grafia)",
-  concorrente: "Concorrentes",
-  software: "Software e gest\xE3o para psic\xF3logos",
-  psicologo_local: "Psic\xF3logo + cidade",
-  psicologo_tema: "Psic\xF3logo + tema (ansiedade, casal\u2026)",
-  psicologo_geral: "Psic\xF3logo (gen\xE9rica, online, perto de mim)",
-  outra: "Outras"
-};
-var TEMAS = {
-  ansiedade: /ansied|panico|estresse/,
-  depress\u00E3o: /depress|tristeza/,
-  TDAH: /tdah|deficit de atencao/,
-  autismo: /autis|tea\b/,
-  casal: /casal|conjugal|relacionamento/,
-  infantil: /infantil|crianca/,
-  adolescente: /adolescen/,
-  luto: /\bluto\b/,
-  burnout: /burnout|esgotamento/,
-  trauma: /trauma|tept/,
-  TCC: /\btcc\b|cognitivo/,
-  "online": /online|on-line|virtual|\bvideo/,
-  conv\u00EAnio: /convenio|plano de saude|unimed/,
-  "pre\xE7o/social": /valor|preco|barato|gratuit|social|quanto custa/
-};
-var CAPITAIS = ["S\xE3o Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre", "Curitiba", "Bras\xEDlia", "Salvador", "Fortaleza", "Recife", "Goi\xE2nia", "Florian\xF3polis", "Campinas", "Manaus", "Bel\xE9m", "Vit\xF3ria"];
-var SIGLA_CIDADE = { bh: "belo horizonte", sp: "s\xE3o paulo", rj: "rio de janeiro", poa: "porto alegre", bsb: "bras\xEDlia", cwb: "curitiba" };
-var CIDADES_N = new Map(CAPITAIS.map((c2) => [sem(c2), c2]));
-var MARCA_EXTRA = /* @__PURE__ */ new Set(["sicpsa", "napsaicare", "psynaps", "synapsa", "sinapsa"]);
-var CONCORRENTES = /consultapsi|zenklub|psicoplanner|psicomanager|amigopsi|vittude|psicologia viva|scippa|simplepractice|tangerino/;
-function lev(a, b) {
-  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
-  for (let j2 = 1; j2 <= b.length; j2++) d[0][j2] = j2;
-  for (let i = 1; i <= a.length; i++) for (let j2 = 1; j2 <= b.length; j2++) d[i][j2] = Math.min(d[i - 1][j2] + 1, d[i][j2 - 1] + 1, d[i - 1][j2 - 1] + (a[i - 1] === b[j2 - 1] ? 0 : 1));
-  return d[a.length][b.length];
-}
-var NAO_E_MARCA = /* @__PURE__ */ new Set(["sinapse", "sinapses", "sinapsis", "synapse", "synapses"]);
-var ehMarca = (q) => sem(q).split(/\s+/).some((t) => t.length >= 5 && !NAO_E_MARCA.has(t) && (MARCA_EXTRA.has(t) || lev(t, "synapsa") <= (t.length >= 6 && "sp".includes(t[0]) ? 3 : 2)));
-function classificarBusca(busca) {
-  const q = sem(busca);
-  if (ehMarca(busca)) return { categoria: "marca" };
-  if (CONCORRENTES.test(q)) return { categoria: "concorrente" };
-  const psi = /psicolog|terapeuta|terapia|tratamento|atendimento|consulta/.test(q);
-  const softwareTipo = sem(q).split(/\s+/).some((t) => t.length >= 5 && lev(t, "software") <= 2);
-  const tema = Object.entries(TEMAS).find(([, re]) => re.test(q))?.[0];
-  if (softwareTipo && !psi) return { categoria: "software" };
-  if (/(software|sistema|programa|plataforma|app|aplicativo|prontuario|agenda|gestao|gerenciar|controle financeiro|planejamento financeiro|clinica de psicologia)/.test(q) && (psi || /clinica/.test(q))) return { categoria: "software" };
-  if (!psi) return { categoria: "outra" };
-  let cidade;
-  for (const [n3, c2] of CIDADES_N) if (new RegExp(`\\b${n3}\\b`).test(q)) cidade = c2;
-  if (!cidade) {
-    for (const [s2, c2] of Object.entries(SIGLA_CIDADE)) if (new RegExp(`\\b${s2}\\b`).test(q)) cidade = CIDADES_N.get(c2) ?? titulo(c2.replace(/ /g, "-"));
-  }
-  if (!cidade) {
-    const resto = q.replace(/psic[a-z]*|terapeuta[s]?|terapia/g, " ").replace(/\b(em|de|do|da|no|na|para|pra|com|e|a|o|perto|mim|proximo|online|melhor|melhores|bom|boa|tratamento|atendimento|consulta)\b/g, " ").replace(new RegExp(`\\w*(?:${Object.values(TEMAS).map((r) => r.source).join("|")})\\w*`, "g"), " ").replace(/\s+/g, " ").trim();
-    if (resto && !/^(associados|clinica|consultorio|centro|instituto|especialista|especializado|especializada|tratamento|perto|proximo)$/.test(resto) && resto.split(" ").length <= 3 && !Object.values(TEMAS).some((r) => r.test(resto))) cidade = titulo(resto.replace(/ /g, "-"));
-  }
-  if (cidade) return { categoria: "psicologo_local", cidade, tema };
-  if (tema && tema !== "online") return { categoria: "psicologo_tema", tema };
-  return { categoria: "psicologo_geral", tema };
-}
-var somar = (a) => {
-  const clicks = a.reduce((t, x) => t + x.clicks, 0), impressions = a.reduce((t, x) => t + x.impressions, 0);
-  return { clicks, impressions, ctr: impressions ? clicks / impressions : 0, position: impressions ? a.reduce((t, x) => t + x.position * x.impressions, 0) / impressions : 0 };
-};
-function porCategoria(qs) {
-  const g = /* @__PURE__ */ new Map();
-  for (const q of qs) {
-    const c2 = classificarBusca(q.chave).categoria;
-    g.set(c2, [...g.get(c2) ?? [], q]);
-  }
-  return [...g].map(([categoria2, l]) => ({ categoria: categoria2, rotulo: ROTULO_CATEGORIA[categoria2], buscas: l.length, ...somar(l) })).sort((a, b) => b.impressions - a.impressions);
-}
-function cobertura(qs) {
-  const cid = /* @__PURE__ */ new Map(), tem = /* @__PURE__ */ new Map();
-  for (const c2 of CAPITAIS) cid.set(c2, []);
-  for (const t of Object.keys(TEMAS)) tem.set(t, []);
-  for (const q of qs) {
-    const i = classificarBusca(q.chave);
-    if (i.cidade) cid.set(i.cidade, [...cid.get(i.cidade) ?? [], q]);
-    if (i.tema && i.categoria !== "marca") tem.set(i.tema, [...tem.get(i.tema) ?? [], q]);
-  }
-  const monta = (m) => [...m].map(([nome, l]) => ({ nome, buscas: l.length, melhor: l.length ? [...l].sort((a, b) => a.position - b.position)[0].chave : null, ...somar(l) })).sort((a, b) => b.impressions - a.impressions || b.buscas - a.buscas || a.nome.localeCompare(b.nome));
-  return { cidades: monta(cid), temas: monta(tem) };
-}
-function oportunidades(qs, paginaDaBusca = /* @__PURE__ */ new Map()) {
-  return qs.filter((q) => classificarBusca(q.chave).categoria !== "marca" && q.impressions >= 3 && q.ctr < 0.05 && q.position >= 3).map((q) => {
-    const info = classificarBusca(q.chave);
-    const pagina = paginaDaBusca.get(q.chave);
-    const onde = pagina ? ` (hoje aparece com ${pagina.replace(/^https?:\/\/(www\.)?/, "")})` : "";
-    let acao;
-    if (q.position <= 10) acao = `Primeira p\xE1gina, mas sem clique${onde}: reescreva t\xEDtulo e descri\xE7\xE3o para pedir o clique.`;
-    else if (q.position <= 20) acao = `Segunda p\xE1gina${onde}: reforce o conte\xFAdo da p\xE1gina e ponha links internos apontando para ela com essa busca no texto.`;
-    else if (pagina && classificarPagina(pagina).tipo === "listagem" && classificarPagina(pagina).caminho !== "/psicologos") acao = `A p\xE1gina da lista (${classificarPagina(pagina).caminho}) j\xE1 existe, mas est\xE1 na posi\xE7\xE3o ${Math.round(q.position)}: reforce o texto da p\xE1gina, os perfis listados e os links internos para ela.`;
-    else if (info.categoria === "psicologo_local") acao = `Fora do alcance${onde}: falta uma p\xE1gina que responda a essa cidade (lista de psic\xF3logos de ${info.cidade ?? "l\xE1"} ou perfis com a cidade no t\xEDtulo).`;
-    else acao = `Longe do topo${onde}: precisa de p\xE1gina pr\xF3pria para esse assunto.`;
-    return { ...q, acao, categoria: info.categoria, pagina };
-  }).sort((a, b) => b.impressions * (b.position <= 20 ? 2 : 1) - a.impressions * (a.position <= 20 ? 2 : 1) || b.impressions - a.impressions).slice(0, 15);
-}
-var n = (x) => Math.round(x).toLocaleString("pt-BR");
-function recados(e) {
-  const r = [];
-  if (e.atual.impressions === 0) return ["Ainda sem impress\xF5es nesse per\xEDodo."];
-  const visiveis = e.marca.clicks + e.naoMarca.clicks;
-  const shareMarca = visiveis ? e.marca.clicks / visiveis : 0;
-  if (e.tipoSite === "site") {
-    if (visiveis >= 5) r.push(`Dos ${n(e.atual.clicks)} cliques, o Google detalha a busca de ${n(visiveis)}; ${Math.round(shareMarca * 100)}% deles (${n(e.marca.clicks)}) v\xEAm de gente que j\xE1 procurou "Synapsa" pelo nome. Quem busca por necessidade (software, gest\xE3o, programa para psic\xF3logos) trouxe ${n(e.naoMarca.clicks)} cliques em ${n(e.naoMarca.impressions)} impress\xF5es. Para crescer, o ganho est\xE1 a\xED.`);
-    const soft = e.categorias.find((c2) => c2.categoria === "software");
-    if (soft && soft.impressions >= 5) r.push(`Buscas de software para psic\xF3logos: ${n(soft.impressions)} impress\xF5es, posi\xE7\xE3o m\xE9dia ${soft.position.toFixed(1)} e ${n(soft.clicks)} cliques. \xC9 o p\xFAblico que compra; vale uma p\xE1gina por inten\xE7\xE3o ("software para psic\xF3logos", "gest\xE3o financeira para psic\xF3logos", "prontu\xE1rio").`);
-  } else if (e.perfis) {
-    const p = e.perfis;
-    r.push(`${n(p.comImpressao)} perfis apareceram no Google, ${n(p.comClique)} receberam clique${p.semImpressao.length ? ` e ${n(p.semImpressao.length)} ainda n\xE3o apareceram em nenhuma busca` : ""}.`);
-    if (e.naoMarca.impressions) r.push(`Buscas por psic\xF3logo (sem contar a marca): ${n(e.naoMarca.impressions)} impress\xF5es, posi\xE7\xE3o m\xE9dia ${e.naoMarca.position.toFixed(0)}. Acima da posi\xE7\xE3o 10 quase ningu\xE9m clica; o diret\xF3rio ainda est\xE1 fora da disputa por "psic\xF3logo em <cidade>".`);
-  }
-  const lacunas = e.cobertura.cidades.filter((c2) => c2.impressions === 0).slice(0, 5).map((c2) => c2.nome);
-  if (e.tipoSite === "diretorio" && lacunas.length) r.push(`Capitais sem nenhuma presen\xE7a nas buscas: ${lacunas.join(", ")}. Priorize as cidades onde voc\xEA j\xE1 tem psic\xF3logos cadastrados.`);
-  const top = e.ops[0];
-  if (top) r.push(`Maior oportunidade: "${top.chave}" (${n(top.impressions)} impress\xF5es, posi\xE7\xE3o ${top.position.toFixed(0)}). ${top.acao}`);
-  const grafias = e.categorias.find((c2) => c2.categoria === "marca");
-  if (grafias && grafias.buscas >= 4) r.push(`A marca \xE9 buscada de ${n(grafias.buscas)} jeitos diferentes (sinapsa, psynaps, sanapsy\u2026). Vale garantir "Synapsa" no t\xEDtulo e no texto das p\xE1ginas principais e ter um perfil no Google Meu Neg\xF3cio.`);
-  return r;
-}
-
-// packages/core/src/gsc.ts
-var DAY4 = 864e5;
-var ESCOPO = "https://www.googleapis.com/auth/webmasters.readonly";
-var SITES_PADRAO = [
-  { id: "site", rotulo: "synapsa.com.br", siteUrl: "sc-domain:synapsa.com.br", tipo: "site" },
-  // O diretório vive em www.synapsa.chat/psicologos (lista) e /psicologo/<nome> (perfil). A home do synapsa.chat entra junto: é onde a marca é buscada.
-  { id: "diretorio", rotulo: "Diret\xF3rio de psic\xF3logos (synapsa.chat)", siteUrl: "sc-domain:synapsa.chat", tipo: "diretorio", sitemap: "https://www.synapsa.chat/sitemap.xml" }
-];
-var sitesGsc = (brain2) => {
-  const p = brain2.policy("gsc_sites", null);
-  return Array.isArray(p) && p.length ? p : SITES_PADRAO;
-};
-function lerChave(env) {
-  const raw = env.GSC_SERVICE_ACCOUNT?.trim();
-  if (!raw) return null;
-  try {
-    const j2 = JSON.parse(raw);
-    return j2.client_email && j2.private_key ? j2 : null;
-  } catch {
-    return null;
-  }
-}
-var b64url = (b) => {
-  const u = typeof b === "string" ? new TextEncoder().encode(b) : b instanceof Uint8Array ? b : new Uint8Array(b);
-  let s2 = "";
-  for (const x of u) s2 += String.fromCharCode(x);
-  return btoa(s2).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-var cache2 = /* @__PURE__ */ new Map();
-async function tokenGoogle(chave2, agora, f = fetch, escopo = ESCOPO) {
-  const guardado = cache2.get(escopo);
-  if (guardado && guardado.ate > agora + 6e4) return guardado.token;
-  const iat = Math.floor(agora / 1e3);
-  const aud = chave2.token_uri ?? "https://oauth2.googleapis.com/token";
-  const corpo2 = `${b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${b64url(JSON.stringify({ iss: chave2.client_email, scope: escopo, aud, iat, exp: iat + 3600 }))}`;
-  const pem = chave2.private_key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, "");
-  const der = Uint8Array.from(atob(pem), (c2) => c2.charCodeAt(0));
-  const k = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", k, new TextEncoder().encode(corpo2));
-  const r = await f(aud, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: `${corpo2}.${b64url(sig)}` }) });
-  const j2 = await r.json().catch(() => ({}));
-  if (!r.ok || !j2.access_token) throw new BrainError("integration", `Google recusou a chave da conta de servi\xE7o: ${j2.error_description ?? r.status}`);
-  cache2.set(escopo, { token: j2.access_token, ate: agora + (j2.expires_in ?? 3600) * 1e3 });
-  return j2.access_token;
-}
-async function consultar(token, site, body, f) {
-  const filtro = site.pagina ? { dimensionFilterGroups: [{ filters: [{ dimension: "page", operator: "contains", expression: site.pagina }] }] } : {};
-  const todas = [];
-  for (let startRow = 0; startRow < 1e5; startRow += 25e3) {
-    const r = await f(`https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site.siteUrl)}/searchAnalytics/query`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ rowLimit: 25e3, ...body, ...filtro, startRow, dataState: "final" })
-    });
-    if (!r.ok) {
-      const e = await r.json().catch(() => ({}));
-      throw new BrainError("integration", r.status === 403 ? `Sem acesso a ${site.siteUrl}: adicione o e-mail da conta de servi\xE7o como usu\xE1rio dessa propriedade no Search Console.` : `Search Console (${site.siteUrl}): ${e.error?.message ?? r.status}`);
-    }
-    const pg = (await r.json()).rows ?? [];
-    todas.push(...pg);
-    if (pg.length < 25e3 || typeof body.rowLimit === "number") break;
-  }
-  return todas;
-}
-var dia2 = (ms2) => brtDay(ms2);
-var SEM_FILTRO_PAGINA = "";
-async function lerSitemap(url, f, nivel = 0) {
-  const r = await f(url, { headers: { "user-agent": "SynapsaBrain/1.0" } });
-  if (!r.ok) return [];
-  const xml = await r.text();
-  const locs = [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1].replace(/&amp;/g, "&"));
-  if (/<sitemapindex/i.test(xml) && nivel < 2) return (await Promise.all(locs.slice(0, 8).map((u) => lerSitemap(u, f, nivel + 1).catch(() => [])))).flat();
-  return locs;
-}
-async function sincronizarGsc(brain2, env, f = fetch, opt = {}) {
-  const chave2 = lerChave(env);
-  if (!chave2) return "Search Console n\xE3o configurado (falta o segredo GSC_SERVICE_ACCOUNT).";
-  const agora = brain2.clock();
-  const hoje = dia2(agora);
-  if (!opt.forcar && brain2.policy("gsc_ultima_sync", "") === hoje) return "Search Console j\xE1 sincronizado hoje.";
-  const token = await tokenGoogle(chave2, agora, f);
-  const fim = dia2(agora - 2 * DAY4);
-  const fimMs = Date.parse(`${fim}T12:00:00Z`);
-  const janela = { atual: [dia2(fimMs - 27 * DAY4), fim], anterior: [dia2(fimMs - 55 * DAY4), dia2(fimMs - 28 * DAY4)] };
-  const falhas = [];
-  let linhas = 0;
-  for (const s2 of sitesGsc(brain2)) {
-    try {
-      const ult = row(brain2.db, "select max(dia) as d from gsc_dia where site = ?", s2.id)?.d;
-      const ini = ult ? dia2(Date.parse(`${ult}T12:00:00Z`) - 4 * DAY4) : dia2(agora - 90 * DAY4);
-      const diario = await consultar(token, s2, { startDate: ini, endDate: fim, dimensions: ["date"], rowLimit: 500 }, f);
-      const ultP = row(brain2.db, "select max(dia) as d from gsc_pagina_dia where site = ?", s2.id)?.d;
-      const iniP = ultP ? dia2(Date.parse(`${ultP}T12:00:00Z`) - 4 * DAY4) : dia2(agora - 90 * DAY4);
-      const porPagina = await consultar(token, s2, { startDate: iniP, endDate: fim, dimensions: ["date", "page"] }, f);
-      const agg = [];
-      for (const periodo of ["atual", "anterior"]) {
-        const [startDate, endDate] = janela[periodo];
-        for (const dim of ["query", "page", "device", "country"])
-          for (const r of await consultar(token, s2, { startDate, endDate, dimensions: [dim], rowLimit: dim === "query" || dim === "page" ? 1e3 : 50 }, f)) agg.push({ tipo: dim, periodo, k1: r.keys[0], k2: SEM_FILTRO_PAGINA, r });
-      }
-      for (const r of await consultar(token, s2, { startDate: janela.atual[0], endDate: janela.atual[1], dimensions: ["page", "query"], rowLimit: 5e3 }, f)) agg.push({ tipo: "page_query", periodo: "atual", k1: r.keys[0], k2: r.keys[1], r });
-      let perfis = null;
-      if (s2.sitemap) perfis = (await lerSitemap(s2.sitemap, f).catch(() => [])).filter((u) => classificarPagina(u).tipo === "perfil");
-      for (const r of diario) {
-        run(brain2.db, "insert into gsc_dia (site, dia, clicks, impressions, ctr, position) values (?, ?, ?, ?, ?, ?) on conflict(site, dia) do update set clicks = excluded.clicks, impressions = excluded.impressions, ctr = excluded.ctr, position = excluded.position", s2.id, r.keys[0], r.clicks, r.impressions, r.ctr, r.position);
-        linhas++;
-      }
-      for (const r of porPagina) run(brain2.db, "insert into gsc_pagina_dia (site, pagina, dia, clicks, impressions, position) values (?, ?, ?, ?, ?, ?) on conflict(site, pagina, dia) do update set clicks = excluded.clicks, impressions = excluded.impressions, position = excluded.position", s2.id, r.keys[1], r.keys[0], r.clicks, r.impressions, r.position);
-      run(brain2.db, "delete from gsc_agg where site = ?", s2.id);
-      for (const a of agg) run(brain2.db, "insert or replace into gsc_agg (site, tipo, periodo, chave, chave2, clicks, impressions, ctr, position) values (?, ?, ?, ?, ?, ?, ?, ?, ?)", s2.id, a.tipo, a.periodo, a.k1, a.k2, a.r.clicks, a.r.impressions, a.r.ctr, a.r.position);
-      if (perfis && perfis.length) brain2.setPolicy(`gsc_perfis_${s2.id}`, perfis);
-    } catch (e) {
-      falhas.push(e instanceof Error ? e.message : String(e));
-    }
-  }
-  if (falhas.length === 0) brain2.setPolicy("gsc_ultima_sync", hoje);
-  else brain2.setPolicy("gsc_ultimo_erro", falhas.join(" | ").slice(0, 400));
-  if (falhas.length === 0) brain2.setPolicy("gsc_ultimo_erro", null);
-  brain2.audit("sistema", "gsc_sincronizou", `${linhas} dias`, { falhas: falhas.length });
-  brain2.emit("change");
-  return falhas.length ? `Search Console com problema: ${falhas.join(" | ")}` : `Search Console sincronizado (${linhas} dias atualizados).`;
-}
-var soma = (a) => {
-  const clicks = a.reduce((t, x) => t + x.clicks, 0), impressions = a.reduce((t, x) => t + x.impressions, 0);
-  return { clicks, impressions, ctr: impressions ? clicks / impressions : 0, position: impressions ? a.reduce((t, x) => t + x.position * x.impressions, 0) / impressions : 0 };
-};
-function gscPainel(brain2, env) {
-  const sites = sitesGsc(brain2).map((s2) => {
-    const tipoSite = s2.tipo ?? (s2.id === "diretorio" ? "diretorio" : "site");
-    const dias = rows(brain2.db, "select dia, clicks, impressions, ctr, position from gsc_dia where site = ? order by dia desc limit 90", s2.id).reverse();
-    const ult = dias.slice(-28), ant = dias.slice(-56, -28);
-    const agg = rows(brain2.db, "select tipo, periodo, chave, chave2, clicks, impressions, ctr, position from gsc_agg where site = ?", s2.id);
-    const de = (tipo, periodo) => agg.filter((a) => a.tipo === tipo && a.periodo === periodo);
-    const antQ = new Map(de("query", "anterior").map((a) => [a.chave, a]));
-    const antP = new Map(de("page", "anterior").map((a) => [a.chave, a]));
-    const qAtual = de("query", "atual").map((a) => ({ chave: a.chave, clicks: a.clicks, impressions: a.impressions, ctr: a.ctr, position: a.position }));
-    const pq = de("page_query", "atual");
-    const paginaDaBusca = /* @__PURE__ */ new Map();
-    for (const a of [...pq].sort((x, y) => y.impressions - x.impressions)) if (!paginaDaBusca.has(a.chave2)) paginaDaBusca.set(a.chave2, a.chave);
-    const queries = [...qAtual].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 300).map((q) => {
-      const i = classificarBusca(q.chave);
-      const a = antQ.get(q.chave);
-      return { ...q, anterior: { clicks: a?.clicks ?? 0, impressions: a?.impressions ?? 0 }, categoria: i.categoria, cidade: i.cidade, tema: i.tema };
-    });
-    const marcaQ = qAtual.filter((q) => ehMarca(q.chave)), naoQ = qAtual.filter((q) => !ehMarca(q.chave));
-    const marca = soma(marcaQ), naoMarca = soma(naoQ);
-    const categorias = porCategoria(qAtual);
-    const cob = cobertura(qAtual);
-    const ops = oportunidades(qAtual, paginaDaBusca);
-    const serieP = /* @__PURE__ */ new Map();
-    const iniSerie = dias.length ? dia2(Date.parse(`${dias[dias.length - 1].dia}T12:00:00Z`) - 27 * DAY4) : "0000-00-00";
-    for (const r of rows(brain2.db, "select pagina, dia, clicks, impressions from gsc_pagina_dia where site = ? and dia >= ?", s2.id, iniSerie)) {
-      const m = serieP.get(r.pagina) ?? /* @__PURE__ */ new Map();
-      m.set(r.dia, { clicks: r.clicks, impressions: r.impressions });
-      serieP.set(r.pagina, m);
-    }
-    const diasJanela = dias.length ? Array.from({ length: 28 }, (_, i) => dia2(Date.parse(`${iniSerie}T12:00:00Z`) + i * DAY4)) : [];
-    const buscasPorPagina = /* @__PURE__ */ new Map();
-    for (const a of pq) buscasPorPagina.set(a.chave, [...buscasPorPagina.get(a.chave) ?? [], { busca: a.chave2, clicks: a.clicks, impressions: a.impressions, position: a.position }]);
-    const paginas = de("page", "atual").sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 400).map((a) => {
-      const info = classificarPagina(a.chave);
-      const m = serieP.get(a.chave);
-      const p = antP.get(a.chave);
-      return {
-        url: a.chave,
-        ...info,
-        clicks: a.clicks,
-        impressions: a.impressions,
-        ctr: a.ctr,
-        position: a.position,
-        anterior: { clicks: p?.clicks ?? 0, impressions: p?.impressions ?? 0 },
-        serie: diasJanela.map((d) => ({ dia: d, ...m?.get(d) ?? { clicks: 0, impressions: 0 } })),
-        buscas: (buscasPorPagina.get(a.chave) ?? []).sort((x, y) => y.impressions - x.impressions).slice(0, 8),
-        status: a.clicks > 0 ? "clique" : "visto"
-      };
-    });
-    let perfis = null;
-    if (tipoSite === "diretorio") {
-      const vistos = paginas.filter((p) => p.tipo === "perfil");
-      const mapa = brain2.policy(`gsc_perfis_${s2.id}`, null);
-      const caminhosVistos = new Set(vistos.map((p) => p.caminho));
-      const sem2 = (mapa ?? []).map((u) => classificarPagina(u)).filter((i) => !caminhosVistos.has(i.caminho));
-      const unicos = [...new Map(sem2.map((i) => [i.caminho, i])).values()].sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"));
-      perfis = { total: vistos.length + (mapa ? unicos.length : 0), esperados: mapa ? new Set(mapa.map((u) => classificarPagina(u).caminho)).size : null, comImpressao: vistos.length, comClique: vistos.filter((p) => p.clicks > 0).length, semImpressao: unicos.map((i) => ({ url: i.caminho, nome: i.rotulo })) };
-    }
-    const atual = soma(ult.map((x) => ({ ...x })));
-    const base = {
-      id: s2.id,
-      rotulo: s2.rotulo,
-      siteUrl: s2.siteUrl,
-      tipo: tipoSite,
-      ultimoDia: dias.at(-1)?.dia ?? null,
-      serie: dias.map((x) => ({ dia: x.dia, clicks: x.clicks, impressions: x.impressions, position: x.position })),
-      atual,
-      anterior: soma(ant.map((x) => ({ ...x }))),
-      marca,
-      naoMarca,
-      queries,
-      paginas,
-      oportunidades: ops,
-      categorias,
-      cobertura: cob,
-      dispositivos: de("device", "atual").map((a) => ({ chave: a.chave, clicks: a.clicks, impressions: a.impressions, ctr: a.ctr, position: a.position })).sort((a, b) => b.impressions - a.impressions),
-      paises: de("country", "atual").map((a) => ({ chave: a.chave, clicks: a.clicks, impressions: a.impressions, ctr: a.ctr, position: a.position })).sort((a, b) => b.impressions - a.impressions).slice(0, 12),
-      recados: [],
-      perfis
-    };
-    base.recados = recados({ rotuloSite: s2.rotulo, tipoSite, atual, marca, naoMarca, categorias, ops, cobertura: cob, perfis: perfis ? { total: perfis.total, esperados: perfis.esperados, comImpressao: perfis.comImpressao, comClique: perfis.comClique, semImpressao: [] } : void 0 });
-    return base;
-  });
-  const cl = row(brain2.db, "select sum(clicks) as c, sum(impressions) as i from gsc_agg where site = 'site' and tipo = 'page' and periodo = 'atual' and chave like '%/clinicas%'");
-  return {
-    configurado: !!lerChave(env),
-    ultimoErro: brain2.policy("gsc_ultimo_erro", null),
-    ultimaSync: brain2.policy("gsc_ultima_sync", null),
-    sites,
-    clinicas: cl && cl.i != null ? { clicks: cl.c ?? 0, impressions: cl.i } : null,
-    funil: null
-  };
-}
-async function gscPainelCompleto(brain2, env, f = fetch) {
-  const p = gscPainel(brain2, env);
-  const site = p.sites.find((s2) => s2.tipo === "site");
-  const c2 = crmClient(env, f);
-  if (!site || !c2 || !site.ultimoDia) return p;
-  try {
-    const fim = Date.parse(`${site.ultimoDia}T23:59:59-03:00`), ini = fim - 28 * DAY4;
-    const leads = (await c2.all("/leads", {}, 5)).data.filter((l) => {
-      const t = Date.parse(String(l.created_at));
-      return t >= ini && t <= fim;
-    });
-    p.funil = {
-      periodo: `${dia2(ini)} a ${site.ultimoDia}`,
-      cliquesGoogle: site.atual.clicks,
-      leads: leads.length,
-      leadsGoogle: leads.filter((l) => ["google", "landing_page"].includes(String(l.origin))).length,
-      clientes: leads.filter((l) => l.status === "cliente_ativo").length
-    };
-  } catch {
-  }
-  return p;
-}
-
 // packages/core/src/ga.ts
-var DAY5 = 864e5;
+var DAY6 = 864e5;
 var ESCOPO2 = "https://www.googleapis.com/auth/analytics.readonly";
 var DATA = "https://analyticsdata.googleapis.com/v1beta";
 var ADMIN = "https://analyticsadmin.googleapis.com/v1beta";
@@ -5258,7 +5768,7 @@ var propriedadesGa = (brain2) => {
   const p = brain2.policy("ga_propriedades", null);
   return p && typeof p === "object" ? p : {};
 };
-async function chamar(f, token, url, init = {}) {
+async function chamar2(f, token, url, init = {}) {
   const r = await f(url, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers ?? {} } });
   const txt = await r.text();
   let j2 = {};
@@ -5277,21 +5787,21 @@ function traduzir(status, msg2, url = "") {
   return `GA4 respondeu ${status}: ${msg2.slice(0, 160)}`;
 }
 async function relatorio(f, token, prop, ini, fim, dims, metricas = METRICAS, limite = 1e3) {
-  const j2 = await chamar(f, token, `${DATA}/properties/${prop}:runReport`, {
+  const j2 = await chamar2(f, token, `${DATA}/properties/${prop}:runReport`, {
     method: "POST",
     body: JSON.stringify({ dateRanges: [{ startDate: ini, endDate: fim }], dimensions: dims.map((name) => ({ name })), metrics: metricas.map((name) => ({ name })), limit: String(limite), keepEmptyRows: false })
   });
   return (j2.rows ?? []).map((r) => ({ dims: (r.dimensionValues ?? []).map((d) => d.value ?? ""), m: daLinha(r.metricValues ?? []) }));
 }
 async function descobrirPropriedades(brain2, env, f = fetch) {
-  const chave2 = lerChave(env);
-  if (!chave2) throw new BrainError("integration", "Falta o segredo GSC_SERVICE_ACCOUNT.");
-  const token = await tokenGoogle(chave2, brain2.clock(), f, ESCOPO2);
-  const resumo2 = await chamar(f, token, `${ADMIN}/accountSummaries?pageSize=200`);
+  const chave3 = lerChave(env);
+  if (!chave3) throw new BrainError("integration", "Falta o segredo GSC_SERVICE_ACCOUNT.");
+  const token = await tokenGoogle(chave3, brain2.clock(), f, ESCOPO2);
+  const resumo2 = await chamar2(f, token, `${ADMIN}/accountSummaries?pageSize=200`);
   const vistas = [];
   for (const c2 of resumo2.accountSummaries ?? []) for (const p of c2.propertySummaries ?? []) {
     const id = p.property.replace("properties/", "");
-    const fluxos = await chamar(f, token, `${ADMIN}/properties/${id}/dataStreams`).catch(() => ({ dataStreams: [] }));
+    const fluxos = await chamar2(f, token, `${ADMIN}/properties/${id}/dataStreams`).catch(() => ({ dataStreams: [] }));
     vistas.push({ id, nome: p.displayName, enderecos: (fluxos.dataStreams ?? []).map((d) => d.webStreamData?.defaultUri ?? "").filter(Boolean) });
   }
   const achadas = {};
@@ -5303,8 +5813,8 @@ async function descobrirPropriedades(brain2, env, f = fetch) {
   return { achadas, vistas };
 }
 async function sincronizarGa(brain2, env, f = fetch, opt = {}) {
-  const chave2 = lerChave(env);
-  if (!chave2) return "GA4 n\xE3o configurado (falta o segredo GSC_SERVICE_ACCOUNT).";
+  const chave3 = lerChave(env);
+  if (!chave3) return "GA4 n\xE3o configurado (falta o segredo GSC_SERVICE_ACCOUNT).";
   const agora = brain2.clock();
   const hoje = dia3(agora);
   if (!opt.forcar && brain2.policy("ga_ultima_sync", "") === hoje) return "GA4 j\xE1 sincronizado hoje.";
@@ -5326,17 +5836,17 @@ async function sincronizarGa(brain2, env, f = fetch, opt = {}) {
       return `GA4 com problema: ${m}`;
     }
   }
-  const token = await tokenGoogle(chave2, agora, f, ESCOPO2);
-  const fim = dia3(agora - DAY5);
+  const token = await tokenGoogle(chave3, agora, f, ESCOPO2);
+  const fim = dia3(agora - DAY6);
   const fimMs = Date.parse(`${fim}T12:00:00Z`);
-  const janela = { atual: [dia3(fimMs - 27 * DAY5), fim], anterior: [dia3(fimMs - 55 * DAY5), dia3(fimMs - 28 * DAY5)] };
+  const janela = { atual: [dia3(fimMs - 27 * DAY6), fim], anterior: [dia3(fimMs - 55 * DAY6), dia3(fimMs - 28 * DAY6)] };
   let dias = 0;
   for (const s2 of sitesGsc(brain2)) {
     const prop = props[s2.id];
     if (!prop) continue;
     try {
       const ult = row(brain2.db, "select max(dia) as d from ga_dia where site = ?", s2.id)?.d;
-      const ini = ult ? dia3(Date.parse(`${ult}T12:00:00Z`) - 3 * DAY5) : dia3(agora - 90 * DAY5);
+      const ini = ult ? dia3(Date.parse(`${ult}T12:00:00Z`) - 3 * DAY6) : dia3(agora - 90 * DAY6);
       const diario = await relatorio(f, token, prop, ini, fim, ["date"], METRICAS, 500);
       const agg = [];
       for (const periodo of ["atual", "anterior"]) {
@@ -5365,20 +5875,20 @@ async function sincronizarGa(brain2, env, f = fetch, opt = {}) {
   brain2.emit("change");
   return falhas.length ? `GA4 com problema: ${falhas.join(" | ")}` : `GA4 sincronizado (${dias} dias atualizados).`;
 }
-var taxa = (a, b) => b ? a / b : 0;
+var taxa2 = (a, b) => b ? a / b : 0;
 function recadosGa(s2) {
   const out = [];
   const { atual: a, anterior: p } = s2;
   if (!a.sessoes) return ["O GA4 est\xE1 ligado, mas ainda n\xE3o registrou visitas neste per\xEDodo. Confira se a tag est\xE1 publicada e espere 24 a 48 horas."];
-  const eng = taxa(a.engajadas, a.sessoes);
+  const eng = taxa2(a.engajadas, a.sessoes);
   out.push(`${a.sessoes} visitas e ${a.usuarios} pessoas em 28 dias${p.sessoes ? ` (${p.sessoes} antes)` : ""}. ${Math.round(eng * 100)}% das visitas foram engajadas (mais de 10 segundos, 2 p\xE1ginas ou um evento-chave).`);
   const direto = s2.canais.find((c2) => /direct|unassigned/i.test(c2.chave));
-  if (direto && taxa(direto.sessoes, a.sessoes) > 0.5) out.push(`${Math.round(taxa(direto.sessoes, a.sessoes) * 100)}% das visitas v\xEAm sem origem identificada (direto ou n\xE3o atribu\xEDdo). Link de bio, WhatsApp e e-mail precisam de UTM para voc\xEA saber o que traz gente.`);
+  if (direto && taxa2(direto.sessoes, a.sessoes) > 0.5) out.push(`${Math.round(taxa2(direto.sessoes, a.sessoes) * 100)}% das visitas v\xEAm sem origem identificada (direto ou n\xE3o atribu\xEDdo). Link de bio, WhatsApp e e-mail precisam de UTM para voc\xEA saber o que traz gente.`);
   const org = s2.canais.find((c2) => /organic search/i.test(c2.chave));
-  if (org) out.push(`Busca org\xE2nica trouxe ${org.sessoes} visitas (${Math.round(taxa(org.sessoes, a.sessoes) * 100)}%).`);
+  if (org) out.push(`Busca org\xE2nica trouxe ${org.sessoes} visitas (${Math.round(taxa2(org.sessoes, a.sessoes) * 100)}%).`);
   if (!a.eventos && !s2.eventos.some((e) => /sign_up|generate_lead|cadastro|agendar|demo|whatsapp/i.test(e.chave))) out.push("Nenhum evento-chave registrado. Sem ele n\xE3o d\xE1 para medir cadastro ou pedido de demo: marque no GA4 (Administrador > Eventos) o evento que representa a convers\xE3o e eu passo a mostrar o funil.");
-  const ruins = s2.entradas.filter((e) => e.sessoes >= 10 && taxa(e.engajadas, e.sessoes) < 0.35).sort((x, y) => y.sessoes - x.sessoes).slice(0, 2);
-  for (const r of ruins) out.push(`${r.chave} recebe ${r.sessoes} visitas, mas s\xF3 ${Math.round(taxa(r.engajadas, r.sessoes) * 100)}% engajam: \xE9 a p\xE1gina para revisar primeiro.`);
+  const ruins = s2.entradas.filter((e) => e.sessoes >= 10 && taxa2(e.engajadas, e.sessoes) < 0.35).sort((x, y) => y.sessoes - x.sessoes).slice(0, 2);
+  for (const r of ruins) out.push(`${r.chave} recebe ${r.sessoes} visitas, mas s\xF3 ${Math.round(taxa2(r.engajadas, r.sessoes) * 100)}% engajam: \xE9 a p\xE1gina para revisar primeiro.`);
   return out;
 }
 function gaPainel(brain2, env) {
@@ -5406,25 +5916,38 @@ function gaPainel(brain2, env) {
 // packages/core/src/planejamento.ts
 var RESPONSAVEIS_PADRAO = ["Felipe Dalpra", "Cassio", "Felipe Augusto"];
 var STATUS = /* @__PURE__ */ new Set(["pendente", "andamento", "concluida"]);
-var DAY6 = 864e5;
+var DAY7 = 864e5;
+function criarLink(brain2, semana, responsavel) {
+  const ja = row(brain2.db, "select token from plan_links where semana = ? and responsavel = ? and revogado = 0", semana, responsavel);
+  if (ja) return ja.token;
+  const b = crypto.getRandomValues(new Uint8Array(24));
+  const token = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  run(brain2.db, "insert into plan_links (token, semana, responsavel, criado_em) values (?, ?, ?, ?)", token, semana, responsavel, brain2.clock());
+  brain2.audit("voce", "plan_link_criado", semana, { responsavel });
+  return token;
+}
 function segundaDe(dia5) {
   const d = /* @__PURE__ */ new Date(`${dia5}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) throw new BrainError("invalid", "Semana inv\xE1lida.");
   const dow = (d.getUTCDay() + 6) % 7;
-  return new Date(d.getTime() - dow * DAY6).toISOString().slice(0, 10);
+  return new Date(d.getTime() - dow * DAY7).toISOString().slice(0, 10);
 }
 var semanaAtual = (brain2) => segundaDe(brtDay(brain2.clock()));
-var somaDias2 = (dia5, n3) => new Date(Date.parse(`${dia5}T12:00:00Z`) + n3 * DAY6).toISOString().slice(0, 10);
+var somaDias2 = (dia5, n4) => new Date(Date.parse(`${dia5}T12:00:00Z`) + n4 * DAY7).toISOString().slice(0, 10);
 var responsaveis = (brain2) => brain2.policy("plan_responsaveis", RESPONSAVEIS_PADRAO);
-var ver = (l) => ({ id: l.id, semana: l.semana, tipo: l.tipo, titulo: l.titulo, dia: l.dia, formato: l.formato, responsavel: l.responsavel, status: l.status, pai: l.pai, ordem: l.ordem, notas: l.notas, criadoEm: l.criado_em, concluidoEm: l.concluido_em, veioDe: l.veio_de, subtarefas: [] });
+var ver = (l) => ({ id: l.id, semana: l.semana, tipo: l.tipo, titulo: l.titulo, dia: l.dia, formato: l.formato, responsavel: l.responsavel, status: l.status, pai: l.pai, ordem: l.ordem, notas: l.notas, criadoEm: l.criado_em, concluidoEm: l.concluido_em, veioDe: l.veio_de, concluidoPor: null, subtarefas: [] });
 function itensDa(brain2, semana) {
   const todos = rows(brain2.db, "select * from plan_itens where semana = ? order by ordem, criado_em", semana).map(ver);
   const porId = new Map(todos.map((i) => [i.id, i]));
+  for (const m of rows(brain2.db, "select m.item_id, m.quem from plan_marcas m join plan_itens i on i.id = m.item_id where i.semana = ?", semana)) {
+    const it = porId.get(m.item_id);
+    if (it && it.status === "concluida") it.concluidoPor = m.quem;
+  }
   for (const i of todos) if (i.pai) porId.get(i.pai)?.subtarefas.push(i);
   return todos.filter((i) => !i.pai);
 }
 var folhas = (itens2) => itens2.flatMap((i) => i.subtarefas.length ? i.subtarefas : [i]);
-function taxa2(itens2) {
+function taxa3(itens2) {
   const f = folhas(itens2);
   const concluidas = f.filter((i) => i.status === "concluida").length, andamento = f.filter((i) => i.status === "andamento").length;
   return { total: f.length, concluidas, andamento, pendentes: f.length - concluidas - andamento, taxa: f.length ? concluidas / f.length : 0 };
@@ -5432,10 +5955,10 @@ function taxa2(itens2) {
 var porResp = (itens2) => {
   const g = /* @__PURE__ */ new Map();
   for (const i of folhas(itens2)) {
-    const n3 = i.responsavel || "Sem respons\xE1vel";
-    g.set(n3, [...g.get(n3) ?? [], { ...i, subtarefas: [] }]);
+    const n4 = i.responsavel || "Sem respons\xE1vel";
+    g.set(n4, [...g.get(n4) ?? [], { ...i, subtarefas: [] }]);
   }
-  return [...g].map(([nome, l]) => ({ nome, ...taxa2(l) })).sort((a, b) => b.total - a.total);
+  return [...g].map(([nome, l]) => ({ nome, ...taxa3(l) })).sort((a, b) => b.total - a.total);
 };
 function planPainel(brain2, semanaPedida) {
   const atual = semanaAtual(brain2);
@@ -5447,7 +5970,7 @@ function planPainel(brain2, semanaPedida) {
   if (!semanas.includes(atual)) semanas.unshift(atual);
   const historico = semanas.slice(0, 12).map((s2) => {
     const l = itensDa(brain2, s2);
-    return { semana: s2, ...taxa2(l), posts: taxa2(l.filter((i) => i.tipo === "post")), tarefas: taxa2(l.filter((i) => i.tipo === "tarefa")) };
+    return { semana: s2, ...taxa3(l), posts: taxa3(l.filter((i) => i.tipo === "post")), tarefas: taxa3(l.filter((i) => i.tipo === "tarefa")) };
   }).reverse();
   const tudo = semanas.filter((s2) => s2 <= atual).flatMap((s2) => itensDa(brain2, s2));
   const anterior = itensDa(brain2, somaDias2(semana, -7));
@@ -5460,10 +5983,11 @@ function planPainel(brain2, semanaPedida) {
     responsaveis: responsaveis(brain2),
     posts,
     tarefas,
-    resumo: { geral: taxa2(itens2), posts: taxa2(posts), tarefas: taxa2(tarefas), porResponsavel: porResp(itens2) },
+    resumo: { geral: taxa3(itens2), posts: taxa3(posts), tarefas: taxa3(tarefas), porResponsavel: porResp(itens2) },
     historico,
-    acumulado: { geral: taxa2(tudo), porResponsavel: porResp(tudo) },
-    pendentesAnterior: anterior.filter((i) => i.status !== "concluida" && !jaTrazidos.has(i.id)).length
+    acumulado: { geral: taxa3(tudo), porResponsavel: porResp(tudo) },
+    pendentesAnterior: anterior.filter((i) => i.status !== "concluida" && !jaTrazidos.has(i.id)).length,
+    links: rows(brain2.db, "select token, responsavel from plan_links where semana = ? and revogado = 0 order by responsavel", semana)
   };
 }
 var texto = (v, max) => String(v ?? "").trim().slice(0, max);
@@ -5508,11 +6032,19 @@ function planAcao(brain2, body) {
     const st = String(body.status);
     if (!STATUS.has(st)) throw new BrainError("invalid", "Status inv\xE1lido.");
     run(brain2.db, "update plan_itens set status = ?, concluido_em = ? where id = ?", st, st === "concluida" ? agora : null, l.id);
-    if (!l.pai && st !== "andamento") run(brain2.db, "update plan_itens set status = ?, concluido_em = ? where pai = ?", st, st === "concluida" ? agora : null, l.id);
+    const filhos = !l.pai && st !== "andamento" ? rows(brain2.db, "select id from plan_itens where pai = ?", l.id).map((f) => f.id) : [];
+    if (filhos.length) run(brain2.db, "update plan_itens set status = ?, concluido_em = ? where pai = ?", st, st === "concluida" ? agora : null, l.id);
     sincronizarPai(brain2, l.pai);
+    const quem = body.via === "link" ? texto(body.quem, 60) : "";
+    for (const id of [l.id, ...filhos, ...l.pai ? [l.pai] : []]) {
+      const atual = row(brain2.db, "select status from plan_itens where id = ?", id);
+      if (quem && atual?.status === "concluida") run(brain2.db, "insert or replace into plan_marcas (item_id, quem, em) values (?, ?, ?)", id, quem, agora);
+      else run(brain2.db, "delete from plan_marcas where item_id = ?", id);
+    }
   } else if (acao === "remover") {
     const l = pegar(brain2, body.id);
     semana = l.semana;
+    run(brain2.db, "delete from plan_marcas where item_id = ? or item_id in (select id from plan_itens where pai = ?)", l.id, l.id);
     run(brain2.db, "delete from plan_itens where id = ? or pai = ?", l.id, l.id);
     sincronizarPai(brain2, l.pai);
   } else if (acao === "trazer_pendentes") {
@@ -5524,10 +6056,509 @@ function planAcao(brain2, body) {
       run(brain2.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em, veio_de) values (?, ?, ?, ?, ?, ?, ?, 'pendente', null, ?, ?, ?, ?)", novo, semana, i.tipo, i.titulo, i.dia, i.formato, i.responsavel, ++ordem, i.notas, agora, i.id);
       for (const s2 of i.subtarefas) if (s2.status !== "concluida") run(brain2.db, "insert into plan_itens (id, semana, tipo, titulo, dia, formato, responsavel, status, pai, ordem, notas, criado_em, veio_de) values (?, ?, ?, ?, null, '', ?, 'pendente', ?, ?, '', ?, ?)", crypto.randomUUID(), semana, s2.tipo, s2.titulo, s2.responsavel, novo, ++ordem, agora, s2.id);
     }
+  } else if (acao === "compartilhar") {
+    criarLink(brain2, semana, texto(body.responsavel, 60));
+  } else if (acao === "compartilhar_todos") {
+    criarLink(brain2, semana, "");
+    const nomes = /* @__PURE__ */ new Set([...responsaveis(brain2), ...folhas(itensDa(brain2, semana)).map((i) => i.responsavel).filter(Boolean)]);
+    for (const n4 of nomes) criarLink(brain2, semana, n4);
+  } else if (acao === "revogar_links") {
+    run(brain2.db, "update plan_links set revogado = 1 where semana = ?", semana);
+    brain2.audit("voce", "plan_links_revogados", semana);
   } else throw new BrainError("invalid", "A\xE7\xE3o desconhecida.");
   brain2.emit("change");
   return planPainel(brain2, semana);
 }
+
+// packages/core/src/auth.ts
+var enc = new TextEncoder();
+var COOKIE = "brain_session";
+var TTL_MS = 7 * 24 * 36e5;
+var b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+async function hmac(secret, data) {
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return b64(await crypto.subtle.sign("HMAC", key, enc.encode(data)));
+}
+async function safeEqual(a, b) {
+  const [x, y] = await Promise.all([crypto.subtle.digest("SHA-256", enc.encode(a)), crypto.subtle.digest("SHA-256", enc.encode(b))]);
+  const A = new Uint8Array(x);
+  const B = new Uint8Array(y);
+  let d = 0;
+  for (let i = 0; i < A.length; i++) d |= A[i] ^ B[i];
+  return d === 0;
+}
+async function makeSession(secret, now, uid = "0", ver3 = 0) {
+  const corpo2 = `${uid}.${ver3}.${now + TTL_MS}`;
+  return `${corpo2}.${await hmac(secret, corpo2)}`;
+}
+async function lerSessao(secret, token, now) {
+  if (!token) return null;
+  const p = token.split(".");
+  const [uid, ver3, exp, sig] = p.length === 2 ? ["0", "0", p[0], p[1]] : p.length === 4 ? p : [];
+  if (!uid || !ver3 || !exp || !sig || !/^\d+$/.test(exp) || !/^\d+$/.test(ver3) || !/^[\w-]{1,40}$/.test(uid) || Number(exp) < now) return null;
+  const corpo2 = p.length === 2 ? exp : `${uid}.${ver3}.${exp}`;
+  return await safeEqual(sig, await hmac(secret, corpo2)) ? { uid, ver: Number(ver3) } : null;
+}
+async function verifySession(secret, token, now) {
+  return await lerSessao(secret, token, now) !== null;
+}
+var readCookie = (req, name = COOKIE) => req.headers.get("cookie")?.split(/;\s*/).map((c2) => c2.split("=")).find(([k]) => k === name)?.[1];
+var sessionCookie = (token, secure) => `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${TTL_MS / 1e3}${secure ? "; Secure" : ""}`;
+var clearCookie = (secure) => `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure ? "; Secure" : ""}`;
+var j = (status, body, extra = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
+var LoginLimiter = class {
+  constructor(max = 5, windowMs = 6e5) {
+    this.max = max;
+    this.windowMs = windowMs;
+  }
+  fails = /* @__PURE__ */ new Map();
+  recentes(now, k) {
+    const l = (this.fails.get(k) ?? []).filter((t) => now - t < this.windowMs);
+    if (l.length) this.fails.set(k, l);
+    else this.fails.delete(k);
+    return l;
+  }
+  blocked(now, k = "") {
+    return this.recentes(now, k).length >= this.max;
+  }
+  fail(now, k = "") {
+    this.fails.set(k, [...this.recentes(now, k), now]);
+  }
+  reset(k = "") {
+    this.fails.delete(k);
+  }
+};
+var hex = (u) => [...u].map((x) => x.toString(16).padStart(2, "0")).join("");
+var unhex = (h) => new Uint8Array((h.match(/../g) ?? []).map((x) => parseInt(x, 16)));
+async function pbkdf2(senha, sal, voltas) {
+  const k = await crypto.subtle.importKey("raw", enc.encode(senha), "PBKDF2", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: sal, iterations: voltas }, k, 256));
+}
+async function hashSenha(senha) {
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  return `pbkdf2$100000$${hex(sal)}$${hex(await pbkdf2(senha, sal, 1e5))}`;
+}
+async function conferirSenha(senha, guardado2) {
+  const [alg, voltas, sal, h] = (guardado2 ?? "pbkdf2$100000$00000000000000000000000000000000$").split("$");
+  const calc = hex(await pbkdf2(senha, unhex(sal ?? ""), Number(voltas) || 1e5));
+  return alg === "pbkdf2" && !!guardado2 && await safeEqual(calc, h ?? "");
+}
+var quemPorRequisicao = /* @__PURE__ */ new WeakMap();
+var usuarioAtual = (req) => quemPorRequisicao.get(req) ?? null;
+var LOGIN_HTML = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Central Synapsa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>:root{color-scheme:dark;--bg:#060a18;--panel:#0e1630;--line:rgba(138,156,214,.2);--line2:rgba(138,156,214,.4);--text:#e7ecfb;--mut:#93a0c8;--core:#7c9ce8;--ind:#5667d6}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;color:var(--text);font:15px "Hanken Grotesk","Segoe UI",system-ui,sans-serif;padding:16px;background:var(--bg) radial-gradient(1100px 700px at 30% -10%,rgba(86,103,214,.28),transparent 60%);background-image:radial-gradient(1100px 700px at 30% -10%,rgba(86,103,214,.28),transparent 60%),linear-gradient(rgba(138,156,214,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(138,156,214,.045) 1px,transparent 1px);background-size:auto,44px 44px,44px 44px}
+form{width:min(380px,100%);display:grid;gap:12px;background:linear-gradient(160deg,var(--panel),#0a1126);border:1px solid var(--line);border-radius:18px;padding:26px}
+.m{display:flex;align-items:center;gap:10px}.m b{font:700 19px "Chakra Petch","Segoe UI",sans-serif}p{margin:0;color:var(--mut);font-size:14px}
+label{display:grid;gap:5px;color:var(--mut);font-size:13px}
+input,button{font:inherit;padding:11px 12px;border-radius:10px;border:1px solid var(--line2);background:#060a18;color:var(--text);min-width:0}input:focus{outline:2px solid var(--core);outline-offset:1px}
+button{background:linear-gradient(135deg,var(--ind),#6a8bd7);border-color:transparent;color:#fff;font-weight:600;cursor:pointer}button:disabled{opacity:.6}#e{color:#f2808e;min-height:1.2em;font-size:14px}</style></head><body>
+<form id="f"><div class="m"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><defs><radialGradient id="o" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#eaf1ff"/><stop offset=".45" stop-color="#7c9ce8"/><stop offset="1" stop-color="#5667d6"/></radialGradient></defs><circle cx="17" cy="17" r="15" fill="url(#o)"/><circle cx="12.5" cy="15" r="2.2" fill="#0a1126"/><circle cx="21.5" cy="15" r="2.2" fill="#0a1126"/></svg><b>Central Synapsa</b></div>
+<p>Acesso da equipe.</p>
+<label>E-mail<input id="u" type="email" autocomplete="username" placeholder="voce@synapsa.com.br" autofocus></label>
+<label>Senha<input id="p" type="password" autocomplete="current-password" required></label>
+<button id="b">Entrar</button><div id="e" role="alert"></div></form>
+<script>f.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:u.value.trim(),password:p.value})});if(r.ok)location.reload();else document.getElementById('e').textContent=r.status===429?'Muitas tentativas. Espere 10 minutos.':r.status===503?'Login n\xE3o configurado no servidor.':'E-mail ou senha incorretos.'}finally{b.disabled=false}}</script></body></html>`;
+function createAuth(env, limiter = new LoginLimiter(), clock = Date.now, users) {
+  const open = env.ALLOW_INSECURE_LOCAL === "1";
+  const configured = Boolean(env.BRAIN_PASSWORD && env.SESSION_SECRET);
+  const dono = () => ({ id: "0", nome: users?.nomeDoDono() ?? "Felipe", email: "", papel: "admin", dono: true, precisaTrocar: false });
+  const isAuthed = async (req) => open || configured && await verifySession(env.SESSION_SECRET, readCookie(req), clock());
+  async function quem(req) {
+    if (open) return dono();
+    if (!configured) return null;
+    const s2 = await lerSessao(env.SESSION_SECRET, readCookie(req), clock());
+    if (!s2) return null;
+    if (s2.uid === "0") return dono();
+    const u = users?.porId(s2.uid);
+    if (!u || !u.ativo || u.versao !== s2.ver) return null;
+    const { hash: _h, ativo: _a, versao: _v, ...pub } = u;
+    return pub;
+  }
+  const authorize = async (req, url) => {
+    if (url.pathname === "/api/login" && req.method === "POST") return login(req, url);
+    if (url.pathname === "/api/logout" && req.method === "POST") return j(200, { ok: true }, { "set-cookie": clearCookie(url.protocol === "https:") });
+    if (!open && !configured) return j(503, { error: "Login n\xE3o configurado: defina BRAIN_PASSWORD e SESSION_SECRET.", code: "not_configured" });
+    const u = await quem(req);
+    if (!u) return j(401, { error: "Fa\xE7a login.", code: "auth" });
+    quemPorRequisicao.set(req, u);
+    return null;
+  };
+  async function login(req, url) {
+    if (!configured) return j(503, { error: "Login n\xE3o configurado.", code: "not_configured" });
+    const now = clock();
+    let pw = "", email = "";
+    try {
+      const b = await req.json();
+      pw = String(b.password ?? "");
+      email = String(b.email ?? "").trim().toLowerCase().slice(0, 120);
+    } catch {
+    }
+    const chave3 = email || "mestre";
+    if (limiter.blocked(now, chave3)) return j(429, { error: "Muitas tentativas.", code: "rate_limited" });
+    const secure = url.protocol === "https:";
+    if (email) {
+      const u = users?.porEmail(email) ?? null;
+      const certo = pw ? await conferirSenha(pw, u?.hash) : false;
+      if (!u || !u.ativo || !certo) {
+        limiter.fail(now, chave3);
+        return j(401, { error: "E-mail ou senha incorretos.", code: "auth" });
+      }
+      limiter.reset(chave3);
+      users.entrou(u.id, now);
+      return j(200, { ok: true }, { "set-cookie": sessionCookie(await makeSession(env.SESSION_SECRET, now, u.id, u.versao), secure) });
+    }
+    if (!pw || !await safeEqual(pw, env.BRAIN_PASSWORD)) {
+      limiter.fail(now, chave3);
+      return j(401, { error: "Senha incorreta.", code: "auth" });
+    }
+    limiter.reset(chave3);
+    return j(200, { ok: true }, { "set-cookie": sessionCookie(await makeSession(env.SESSION_SECRET, now), secure) });
+  }
+  return { authorize, isAuthed, quem, configured: configured || open };
+}
+
+// packages/core/src/usuarios.ts
+var guardado = (l) => ({ id: l.id, email: l.email, nome: l.nome, hash: l.hash, papel: l.papel, ativo: l.ativo === 1, versao: l.versao, dono: false, precisaTrocar: l.precisa_trocar === 1 });
+var armazemUsuarios = (brain2) => ({
+  porEmail: (email) => {
+    const l = row(brain2.db, "select * from usuarios where email = ?", email.toLowerCase());
+    return l ? guardado(l) : null;
+  },
+  porId: (id) => {
+    const l = row(brain2.db, "select * from usuarios where id = ?", id);
+    return l ? guardado(l) : null;
+  },
+  entrou: (id, quando) => run(brain2.db, "update usuarios set ultimo_acesso = ? where id = ?", quando, id),
+  nomeDoDono: () => brain2.policy("dono", {}).nome || "Felipe"
+});
+function listarUsuarios(brain2) {
+  return rows(brain2.db, "select * from usuarios order by ativo desc, nome collate nocase").map((l) => ({ id: l.id, nome: l.nome, email: l.email, papel: l.papel, ativo: l.ativo === 1, precisaTrocar: l.precisa_trocar === 1, criadoEm: l.criado_em, ultimoAcesso: l.ultimo_acesso }));
+}
+var ALFABETO = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function gerarSenha() {
+  const b = crypto.getRandomValues(new Uint8Array(12));
+  return [...b].map((x) => ALFABETO[x % ALFABETO.length]).join("");
+}
+var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+var pegar2 = (brain2, id) => {
+  const l = row(brain2.db, "select * from usuarios where id = ?", String(id ?? ""));
+  if (!l) throw new BrainError("not_found", "Usu\xE1rio n\xE3o encontrado.");
+  return l;
+};
+async function usuarioAcao(brain2, body) {
+  const acao = String(body.acao ?? "");
+  let temp, email;
+  if (acao === "criar") {
+    const nome = String(body.nome ?? "").trim().slice(0, 80);
+    email = String(body.email ?? "").trim().toLowerCase();
+    if (!nome) throw new BrainError("invalid", "Escreva o nome.");
+    if (!EMAIL.test(email)) throw new BrainError("invalid", "E-mail inv\xE1lido.");
+    if (row(brain2.db, "select 1 from usuarios where email = ?", email)) throw new BrainError("invalid", "J\xE1 existe uma conta com esse e-mail.");
+    temp = gerarSenha();
+    const id = crypto.randomUUID().slice(0, 12);
+    run(brain2.db, "insert into usuarios (id, email, nome, hash, papel, criado_em) values (?, ?, ?, ?, ?, ?)", id, email, nome, await hashSenha(temp), body.papel === "admin" ? "admin" : "membro", brain2.clock());
+    brain2.audit("voce", "usuario_criado", id, { email, papel: body.papel === "admin" ? "admin" : "membro" });
+  } else if (acao === "redefinir_senha") {
+    const l = pegar2(brain2, body.id);
+    temp = gerarSenha();
+    email = l.email;
+    run(brain2.db, "update usuarios set hash = ?, versao = versao + 1, precisa_trocar = 1 where id = ?", await hashSenha(temp), l.id);
+    brain2.audit("voce", "usuario_senha_redefinida", l.id);
+  } else if (acao === "desativar" || acao === "reativar") {
+    const l = pegar2(brain2, body.id);
+    run(brain2.db, "update usuarios set ativo = ?, versao = versao + 1 where id = ?", acao === "reativar" ? 1 : 0, l.id);
+    brain2.audit("voce", acao === "reativar" ? "usuario_reativado" : "usuario_desativado", l.id);
+  } else if (acao === "papel") {
+    const l = pegar2(brain2, body.id);
+    run(brain2.db, "update usuarios set papel = ? where id = ?", body.papel === "admin" ? "admin" : "membro", l.id);
+    brain2.audit("voce", "usuario_papel", l.id, { papel: body.papel });
+  } else throw new BrainError("invalid", "A\xE7\xE3o desconhecida.");
+  brain2.emit("change");
+  return { usuarios: listarUsuarios(brain2), ...temp ? { senhaTemporaria: temp, email } : {} };
+}
+async function trocarSenha(brain2, id, atual, nova) {
+  const l = pegar2(brain2, id);
+  if (!await conferirSenha(atual, l.hash)) throw new BrainError("invalid", "A senha atual n\xE3o confere.");
+  if (nova.length < 8) throw new BrainError("invalid", "A nova senha precisa de pelo menos 8 caracteres.");
+  if (nova === atual) throw new BrainError("invalid", "Escolha uma senha diferente da atual.");
+  run(brain2.db, "update usuarios set hash = ?, versao = versao + 1, precisa_trocar = 0 where id = ?", await hashSenha(nova), l.id);
+  brain2.audit(l.nome, "senha_trocada", l.id);
+  return l.versao + 1;
+}
+
+// packages/core/src/plano-link.ts
+var DAY8 = 864e5;
+var somaDias3 = (dia5, n4) => new Date(Date.parse(`${dia5}T12:00:00Z`) + n4 * DAY8).toISOString().slice(0, 10);
+var DIAS2 = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado", "Domingo"];
+function pegarLink(brain2, token) {
+  const l = /^[0-9a-f]{48}$/.test(token) ? row(brain2.db, "select token, semana, responsavel, revogado from plan_links where token = ?", token) : void 0;
+  if (!l || l.revogado) throw new BrainError("not_found", "Este link n\xE3o existe mais. Pe\xE7a um novo.");
+  return l;
+}
+function vistaPublica(brain2, semana, responsavel) {
+  const todos = itensDa(brain2, semana);
+  const meu = (i) => !responsavel || i.responsavel === responsavel || i.subtarefas.some((s2) => s2.responsavel === responsavel);
+  const limpo = (i) => ({ ...i, notas: "", subtarefas: i.subtarefas.map((s2) => ({ ...s2, notas: "" })) });
+  const itens2 = todos.filter(meu).map(limpo);
+  const posts = itens2.filter((i) => i.tipo === "post").sort((a, b) => (a.dia ?? 9) - (b.dia ?? 9) || a.ordem - b.ordem);
+  const tarefas = itens2.filter((i) => i.tipo === "tarefa");
+  return { semana, fim: somaDias3(semana, 6), responsavel, resumo: taxa3(itens2), posts, tarefas };
+}
+var vistaDoLink = (brain2, token) => {
+  const l = pegarLink(brain2, token);
+  return vistaPublica(brain2, l.semana, l.responsavel);
+};
+function marcarPeloLink(brain2, token, body) {
+  const l = pegarLink(brain2, token);
+  const v = vistaPublica(brain2, l.semana, l.responsavel);
+  const visiveis = new Set([...v.posts, ...v.tarefas].flatMap((i) => [i.id, ...i.subtarefas.map((s2) => s2.id)]));
+  const id = String(body.id ?? "");
+  if (!visiveis.has(id)) throw new BrainError("not_found", "Essa tarefa n\xE3o est\xE1 neste link.");
+  const status = String(body.status ?? "");
+  if (!["pendente", "andamento", "concluida"].includes(status)) throw new BrainError("invalid", "Status inv\xE1lido.");
+  const quem = String(body.quem ?? "").trim().slice(0, 60) || l.responsavel;
+  if (!quem) throw new BrainError("invalid", "Diga quem voc\xEA \xE9 antes de marcar.");
+  planAcao(brain2, { acao: "status", id, status, semana: l.semana, via: "link", quem });
+  brain2.audit("time", "plan_marcado_por_link", id, { quem, status });
+  return vistaPublica(brain2, l.semana, l.responsavel);
+}
+var W = 595;
+var H = 842;
+var M = 48;
+var CP1252 = { "\u2013": 150, "\u2014": 151, "\u2018": 145, "\u2019": 146, "\u201C": 147, "\u201D": 148, "\u2022": 149, "\u2026": 133, "\u20AC": 128 };
+function pdfTexto(s2) {
+  let out = "";
+  for (const ch of s2) {
+    const c2 = ch.codePointAt(0);
+    const b = c2 < 256 ? c2 : CP1252[ch] ?? 63;
+    out += b === 40 || b === 41 || b === 92 ? `\\${String.fromCharCode(b)}` : b >= 32 && b < 127 ? String.fromCharCode(b) : b < 32 ? " " : `\\${b.toString(8).padStart(3, "0")}`;
+  }
+  return out;
+}
+var largura = (s2, tam, neg) => {
+  let w = 0;
+  for (const ch of s2) w += /[iljtfI.,:;'|!()\[\] ]/.test(ch) ? 0.28 : /[mwMW@]/.test(ch) ? 0.85 : /[A-Z]/.test(ch) ? 0.68 : /\d/.test(ch) ? 0.556 : 0.5;
+  return w * tam * (neg ? 1.06 : 1);
+};
+function quebrar(s2, max, tam, neg = false) {
+  const out = [];
+  let cur = "";
+  for (const palavra of s2.replace(/\s+/g, " ").trim().split(" ")) {
+    const t = cur ? `${cur} ${palavra}` : palavra;
+    if (cur && largura(t, tam, neg) > max) {
+      out.push(cur);
+      cur = palavra;
+    } else cur = t;
+  }
+  if (cur) out.push(cur);
+  return out.length ? out : [""];
+}
+var dm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+var pct = (x) => `${Math.round(x * 100)}%`;
+function pdfDaVista(v, linkUrl) {
+  const paginas = [];
+  let pg;
+  const nova = () => {
+    pg = { c: [], y: H - M, annots: [] };
+    paginas.push(pg);
+  };
+  const garantir = (altura) => {
+    if (pg.y - altura < M + 24) nova();
+  };
+  const texto2 = (x, y, s2, tam, neg = false, cinza = false) => pg.c.push(`BT /${neg ? "F2" : "F1"} ${tam} Tf ${cinza ? "0.45 0.48 0.55" : "0.07 0.09 0.15"} rg ${x} ${y} Td (${pdfTexto(s2)}) Tj ET`);
+  const caixa = (x, y, st) => {
+    pg.c.push(`${st === "concluida" ? "0.2 0.65 0.5" : "0.35 0.4 0.55"} RG 1 w ${x} ${y} 10 10 re S`);
+    if (st === "concluida") pg.c.push(`0.2 0.65 0.5 RG 1.6 w ${x + 2} ${y + 5} m ${x + 4.2} ${y + 2.5} l ${x + 8.5} ${y + 8.2} l S`);
+    if (st === "andamento") pg.c.push(`0.85 0.6 0.2 RG 1.6 w ${x + 2.5} ${y + 5} m ${x + 7.5} ${y + 5} l S`);
+  };
+  nova();
+  texto2(M, pg.y - 18, "Planejamento da semana", 20, true);
+  pg.y -= 28;
+  texto2(M, pg.y - 12, `${dm(v.semana)} a ${dm(v.fim)}/${v.fim.slice(0, 4)}${v.responsavel ? `  \xB7  Respons\xE1vel: ${v.responsavel}` : "  \xB7  Equipe toda"}`, 11, false, true);
+  pg.y -= 20;
+  texto2(M, pg.y - 12, v.resumo.total ? `${v.resumo.concluidas} de ${v.resumo.total} conclu\xEDdas (${pct(v.resumo.taxa)})` : "Nada planejado para esta semana", 11, true);
+  pg.y -= 16;
+  if (linkUrl) {
+    texto2(M, pg.y - 11, "Para marcar como conclu\xEDda, abra o link:", 9.5, false, true);
+    texto2(M, pg.y - 24, linkUrl, 8, true);
+    pg.annots.push(`<< /Type /Annot /Subtype /Link /Rect [${M} ${pg.y - 27} ${M + Math.min(largura(linkUrl, 8, true), W - 2 * M)} ${pg.y - 13}] /Border [0 0 0] /A << /S /URI /URI (${pdfTexto(linkUrl)}) >> >>`);
+    pg.y -= 32;
+  }
+  pg.y -= 10;
+  const item = (i, recuo, prefixo = "", resp = true) => {
+    const x = M + recuo, larg = W - M - (x + 20);
+    const rot = `${prefixo}${i.titulo}`;
+    const linhas = quebrar(rot, larg, 11, false);
+    const meta = [i.responsavel && resp ? i.responsavel : "", i.status === "andamento" ? "em andamento" : "", i.status === "concluida" && i.concluidoPor ? `conclu\xEDda por ${i.concluidoPor}` : ""].filter(Boolean).join("  \xB7  ");
+    garantir(linhas.length * 14 + (meta ? 12 : 0) + 8);
+    caixa(x, pg.y - 11, i.status);
+    linhas.forEach((ln, k) => texto2(x + 20, pg.y - 10 - k * 14, ln, 11, false, i.status === "concluida"));
+    pg.y -= linhas.length * 14;
+    if (meta) {
+      texto2(x + 20, pg.y - 8, meta, 9, false, true);
+      pg.y -= 12;
+    }
+    pg.y -= 6;
+  };
+  const titulo2 = (s2) => {
+    garantir(40);
+    pg.y -= 6;
+    texto2(M, pg.y - 12, s2, 13, true);
+    pg.c.push(`0.8 0.83 0.9 RG 0.7 w ${M} ${pg.y - 18} m ${W - M} ${pg.y - 18} l S`);
+    pg.y -= 28;
+  };
+  if (v.posts.length) {
+    titulo2("Posts da semana");
+    for (const p of v.posts) item(p, 0, `${p.dia != null ? `${DIAS2[p.dia].slice(0, 3)} ${dm(somaDias3(v.semana, p.dia))} \xB7 ` : ""}${p.formato ? `[${p.formato}] ` : ""}`, !v.responsavel);
+  }
+  if (v.tarefas.length) {
+    titulo2("Tarefas");
+    for (const t of v.tarefas) {
+      item(t, 0, "", !v.responsavel);
+      for (const s2 of t.subtarefas) item(s2, 22, "", !v.responsavel);
+    }
+  }
+  if (!v.posts.length && !v.tarefas.length) texto2(M, pg.y - 12, "Nenhum item para mostrar.", 11, false, true);
+  const objs = [];
+  const add = (s2) => objs.push(s2) && objs.length;
+  add("<< /Type /Catalog /Pages 2 0 R >>");
+  add("");
+  add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  const kids = [];
+  paginas.forEach((p, n4) => {
+    p.c.push(`BT /F1 8.5 Tf 0.45 0.48 0.55 rg ${M} ${M - 14} Td (${pdfTexto(`Synapsa  \xB7  p\xE1gina ${n4 + 1} de ${paginas.length}`)}) Tj ET`);
+    const cont = p.c.join("\n");
+    const iCont = add(`<< /Length ${cont.length} >>
+stream
+${cont}
+endstream`);
+    const ann = p.annots.map((a) => add(a));
+    const iPag = add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${iCont} 0 R${ann.length ? ` /Annots [${ann.map((a) => `${a} 0 R`).join(" ")}]` : ""} >>`);
+    kids.push(iPag);
+  });
+  objs[1] = `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(" ")}] /Count ${kids.length} >>`;
+  let out = "%PDF-1.4\n";
+  const pos = [];
+  objs.forEach((o, i) => {
+    pos.push(out.length);
+    out += `${i + 1} 0 obj
+${o}
+endobj
+`;
+  });
+  const xref = out.length;
+  out += `xref
+0 ${objs.length + 1}
+0000000000 65535 f 
+${pos.map((p) => `${String(p).padStart(10, "0")} 00000 n 
+`).join("")}trailer
+<< /Size ${objs.length + 1} /Root 1 0 R >>
+startxref
+${xref}
+%%EOF`;
+  const bytes = new Uint8Array(out.length);
+  for (let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+  return bytes;
+}
+var pdfSemana = (brain2, semana, responsavel, linkUrl) => pdfDaVista(vistaPublica(brain2, segundaDe(semana), responsavel), linkUrl);
+var PLANO_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+var PLANO_HTML = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Tarefas da semana \xB7 Synapsa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060a18;--bg2:#0a1126;--panel:#0e1630;--panel2:#141f40;--line:rgba(138,156,214,.16);--line2:rgba(138,156,214,.34);--text:#e7ecfb;--mut:#93a0c8;--blue:#6a8bd7;--indigo:#5667d6;--ok:#5fd3b0;--warn:#f0b86e;--crit:#f2808e;--core2:#7c9ce8;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.5 "Hanken Grotesk","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;
+background-image:radial-gradient(1100px 700px at 30% -10%,rgba(86,103,214,.22),transparent 60%),linear-gradient(rgba(138,156,214,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(138,156,214,.045) 1px,transparent 1px);background-size:auto,44px 44px,44px 44px;background-attachment:fixed;
+padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right)) 60px max(16px,env(safe-area-inset-left))}
+main{max-width:720px;margin:0 auto}
+.marca{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.marca svg{flex:none}.marca span{font:600 17px/1 "Chakra Petch","Segoe UI",sans-serif;letter-spacing:.2px}.marca em{font-style:normal;color:var(--mut);font-size:13px;margin-left:auto}
+.cab{background:linear-gradient(160deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px}
+h1{font:700 26px/1.15 "Chakra Petch","Segoe UI",sans-serif;margin:0 0 4px}
+h2{font:600 14px/1 "Chakra Petch","Segoe UI",sans-serif;letter-spacing:.4px;margin:28px 0 10px;color:var(--mut)}
+.sub{color:var(--mut);font-size:14px;margin:0}
+.top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+a.pdf{display:inline-flex;align-items:center;padding:8px 14px;border-radius:10px;border:1px solid var(--line2);color:var(--text);text-decoration:none;font-weight:500;font-size:14px;transition:background .15s}
+a.pdf:hover{background:#8a9cd61a}
+.barra{height:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:16px 0 8px}
+.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--indigo),var(--ok));border-radius:6px;transition:width .4s}
+#res{color:var(--text);font-weight:500}
+.quem{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:14px 0 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--mut);font-size:14px}
+.quem input{flex:1 1 180px;min-width:0;padding:9px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--text);font:inherit}
+.quem input:focus{outline:2px solid var(--core2);outline-offset:1px}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}ul ul{margin:8px 0 0 30px}
+li>.it{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;gap:13px;align-items:flex-start;transition:border-color .15s,background .15s}
+li>.it:hover{border-color:var(--line2);background:var(--panel2)}
+li li>.it{padding:10px 12px;background:var(--bg2)}
+button.cx{flex:none;width:28px;height:28px;border-radius:9px;border:2px solid var(--line2);background:transparent;color:#04201a;font-size:17px;font-weight:700;line-height:1;cursor:pointer;padding:0;transition:background .15s,border-color .15s}
+button.cx:hover{border-color:var(--ok)}
+button.cx.c{background:var(--ok);border-color:var(--ok)}button.cx.a{border-color:var(--warn);color:var(--warn)}button.cx:focus-visible{outline:2px solid var(--core2);outline-offset:2px}
+.t{min-width:0;flex:1}.t b{font-weight:600;overflow-wrap:anywhere}.t.f b{text-decoration:line-through;text-decoration-color:var(--mut);color:var(--mut);font-weight:500}
+.m{color:var(--mut);font-size:13px;margin-top:2px}.erro{color:var(--crit);background:rgba(242,128,142,.1);border:1px solid rgba(242,128,142,.35);border-radius:10px;padding:8px 12px;margin:14px 0 0}.vazio{color:var(--mut)}
+.rodape{margin-top:36px;text-align:center;color:var(--mut);font-size:12.5px}
+@media print{body{background:#fff;color:#000}.quem,a.pdf,button.cx{display:none}}
+</style></head><body><main>
+<div class="marca"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><defs><radialGradient id="o" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#eaf1ff"/><stop offset=".45" stop-color="#7c9ce8"/><stop offset="1" stop-color="#5667d6"/></radialGradient></defs><circle cx="17" cy="17" r="15" fill="url(#o)"/><circle cx="17" cy="17" r="15" fill="none" stroke="#8a9cd6" stroke-opacity=".5"/><circle cx="12.5" cy="15" r="2.2" fill="#0a1126"/><circle cx="21.5" cy="15" r="2.2" fill="#0a1126"/></svg><span>Central Synapsa</span><em>Time</em></div>
+<section class="cab"><div class="top"><div><h1>Tarefas da semana</h1><p class="sub" id="sub"></p></div><a class="pdf" id="pdf" href="#">Baixar PDF</a></div>
+<div class="barra"><i id="prog" style="width:0"></i></div><p class="sub" id="res"></p></section>
+<div class="quem" id="quem" hidden><label for="nome">Seu nome, para registrar quem concluiu:</label><input id="nome" maxlength="60" autocomplete="name" placeholder="Ex.: Cassio"></div>
+<p class="erro" id="erro" hidden></p><div id="lista"></div>
+<p class="rodape">Synapsa. Onde a pr\xE1tica evolui.</p>
+</main><script>
+(function(){
+var token=location.pathname.split("/").filter(Boolean).pop();
+var api="/api/p/"+token, nomeEl=document.getElementById("nome"), fixo="";
+var DIAS=["Seg","Ter","Qua","Qui","Sex","S\xE1b","Dom"];
+try{nomeEl.value=localStorage.getItem("plano_nome")||""}catch(e){}
+nomeEl.addEventListener("input",function(){try{localStorage.setItem("plano_nome",nomeEl.value)}catch(e){}});
+document.getElementById("pdf").href=api+"/pdf";
+function dm(d){return d.slice(8,10)+"/"+d.slice(5,7)}
+function soma(d,n){return new Date(Date.parse(d+"T12:00:00Z")+n*864e5).toISOString().slice(0,10)}
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function erro(m){var e=document.getElementById("erro");e.hidden=!m;e.textContent=m||""}
+function marcar(i){
+  var quem=fixo||nomeEl.value.trim();
+  if(!quem){erro("Escreva seu nome acima antes de marcar.");nomeEl.focus();return}
+  erro("");
+  fetch(api+"/status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:i.id,status:i.status==="concluida"?"pendente":"concluida",quem:quem})})
+   .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"N\xE3o deu certo.");return j})}).then(desenhar).catch(function(e){erro(e.message)});
+}
+function linha(i,sub){
+  var li=el("li"),it=el("div","it"),b=el("button","cx"+(i.status==="concluida"?" c":i.status==="andamento"?" a":""),i.status==="concluida"?"\u2713":i.status==="andamento"?"\u2013":"");
+  b.type="button";b.setAttribute("role","checkbox");b.setAttribute("aria-checked",i.status==="concluida"?"true":"false");b.setAttribute("aria-label",(i.status==="concluida"?"Reabrir: ":"Concluir: ")+i.titulo);
+  b.onclick=function(){marcar(i)};
+  var t=el("div","t"+(i.status==="concluida"?" f":"")),meta=[];
+  t.appendChild(el("b",null,(i.dia!=null&&i.tipo==="post"?DIAS[i.dia]+" \xB7 ":"")+(i.formato?"["+i.formato+"] ":"")+i.titulo));
+  if(i.responsavel&&!fixo)meta.push(i.responsavel);
+  if(i.status==="andamento")meta.push("em andamento");
+  if(i.status==="concluida"&&i.concluidoPor)meta.push("conclu\xEDda por "+i.concluidoPor);
+  if(meta.length)t.appendChild(el("div","m",meta.join(" \xB7 ")));
+  it.appendChild(b);it.appendChild(t);li.appendChild(it);
+  if(i.subtarefas&&i.subtarefas.length){var u=el("ul");i.subtarefas.forEach(function(s){u.appendChild(linha(s,true))});li.appendChild(u)}
+  return li;
+}
+function bloco(box,titulo,itens){
+  if(!itens.length)return;
+  box.appendChild(el("h2",null,titulo));var u=el("ul");itens.forEach(function(i){u.appendChild(linha(i))});box.appendChild(u);
+}
+function desenhar(v){
+  fixo=v.responsavel||"";
+  document.getElementById("quem").hidden=!!fixo;
+  document.getElementById("sub").textContent=dm(v.semana)+" a "+dm(v.fim)+(fixo?" \xB7 "+fixo:" \xB7 equipe toda");
+  var r=v.resumo;document.getElementById("prog").style.width=(r.taxa*100)+"%";
+  document.getElementById("res").textContent=r.total?r.concluidas+" de "+r.total+" conclu\xEDdas":"Nada planejado para esta semana.";
+  var box=document.getElementById("lista");box.textContent="";
+  bloco(box,"Posts da semana",v.posts);bloco(box,"Tarefas",v.tarefas);
+  if(!v.posts.length&&!v.tarefas.length)box.appendChild(el("p","vazio","Nenhum item para mostrar."));
+}
+function carregar(){fetch(api).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"Link inv\xE1lido.");return j})}).then(desenhar).catch(function(e){erro(e.message)})}
+carregar();setInterval(function(){if(!document.hidden)carregar()},45000);
+})();
+</script></body></html>`;
 
 // packages/core/src/compliance.ts
 var EXTERNAL2 = /* @__PURE__ */ new Set(["whatsapp", "email", "linkedin", "instagram"]);
@@ -5587,7 +6618,7 @@ function revisarTexto(texto2) {
 var MATURIDADES = /* @__PURE__ */ new Set(["existe", "piloto", "plano", "educativo"]);
 function receberPost(brain2, body, origem) {
   const s2 = (k, max) => String(body[k] ?? "").trim().slice(0, max);
-  const legenda = s2("legenda", 2200), tema = s2("tema", 160), pilar = s2("pilar", 60), textos = s2("textos", 6e3), creditos = s2("creditos", 600), chave2 = s2("chave", 120);
+  const legenda = s2("legenda", 2200), tema = s2("tema", 160), pilar = s2("pilar", 60), textos = s2("textos", 6e3), creditos = s2("creditos", 600), chave3 = s2("chave", 120);
   const maturidade = s2("maturidade", 20) || "educativo";
   const slides = Array.isArray(body.slides) ? body.slides.map(String) : [];
   if (!legenda || !tema) throw new BrainError("invalid", "Faltou tema ou legenda.");
@@ -5600,8 +6631,8 @@ function receberPost(brain2, body, origem) {
   const motivo = revisarTexto(`${legenda}
 ${textos}`);
   if (motivo) throw new BrainError("invalid", `A conformidade barrou esse post: ${motivo}. Reescreva e mande de novo.`);
-  if (chave2) {
-    const ja = row(brain2.db, "select id, status, agendado_para from ig_posts where chave = ?", chave2);
+  if (chave3) {
+    const ja = row(brain2.db, "select id, status, agendado_para from ig_posts where chave = ?", chave3);
     if (ja) return { id: ja.id, status: ja.status, agendadoPara: ja.agendado_para };
   }
   const agora = brain2.clock();
@@ -5609,7 +6640,7 @@ ${textos}`);
   const agendado = Number.isFinite(ag) && ag > agora ? ag : agora;
   const id = crypto.randomUUID();
   brain2.db.transaction(() => {
-    run(brain2.db, "insert into ig_posts (id, chave, status, tema, pilar, maturidade, legenda, textos, creditos, agendado_para, criado_em) values (?, ?, 'pendente', ?, ?, ?, ?, ?, ?, ?, ?)", id, chave2 || null, tema, pilar, maturidade, legenda, textos, creditos, agendado, agora);
+    run(brain2.db, "insert into ig_posts (id, chave, status, tema, pilar, maturidade, legenda, textos, creditos, agendado_para, criado_em) values (?, ?, 'pendente', ?, ?, ?, ?, ?, ?, ?, ?)", id, chave3 || null, tema, pilar, maturidade, legenda, textos, creditos, agendado, agora);
     slides.forEach((b, i) => run(brain2.db, "insert into ig_midia (id, post_id, ordem, b64) values (?, ?, ?, ?)", crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "").slice(0, 8), id, i, b));
   });
   brain2.setPolicy("ig_origem", origem);
@@ -5682,6 +6713,11 @@ async function graph(env, f, metodo, caminho, params) {
   if (!res.ok) throw new BrainError("invalid", `Instagram recusou (${res.status}): ${body.error?.message ?? "erro"}`);
   return body;
 }
+var Pausa = class extends Error {
+  constructor() {
+    super("pausa");
+  }
+};
 async function publicarPost(brain2, env, id, f = fetch, espera = (ms2) => new Promise((r) => setTimeout(r, ms2))) {
   if (brain2.killed()) throw new BrainError("kill_switch", "Bot\xE3o de emerg\xEAncia ligado.");
   const p = row(brain2.db, "select * from ig_posts where id = ?", id);
@@ -5695,35 +6731,55 @@ async function publicarPost(brain2, env, id, f = fetch, espera = (ms2) => new Pr
   const midias = rows(brain2.db, "select id from ig_midia where post_id = ? order by ordem", id).map((m) => `${origem}/api/midia/${m.id}.jpg`);
   if (!midias.length) throw new BrainError("invalid", "Esse post n\xE3o tem imagem.");
   run(brain2.db, "update ig_posts set status = 'falhou', erro = 'publica\xE7\xE3o interrompida: confira o perfil antes de tentar de novo' where id = ?", id);
+  const LIMITE = 30;
+  let usadas = 0;
+  const fc = (async (...a) => {
+    if (++usadas > LIMITE) throw new Pausa();
+    return f(...a);
+  });
+  const prog = row(brain2.db, "select filhos, container from ig_progresso where post_id = ?", id);
+  const filhos = prog ? JSON.parse(prog.filhos) : [];
   try {
     const pronto = async (container) => {
       for (let i = 0; i < 10; i++) {
-        const st = await graph(env, f, "GET", container, { fields: "status_code" });
+        const st = await graph(env, fc, "GET", container, { fields: "status_code" });
         if (st.status_code === "FINISHED" || st.status_code === void 0) return;
         if (st.status_code === "ERROR" || st.status_code === "EXPIRED") throw new BrainError("invalid", `O Instagram n\xE3o processou a imagem (${st.status_code}).`);
-        await espera(2e3);
+        await espera(3e3);
       }
+      throw new Pausa();
     };
     let criacao;
     if (midias.length === 1) {
-      criacao = (await graph(env, f, "POST", `${ig}/media`, { image_url: midias[0], caption: p.legenda })).id;
+      criacao = prog?.container ?? (await graph(env, fc, "POST", `${ig}/media`, { image_url: midias[0], caption: p.legenda })).id;
+      run(brain2.db, "insert or replace into ig_progresso (post_id, filhos, container) values (?, '[]', ?)", id, criacao);
+    } else if (prog?.container) {
+      criacao = prog.container;
     } else {
-      const filhos = [];
-      for (const u of midias) {
-        const c2 = (await graph(env, f, "POST", `${ig}/media`, { image_url: u, is_carousel_item: "true" })).id;
-        await pronto(c2);
+      for (let i = filhos.length; i < midias.length; i++) {
+        const c2 = (await graph(env, fc, "POST", `${ig}/media`, { image_url: midias[i], is_carousel_item: "true" })).id;
         filhos.push(c2);
+        run(brain2.db, "insert or replace into ig_progresso (post_id, filhos, container) values (?, ?, null)", id, JSON.stringify(filhos));
       }
-      criacao = (await graph(env, f, "POST", `${ig}/media`, { media_type: "CAROUSEL", children: filhos.join(","), caption: p.legenda })).id;
+      for (const c2 of filhos) await pronto(c2);
+      criacao = (await graph(env, fc, "POST", `${ig}/media`, { media_type: "CAROUSEL", children: filhos.join(","), caption: p.legenda })).id;
+      run(brain2.db, "insert or replace into ig_progresso (post_id, filhos, container) values (?, ?, ?)", id, JSON.stringify(filhos), criacao);
     }
     await pronto(criacao);
-    const mediaId = (await graph(env, f, "POST", `${ig}/media_publish`, { creation_id: criacao })).id;
-    const link = await graph(env, f, "GET", mediaId, { fields: "permalink" }).then((r) => r.permalink ?? null).catch(() => null);
+    usadas = Math.min(usadas, LIMITE - 4);
+    const mediaId = (await graph(env, fc, "POST", `${ig}/media_publish`, { creation_id: criacao })).id;
+    const link = await graph(env, fc, "GET", mediaId, { fields: "permalink" }).then((r) => r.permalink ?? null).catch(() => null);
     run(brain2.db, "update ig_posts set status = 'publicado', publicado_em = ?, media_id = ?, permalink = ?, erro = null where id = ?", brain2.clock(), mediaId, link, id);
+    run(brain2.db, "delete from ig_progresso where post_id = ?", id);
     brain2.audit("sistema", "ig_publicou", p.tema, { mediaId });
     brain2.emit("change");
     return "Publicado no Instagram.";
   } catch (e) {
+    if (e instanceof Pausa) {
+      run(brain2.db, "update ig_posts set status = 'aprovado', erro = 'em andamento: continuo na pr\xF3xima rodada' where id = ?", id);
+      brain2.emit("change");
+      return "Publica\xE7\xE3o em andamento: continua na pr\xF3xima rodada.";
+    }
     const msg2 = e instanceof Error ? e.message : String(e);
     run(brain2.db, "update ig_posts set status = 'falhou', erro = ? where id = ?", msg2.slice(0, 300), id);
     brain2.emit("change");
@@ -5866,7 +6922,7 @@ var SISTEMA = `Voc\xEA \xE9 Felipe Dalpra, fundador da Synapsa, plataforma para 
 Regras: m\xE1ximo 1200 caracteres; 3 a 5 hashtags no final; frases curtas; nada de "voc\xEA sabia?"; sem emoji em excesso (no m\xE1ximo 2).
 Proibido: prometer resultado cl\xEDnico, cura ou garantia; desconto, promo\xE7\xE3o ou urg\xEAncia artificial; dado ou caso cl\xEDnico de paciente; estat\xEDstica ou n\xFAmero inventado (s\xF3 use n\xFAmero se for citar quem publicou e o ano); citar concorrente; dizer que a Synapsa garante conformidade com a NR 1.
 Responda s\xF3 com o texto do post, sem t\xEDtulo nem explica\xE7\xE3o.`;
-var row2 = (l) => ({ id: l.id, status: l.status, categoria: l.categoria, texto: l.texto, criadoEm: l.criado_em, publicadoEm: l.publicado_em, permalink: l.permalink, erro: l.erro, manual: l.manual === 1 });
+var row22 = (l) => ({ id: l.id, status: l.status, categoria: l.categoria, texto: l.texto, criadoEm: l.criado_em, publicadoEm: l.publicado_em, permalink: l.permalink, erro: l.erro, manual: l.manual === 1 });
 var diaDePostar = (agora) => [1, 3, 5].includes((/* @__PURE__ */ new Date(`${brtDay(agora)}T12:00:00Z`)).getUTCDay());
 function proximoTema(brain2) {
   const ult = new Map(rows(brain2.db, "select categoria, max(criado_em) as u from li_posts group by categoria").map((r) => [r.categoria, r.u]));
@@ -5928,7 +6984,7 @@ function liPainel(brain2, env) {
   const ls = rows(brain2.db, "select * from li_posts order by case status when 'pendente' then 0 when 'falhou' then 1 when 'aprovado' then 2 else 3 end, criado_em desc limit 40");
   const au = lerAutor(brain2);
   const doToken = !!lerToken(brain2);
-  return { configurado: liConfigurado(brain2, env), alvo: doToken ? au.alvo : "organizacao", destino: doToken && au.alvo === "pessoa" ? `perfil de ${au.nome ?? "voc\xEA"}` : `p\xE1gina da empresa (${env.LINKEDIN_ORG_ID ?? ORG_PADRAO})`, appPronto: !!(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET), expiraEm: lerToken(brain2)?.expira_em ?? null, organizacao: env.LINKEDIN_ORG_ID ?? ORG_PADRAO, llm: !!llmConfig(env, "agent"), diasDePostar: "segunda, quarta e sexta", posts: ls.map(row2) };
+  return { configurado: liConfigurado(brain2, env), alvo: doToken ? au.alvo : "organizacao", destino: doToken && au.alvo === "pessoa" ? `perfil de ${au.nome ?? "voc\xEA"}` : `p\xE1gina da empresa (${env.LINKEDIN_ORG_ID ?? ORG_PADRAO})`, appPronto: !!(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET), expiraEm: lerToken(brain2)?.expira_em ?? null, organizacao: env.LINKEDIN_ORG_ID ?? ORG_PADRAO, llm: !!llmConfig(env, "agent"), diasDePostar: "segunda, quarta e sexta", posts: ls.map(row22) };
 }
 async function liGerar(brain2, env, f = fetch, opts = {}) {
   if (brain2.killed()) return null;
@@ -6156,7 +7212,7 @@ O rascunho de retorno j\xE1 est\xE1 em Aprova\xE7\xF5es na Central.`, f);
 }
 
 // packages/core/src/webhook-resend.ts
-var b64 = (s2) => Uint8Array.from(atob(s2), (c2) => c2.charCodeAt(0));
+var b642 = (s2) => Uint8Array.from(atob(s2), (c2) => c2.charCodeAt(0));
 var toB64 = (u) => btoa(String.fromCharCode(...u));
 async function assinaturaValida(secret, headers, raw, agoraMs) {
   const id = headers.get("svix-id");
@@ -6165,7 +7221,7 @@ async function assinaturaValida(secret, headers, raw, agoraMs) {
   if (!id || !ts || !sig || !secret.startsWith("whsec_")) return false;
   if (!Number.isFinite(Number(ts)) || Math.abs(agoraMs / 1e3 - Number(ts)) > 300) return false;
   try {
-    const key = await crypto.subtle.importKey("raw", b64(secret.slice(6)), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const key = await crypto.subtle.importKey("raw", b642(secret.slice(6)), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     const esperado = toB64(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${id}.${ts}.${raw}`))));
     return sig.split(" ").some((p) => p.startsWith("v1,") && p.slice(3) === esperado);
   } catch {
@@ -6204,7 +7260,7 @@ async function receberWebhook(brain2, env, req) {
 var API = "https://api.apify.com/v2";
 var ATORES = { maps: "compass~crawler-google-places", site: "apify~website-content-crawler" };
 var REGIOES = ["S\xE3o Paulo, SP", "Rio de Janeiro, RJ", "Belo Horizonte, MG", "Campinas, SP", "Niter\xF3i, RJ", "Santo Andr\xE9, SP", "Uberl\xE2ndia, MG", "Juiz de Fora, MG"];
-var r24 = (n3) => Math.round(n3 * 100) / 100;
+var r24 = (n4) => Math.round(n4 * 100) / 100;
 var mes = (now) => new Date(now - 3 * 36e5).toISOString().slice(0, 7);
 function orcamento(brain2) {
   const mesUsd = Number(brain2.policy("apify_budget_usd_month", 5));
@@ -6236,7 +7292,7 @@ async function apify(env, f, path, init = {}) {
 async function iniciar(env, f, ator, input, tetoUsd) {
   return apify(env, f, `/acts/${ator}/runs?maxTotalChargeUsd=${tetoUsd}&timeout=600`, { method: "POST", body: JSON.stringify(input) });
 }
-var statusDe = (env, f, id) => apify(env, f, `/actor-runs/${encodeURIComponent(id)}`);
+var statusDe2 = (env, f, id) => apify(env, f, `/actor-runs/${encodeURIComponent(id)}`);
 var itens = async (env, f, ds, limit = 500) => {
   const r = await apify(env, f, `/datasets/${encodeURIComponent(ds)}/items?clean=true&limit=${limit}&format=json`);
   return Array.isArray(r) ? r : [];
@@ -6245,17 +7301,18 @@ async function iniciarDescoberta(brain2, env, d, f = fetch) {
   const regiao = (d.regiao ?? "").trim();
   if (regiao.length < 3 || regiao.length > 80) throw new BrainError("invalid", "Diga a cidade, ex.: S\xE3o Paulo, SP.");
   const busca = (d.busca ?? "").trim().slice(0, 80);
-  const termos = busca ? [busca] : ["cl\xEDnica de psicologia", "centro de psicologia", "cl\xEDnica multidisciplinar psicologia"];
+  const autonomo = d.tipo === "autonomo";
+  const termos = busca ? [busca] : autonomo ? ["psic\xF3logo cl\xEDnico", "psic\xF3loga cl\xEDnica", "consult\xF3rio de psicologia"] : ["cl\xEDnica de psicologia", "centro de psicologia", "cl\xEDnica multidisciplinar psicologia"];
   const maximo = Math.min(Math.max(Math.floor(d.maximo ?? 20), 1), 60);
   const teto = tetoDaRodada(brain2);
   const r = await iniciar(env, f, ATORES.maps, { searchStringsArray: termos, locationQuery: `${regiao}, Brasil`, maxCrawledPlacesPerSearch: maximo, language: "pt-BR", skipClosedPlaces: true, scrapePlaceDetailPage: false }, teto);
-  run(brain2.db, "insert into prospect_runs (tipo, apify_run_id, dataset_id, status, consulta, criado_em) values ('descoberta', ?, ?, 'rodando', ?, ?)", r.id, r.defaultDatasetId ?? null, `${termos.length > 1 ? "cl\xEDnicas de psicologia" : busca} \xB7 ${regiao}`, brain2.clock());
+  run(brain2.db, "insert into prospect_runs (tipo, apify_run_id, dataset_id, status, consulta, criado_em) values ('descoberta', ?, ?, 'rodando', ?, ?)", r.id, r.defaultDatasetId ?? null, `${autonomo ? "aut\xF4nomos" : termos.length > 1 ? "cl\xEDnicas de psicologia" : busca} \xB7 ${regiao}`, brain2.clock());
   brain2.audit("voce", "prospeccao_descoberta", regiao);
   brain2.emit("prospeccao");
   return `Busca iniciada: ${termos[0]} em ${regiao} (at\xE9 ${maximo} lugares, teto US$ ${teto}).`;
 }
 var s = (v) => typeof v === "string" && v.trim() ? v.trim() : null;
-var n2 = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
+var n3 = (v) => typeof v === "number" && Number.isFinite(v) ? v : null;
 var host = (u) => {
   try {
     return u ? new URL(u.startsWith("http") ? u : `https://${u}`).hostname.replace(/^www\./, "") : null;
@@ -6265,10 +7322,13 @@ var host = (u) => {
 };
 var NAO_CLINICA = /\b(clube|caps\b|capsi|ubs\b|hospital|escola|col[eé]gio|universidade|faculdade|prefeitura|igreja|academia|cemp|detran|psic[oó]log[oa]\s+[A-ZÀ-Ú]|psiconew|consult[oó]rio\s+(de\s+)?psicologia\s+[A-ZÀ-Ú][a-zà-ú]+\s+[A-ZÀ-Ú])/i;
 var ehAlvo = (nome) => !NAO_CLINICA.test(nome);
+var NAO_AUTONOMO = /\b(clube|caps\b|capsi|ubs\b|hospital|escola|col[eé]gio|universidade|faculdade|prefeitura|igreja|academia|detran|cl[ií]nica|centro|instituto|n[uú]cleo|laborat[oó]rio|psiquiatri\w*|multidisciplinar\w*|terapias)\b/i;
+var ehAlvoAutonomo = (nome) => !NAO_AUTONOMO.test(nome);
 var SITE_RUIM = /(instagram|facebook|linktr\.ee|wa\.me|whatsapp|doctoralia|google|youtube|tiktok|linkedin)/i;
 function ingerirDescoberta(brain2, itens_, consulta) {
   let novos = 0, repetidos = 0;
   const agora = brain2.clock();
+  const auto = consulta.startsWith("aut\xF4nomos");
   for (const it of itens_) {
     const placeId = s(it.placeId);
     const nome = s(it.title);
@@ -6290,13 +7350,14 @@ function ingerirDescoberta(brain2, itens_, consulta) {
       s(it.phone) ?? s(it.phoneUnformatted),
       site && !SITE_RUIM.test(site) ? site : null,
       ig,
-      n2(it.reviewsCount),
-      n2(it.totalScore),
-      ehAlvo(nome) ? "novo" : "descartado",
+      n3(it.reviewsCount),
+      n3(it.totalScore),
+      (auto ? ehAlvoAutonomo(nome) : ehAlvo(nome)) ? "novo" : "descartado",
       consulta,
       agora,
       agora
     );
+    if (auto) run(brain2.db, "insert or ignore into prospect_autonomo (prospect_id) select id from prospects where place_id = ?", placeId);
     novos++;
   }
   return { novos, repetidos };
@@ -6318,16 +7379,17 @@ async function iniciarEnriquecimento(brain2, env, ids, f = fetch) {
   brain2.emit("prospeccao");
   return `Lendo ${alvo.length} sites (teto US$ ${teto}).`;
 }
-var GENERICO = /^(contato|atendimento|recepcao|recepção|clinica|clínica|comercial|secretaria|agendamento|agenda|sac|adm|administrativo|psicologia|ola|olá|oi|faleconosco)/i;
+var GENERICO2 = /^(contato|atendimento|recepcao|recepção|clinica|clínica|comercial|secretaria|agendamento|agenda|sac|adm|administrativo|psicologia|ola|olá|oi|faleconosco)/i;
 var EMAIL_RE2 = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
 var LIXO = /\.(png|jpe?g|gif|webp|svg|css|js)$|wixpress|sentry|example\.|seudominio|email\.com$|@2x/i;
-function lerSinais(paginas, siteHost) {
+function lerSinais(paginas, siteHost, autonomo = false) {
   const texto2 = paginas.join("\n");
   const crps = new Set([...texto2.matchAll(/CRP[\s:.-]*(\d{2})\s*[\/-]\s*(\d{3,6})/gi)].map((m) => `${m[1]}/${m[2]}`));
   const emails = [...new Set((texto2.match(EMAIL_RE2) ?? []).map((e) => e.toLowerCase().replace(/[.,;)]+$/, "")).filter((e) => !LIXO.test(e)))];
   const doDominio = emails.filter((e) => siteHost && e.endsWith(`@${siteHost}`));
-  const genericos = emails.filter((e) => GENERICO.test(e.split("@")[0]));
-  const ordenados = [.../* @__PURE__ */ new Set([...doDominio.filter((e) => GENERICO.test(e.split("@")[0])), ...genericos, ...doDominio])];
+  const genericos = emails.filter((e) => GENERICO2.test(e.split("@")[0]));
+  const base = [.../* @__PURE__ */ new Set([...doDominio.filter((e) => GENERICO2.test(e.split("@")[0])), ...genericos, ...doDominio])];
+  const ordenados = autonomo ? [.../* @__PURE__ */ new Set([...base, ...emails.filter((e) => /@(gmail|hotmail|outlook|yahoo|icloud|uol|bol|terra|live|msn)\./i.test(e))])] : base;
   const ig = /instagram\.com\/([A-Za-z0-9._]{3,30})/i.exec(texto2);
   const igOk = ig && !/^(p|reel|reels|explore|accounts|stories|tv)$/i.test(ig[1]) ? `https://instagram.com/${ig[1]}` : null;
   return { crp: crps.size, emails: ordenados.slice(0, 3), instagram: igOk, whatsapp: /wa\.me|api\.whatsapp\.com|whatsapp/i.test(texto2), agenda: /agende (sua|uma)|agendamento online|agendar online|agende online/i.test(texto2) };
@@ -6342,6 +7404,16 @@ function pontuar(p) {
   if ((p.notaGoogle ?? 0) >= 4.5) nota += 5;
   const status = p.crp === null ? "revisar" : crp >= 4 ? "qualificado" : crp >= 2 ? "revisar" : "descartado";
   return { nota: Math.min(100, nota), status };
+}
+function pontuarAutonomo(p) {
+  const crp = p.crp ?? 0;
+  let nota = crp >= 1 ? 25 : 0;
+  if (p.email) nota += 40;
+  if (p.whatsapp) nota += 10;
+  if (p.instagram) nota += 5;
+  if ((p.avaliacoes ?? 0) >= 30) nota += 10;
+  if ((p.notaGoogle ?? 0) >= 4.5) nota += 5;
+  return { nota: Math.min(100, nota), status: p.email && crp >= 1 ? "qualificado" : p.email || crp >= 1 ? "revisar" : "descartado" };
 }
 function ingerirEnriquecimento(brain2, itens_, ids) {
   const alvo = ids.map((id) => row(brain2.db, "select id, site, telefone, avaliacoes, nota_google, instagram from prospects where id = ?", id)).filter((x) => !!x);
@@ -6363,10 +7435,11 @@ function ingerirEnriquecimento(brain2, itens_, ids) {
       run(brain2.db, "update prospects set status = 'revisar', atualizado_em = ? where id = ?", agora, p.id);
       continue;
     }
-    const sin = lerSinais(paginas, h);
+    const auto = !!row(brain2.db, "select 1 as x from prospect_autonomo where prospect_id = ?", p.id);
+    const sin = lerSinais(paginas, h, auto);
     const email = sin.emails[0] ?? null;
     const instagram2 = p.instagram ?? sin.instagram;
-    const pt = pontuar({ crp: sin.crp, email, whatsapp: sin.whatsapp, instagram: instagram2, avaliacoes: p.avaliacoes, notaGoogle: p.nota_google });
+    const pt = (auto ? pontuarAutonomo : pontuar)({ crp: sin.crp, email, whatsapp: sin.whatsapp, instagram: instagram2, avaliacoes: p.avaliacoes, notaGoogle: p.nota_google });
     run(brain2.db, "update prospects set crp_count = ?, email = ?, email_fonte = ?, instagram = ?, whatsapp_no_site = ?, agenda_online = ?, nota = ?, status = ?, atualizado_em = ? where id = ?", sin.crp, email, email ? "site" : null, instagram2, sin.whatsapp ? 1 : 0, sin.agenda ? 1 : 0, pt.nota, pt.status, agora, p.id);
     lidos++;
   }
@@ -6379,7 +7452,7 @@ async function avancar(brain2, env, f = fetch) {
   for (const r of pend) {
     let info;
     try {
-      info = await statusDe(env, f, r.apify_run_id);
+      info = await statusDe2(env, f, r.apify_run_id);
     } catch (e) {
       run(brain2.db, "update prospect_runs set detalhe = ? where id = ?", e instanceof Error ? e.message.slice(0, 200) : "erro", r.id);
       continue;
@@ -6427,6 +7500,10 @@ async function avancar(brain2, env, f = fetch) {
         gerarRascunhos(brain2);
       } catch {
       }
+      try {
+        gerarAutonomos(brain2);
+      } catch {
+      }
     }
   }
   if (concluidas) brain2.emit("change");
@@ -6449,7 +7526,7 @@ async function autoCrm(brain2, env, f = fetch) {
   if (!c2.ativo) return { criados: 0 };
   const sobra = c2.limiteDia - enviadasHoje(brain2);
   if (sobra <= 0) return { criados: 0 };
-  const ids = rows(brain2.db, "select id from prospects where status = 'qualificado' and nota >= ? and telefone is not null order by nota desc, id limit ?", c2.notaMin, sobra).map((x) => x.id);
+  const ids = rows(brain2.db, "select id from prospects where status = 'qualificado' and nota >= ? and telefone is not null and id not in (select prospect_id from prospect_autonomo) order by nota desc, id limit ?", c2.notaMin, sobra).map((x) => x.id);
   if (!ids.length) return { criados: 0 };
   try {
     const r = await enviarAoCrm(brain2, env, ids, f);
@@ -6479,9 +7556,10 @@ async function rodarRotina(brain2, env, f = fetch, opts = {}) {
   if (!opts.forcar && c2.ultimaData === hoje) return "J\xE1 rodou hoje.";
   if (row(brain2.db, "select count(*) as n from prospect_runs where status = 'rodando'")?.n) return "J\xE1 existe uma rodada em andamento.";
   const cidade = REGIOES[c2.indice % REGIOES.length];
+  const tipo = brain2.policy("prospect_autonomos", {}).ativo === true && Math.floor(brain2.clock() / 864e5) % 2 === 1 ? "autonomo" : "clinica";
   brain2.setPolicy("prospect_rotina", { ...c2, indice: (c2.indice + 1) % REGIOES.length, ultimaData: hoje });
   try {
-    const m = await iniciarDescoberta(brain2, env, { regiao: cidade, maximo: c2.maximo }, f);
+    const m = await iniciarDescoberta(brain2, env, { regiao: cidade, maximo: c2.maximo, tipo }, f);
     brain2.audit("sistema", "prospeccao_rotina", cidade);
     return m;
   } catch (e) {
@@ -6552,7 +7630,7 @@ function descartar(brain2, id, descartar_) {
 }
 function prospeccaoPainel(brain2, env) {
   const db = brain2.db;
-  for (const x of rows(db, "select id, nome from prospects where status = 'novo'")) if (!ehAlvo(x.nome)) run(db, "update prospects set status = 'descartado' where id = ?", x.id);
+  for (const x of rows(db, "select id, nome from prospects where status = 'novo' and id not in (select prospect_id from prospect_autonomo)")) if (!ehAlvo(x.nome)) run(db, "update prospects set status = 'descartado' where id = ?", x.id);
   const ps = rows(db, "select * from prospects order by nota desc, id desc limit 400");
   const contagem = { novo: 0, enriquecendo: 0, qualificado: 0, revisar: 0, descartado: 0, no_crm: 0 };
   for (const p of ps) contagem[p.status]++;
@@ -6710,7 +7788,7 @@ function planGuardiao(i) {
 }
 
 // packages/core/src/handlers.ts
-var brl3 = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n3 % 1 ? 2 : 0 }).replace(/ /g, " ");
+var brl3 = (n4) => n4.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n4 % 1 ? 2 : 0 }).replace(/ /g, " ");
 var allSubs = (brain2) => rows(brain2.db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
 async function sincronizarAssinaturasStripe(brain2, env, now) {
   const synced = (await fetchStripeSubs(env.STRIPE_READ_KEY)).map(stripeToRow);
@@ -6748,7 +7826,7 @@ async function guardiao({ brain: brain2, env, now }) {
   }
   const all = allSubs(brain2);
   const { bySource, total } = mrrBySource(all);
-  for (const [source, v] of Object.entries({ ...bySource, total: { mrr: total, count: Object.values(bySource).reduce((n3, x) => n3 + x.count, 0) } })) {
+  for (const [source, v] of Object.entries({ ...bySource, total: { mrr: total, count: Object.values(bySource).reduce((n4, x) => n4 + x.count, 0) } })) {
     run(brain2.db, "insert into mrr_daily (day, source, mrr_brl, subs_count) values (?, ?, ?, ?) on conflict(day, source) do update set mrr_brl = excluded.mrr_brl, subs_count = excluded.subs_count", day, source, v.mrr, v.count);
   }
   const plan = planGuardiao({ stripeRows: all.filter((r) => r.source === "stripe"), others: all.filter((r) => r.source !== "stripe"), all, now: new Date(now), windowDays: 30, day });
@@ -6768,9 +7846,9 @@ async function guardiao({ brain: brain2, env, now }) {
 async function financeiro({ brain: brain2 }) {
   const m = brain2.metrics();
   const falta = Math.max(0, m.mrr.goal - m.mrr.total);
-  const pct = Math.round(m.mrr.total / m.mrr.goal * 100);
+  const pct2 = Math.round(m.mrr.total / m.mrr.goal * 100);
   const d = m.descontos.map((x) => `${x.contas} em ${x.quando}`).join(", ");
-  return { status: "done", result: `MRR de ${brl3(m.mrr.total)}, ${pct}% de ${brl3(m.mrr.goal)}. Faltam ${brl3(falta)}, cerca de ${Math.ceil(falta / m.mrr.essencialPrice)} Essenciais a ${brl3(m.mrr.essencialPrice)}.${d ? ` Reajustes \xE0 vista: ${d}.` : ""}` };
+  return { status: "done", result: `MRR de ${brl3(m.mrr.total)}, ${pct2}% de ${brl3(m.mrr.goal)}. Faltam ${brl3(falta)}, cerca de ${Math.ceil(falta / m.mrr.essencialPrice)} Essenciais a ${brl3(m.mrr.essencialPrice)}.${d ? ` Reajustes \xE0 vista: ${d}.` : ""}` };
 }
 async function midia({ brain: brain2, env, now }) {
   const token = env.META_SYSTEM_USER_TOKEN;
@@ -6781,8 +7859,8 @@ async function midia({ brain: brain2, env, now }) {
   const ads = m.ads ?? [];
   const ig = m.ig ? ` Instagram: ${m.ig.followers ?? "?"} seguidores.` : m.igErro ? ` Instagram falhou: ${m.igErro}.` : "";
   const adsNote = m.adsErro ? ` An\xFAncios falharam: ${m.adsErro}.` : "";
-  const spend = ads.reduce((n3, r) => n3 + r.spend, 0);
-  const leads = ads.reduce((n3, r) => n3 + r.leads, 0);
+  const spend = ads.reduce((n4, r) => n4 + r.spend, 0);
+  const leads = ads.reduce((n4, r) => n4 + r.leads, 0);
   const day = brtDay(now);
   const proposals = wastedSpend(ads, 50).map((c2) => ({
     agentId: "midia",
@@ -6810,14 +7888,24 @@ async function chief({ brain: brain2 }) {
   };
 }
 var now0 = (brain2) => Date.parse(`${brtDay(brain2.clock())}T00:00:00-03:00`);
-var HANDLERS = { guardiao, financeiro, midia, chief };
+async function instinct(c2) {
+  try {
+    await sincronizar(c2.brain, c2.env);
+  } catch (e) {
+    return { status: "blocked", result: `N\xE3o consegui ler a planilha do Instinct: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  const t = painel(c2.brain, c2.env).ultimos30.total;
+  const pc = (v) => v === null ? "sem base" : `${String(v).replace(".", ",")}%`;
+  return { status: "done", result: `Instinct, \xFAltimos 30 dias: ${t.abordados} abordados, ${t.responderam} responderam (${pc(t.taxaResposta)}), ${t.reunioes} reuni\xF5es, ${t.contas} contas gratuitas e ${t.assinantes} assinantes (convers\xE3o ${pc(t.taxaConversao)}).` };
+}
+var HANDLERS = { guardiao, financeiro, midia, chief, instinct };
 
 // packages/core/src/fin-proj.ts
-var r25 = (n3) => Math.round(n3 * 100) / 100;
+var r25 = (n4) => Math.round(n4 * 100) / 100;
 var HORIZONTE_MESES = 36;
-function mesMais(ref, n3) {
+function mesMais(ref, n4) {
   const [y, m] = ref.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + n3, 1));
+  const d = new Date(Date.UTC(y, m - 1 + n4, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 var CENARIOS = [
@@ -6849,8 +7937,8 @@ function projetar(mrrAtual, saldoInicial, mesRef, p, meta) {
   });
   return { meses, saldoInicial: r25(saldoInicial), cenarios };
 }
-function diaMenos(hoje, n3) {
-  return new Date(Date.parse(`${hoje}T12:00:00Z`) - n3 * 864e5).toISOString().slice(0, 10);
+function diaMenos(hoje, n4) {
+  return new Date(Date.parse(`${hoje}T12:00:00Z`) - n4 * 864e5).toISOString().slice(0, 10);
 }
 function indicadores(i) {
   const notas = [];
@@ -6888,7 +7976,7 @@ function indicadores(i) {
 // packages/core/src/fin.ts
 var CATEGORIAS_RECEITA = ["Recorr\xEAncia (Mensalidade)", "Implementa\xE7\xE3o/Setup", "Outras Receitas"];
 var CATEGORIAS_DESPESA = ["Custos Diretos (CMV)", "Pessoal", "Marketing e Vendas", "Tecnologia/Ferramentas", "Administrativas", "Financeiras", "Impostos e Taxas", "Outras Despesas"];
-var r26 = (n3) => Math.round(n3 * 100) / 100;
+var r26 = (n4) => Math.round(n4 * 100) / 100;
 var DATA2 = /^\d{4}-\d{2}-\d{2}$/;
 var DIA2 = 864e5;
 function categoria(c2, entrada) {
@@ -6899,9 +7987,9 @@ function categoria(c2, entrada) {
 }
 var diaMs = (d) => Date.parse(`${d}T12:00:00-03:00`);
 var mesDe = (d) => d.slice(0, 7);
-function somaMeses(d, n3) {
+function somaMeses(d, n4) {
   const [y, m, dia5] = d.split("-").map(Number);
-  const alvo = new Date(Date.UTC(y, m - 1 + n3, 1));
+  const alvo = new Date(Date.UTC(y, m - 1 + n4, 1));
   const ult = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
   return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(dia5, ult)).padStart(2, "0")}`;
 }
@@ -6910,15 +7998,15 @@ var nomeMes = (ref) => {
   return `${["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"][Number(m) - 1]}/${y.slice(2)}`;
 };
 var PREMISSAS_PADRAO2 = { novos_por_mes: 2, preco_novo: 49, churn: 0.05 };
-function cfgNum(db, chave2) {
-  const a = row(db, "select valor from fin_config where chave = ?", chave2);
+function cfgNum(db, chave3) {
+  const a = row(db, "select valor from fin_config where chave = ?", chave3);
   if (!a || a.valor === "") return null;
-  const n3 = Number(a.valor);
-  return Number.isFinite(n3) ? n3 : null;
+  const n4 = Number(a.valor);
+  return Number.isFinite(n4) ? n4 : null;
 }
 function finConfig(db) {
-  const n3 = cfgNum(db, "aliquota_impostos") ?? 0.16;
-  return { aliquotaImpostos: n3 >= 0 && n3 < 1 ? n3 : 0.16 };
+  const n4 = cfgNum(db, "aliquota_impostos") ?? 0.16;
+  return { aliquotaImpostos: n4 >= 0 && n4 < 1 ? n4 : 0.16 };
 }
 function finSetAliquota(db, aliquota) {
   if (!(aliquota >= 0 && aliquota < 1)) throw new BrainError("invalid", "A al\xEDquota \xE9 um n\xFAmero entre 0 e 1 (ex.: 0,16 para 16%).");
@@ -6980,18 +8068,18 @@ function finRemoverCobranca(db, id) {
 }
 function gerarCobrancas(db, agora) {
   const hoje = brtDay(agora);
-  let n3 = 0;
+  let n4 = 0;
   for (const c2 of finCobrancas(db).filter((x) => x.ativa)) {
     for (let k = 0; k < 3; k++) {
       const venc = somaMeses(`${mesDe(hoje)}-${String(c2.dia).padStart(2, "0")}`, k);
       const jaTem = row(db, "select id from fin_contas where grupo = ? and substr(vencimento, 1, 7) = ?", `cob:${c2.id}`, mesDe(venc));
       if (jaTem) continue;
       run(db, "insert into fin_contas (tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, grupo, obs, criado_em) values ('receber', ?, ?, 'Recorr\xEAncia (Mensalidade)', ?, ?, null, ?, ?, ?)", c2.nome, c2.nome, venc, c2.valor, `cob:${c2.id}`, `Cobran\xE7a recorrente (${c2.forma})`, agora);
-      n3++;
+      n4++;
     }
   }
-  if (n3) conciliar(db);
-  return n3;
+  if (n4) conciliar(db);
+  return n4;
 }
 function finAddManual(db, agora, x) {
   const v = validarExtrato(x, 0);
@@ -7024,9 +8112,9 @@ function validarConta(c2, i) {
   if (!DATA2.test(String(c2.vencimento))) throw new BrainError("invalid", `${p}: vencimento precisa ser AAAA-MM-DD.`);
   if (c2.pagoEm != null && !DATA2.test(String(c2.pagoEm))) throw new BrainError("invalid", `${p}: data de pagamento precisa ser AAAA-MM-DD.`);
   if (c2.valor != null && (typeof c2.valor !== "number" || !Number.isFinite(c2.valor) || c2.valor <= 0)) throw new BrainError("invalid", `${p}: o valor \xE9 um n\xFAmero positivo (sem sinal).`);
-  const n3 = c2.recorrenciaMeses ?? 1;
-  if (!Number.isInteger(n3) || n3 < 1 || n3 > 60) throw new BrainError("invalid", `${p}: recorr\xEAncia de 1 a 60 meses.`);
-  return { ...c2, descricao: desc, valor: c2.valor == null ? null : r26(c2.valor), recorrenciaMeses: n3, categoria: categoria(c2.categoria, c2.tipo === "receber") };
+  const n4 = c2.recorrenciaMeses ?? 1;
+  if (!Number.isInteger(n4) || n4 < 1 || n4 > 60) throw new BrainError("invalid", `${p}: recorr\xEAncia de 1 a 60 meses.`);
+  return { ...c2, descricao: desc, valor: c2.valor == null ? null : r26(c2.valor), recorrenciaMeses: n4, categoria: categoria(c2.categoria, c2.tipo === "receber") };
 }
 function finAddExtrato(db, agora, itens2, fonte = "manual") {
   if (!Array.isArray(itens2) || itens2.length === 0) throw new BrainError("invalid", "Nenhum lan\xE7amento para importar.");
@@ -7037,9 +8125,9 @@ function finAddExtrato(db, agora, itens2, fonte = "manual") {
     const visto = /* @__PURE__ */ new Map();
     for (const x of ok) {
       const base = `${x.data}|${x.valor.toFixed(2)}|${x.descricao.toLowerCase()}`;
-      const n3 = (visto.get(base) ?? 0) + 1;
-      visto.set(base, n3);
-      const hash = `${base}#${n3}`;
+      const n4 = (visto.get(base) ?? 0) + 1;
+      visto.set(base, n4);
+      const hash = `${base}#${n4}`;
       if (row(db, "select id from fin_extrato where hash = ?", hash)) continue;
       run(db, "insert into fin_extrato (data, descricao, valor, categoria, fonte, hash, criado_em) values (?, ?, ?, ?, ?, ?, ?)", x.data, x.descricao, x.valor, x.valor > 0 ? categoria(x.categoria, true) : categoria(x.categoria, false), fonte, hash, agora);
       novos++;
@@ -7049,11 +8137,11 @@ function finAddExtrato(db, agora, itens2, fonte = "manual") {
 }
 function finAddConta(db, agora, entrada) {
   const c2 = validarConta(entrada, 0);
-  const n3 = c2.recorrenciaMeses ?? 1;
-  const grupo2 = n3 > 1 ? crypto.randomUUID() : null;
+  const n4 = c2.recorrenciaMeses ?? 1;
+  const grupo2 = n4 > 1 ? crypto.randomUUID() : null;
   let criadas = 0;
   tx(db, () => {
-    for (let k = 0; k < n3; k++) {
+    for (let k = 0; k < n4; k++) {
       const venc = somaMeses(c2.vencimento, k);
       const dup = row(db, "select id from fin_contas where tipo = ? and descricao = ? and vencimento = ? and coalesce(valor, -1) = coalesce(?, -1)", c2.tipo, c2.descricao, venc, c2.valor ?? null);
       if (dup) continue;
@@ -7090,11 +8178,11 @@ function finNovaVenda(db, agora, v) {
       run(db, "insert into fin_contas (tipo, descricao, contraparte, categoria, vencimento, valor, pago_em, grupo, obs, criado_em) values ('receber', ?, ?, ?, ?, ?, ?, ?, ?, ?)", descricao, cliente, cat, venc, val, pago, grupo2, obs, agora);
       contas++;
     };
-    const n3 = parcelas.length;
+    const n4 = parcelas.length;
     parcelas.forEach((p, i) => {
       const pago = p.pagoEm ? String(p.pagoEm) : null;
       const venc = p.vencimento ? String(p.vencimento) : pago ?? v.inicio;
-      ins(n3 > 1 ? `${cliente}: mensalidade 1 (parcela ${i + 1}/${n3})` : `${cliente}: mensalidade 1`, recorrente ? "Recorr\xEAncia (Mensalidade)" : "Outras Receitas", venc, p.valor, pago, null, p.nota ? String(p.nota).slice(0, 200) : null);
+      ins(n4 > 1 ? `${cliente}: mensalidade 1 (parcela ${i + 1}/${n4})` : `${cliente}: mensalidade 1`, recorrente ? "Recorr\xEAncia (Mensalidade)" : "Outras Receitas", venc, p.valor, pago, null, p.nota ? String(p.nota).slice(0, 200) : null);
     });
     if (setup > 0) ins(`${cliente}: implementa\xE7\xE3o`, "Implementa\xE7\xE3o/Setup", v.inicio, setup, v.taxaSetupPaga ? v.inicio : null, null, null);
     if (recorrente) {
@@ -7135,7 +8223,7 @@ function conciliar(db) {
   const ext = rows(db, "select id, data, valor from fin_extrato where conta_id is null order by data, id");
   const contas = rows(db, "select id, tipo, valor, coalesce(pago_em, vencimento) as ref, case when pago_em is null then 0 else 1 end as pago from fin_contas where extrato_id is null and valor is not null");
   const usadas = /* @__PURE__ */ new Set();
-  let n3 = 0;
+  let n4 = 0;
   tx(db, () => {
     for (const e of ext) {
       const tipo = e.valor > 0 ? "receber" : "pagar";
@@ -7153,10 +8241,10 @@ function conciliar(db) {
       usadas.add(melhor.id);
       run(db, "update fin_contas set extrato_id = ?, pago_em = coalesce(pago_em, ?) where id = ?", e.id, e.data, melhor.id);
       run(db, "update fin_extrato set conta_id = ? where id = ?", melhor.id, e.id);
-      n3++;
+      n4++;
     }
   });
-  return n3;
+  return n4;
 }
 var IGNORAR = "Ignorar";
 var ignorado = (e) => (e.categoria ?? "").trim().toLowerCase() === "ignorar";
@@ -7267,31 +8355,31 @@ function finPainel(db, agora) {
   const ultimo = ext.length ? ext[ext.length - 1].data : null;
   const { entradas, despesas } = movimentosFin(ext, contas);
   const comp = movimentosCompetencia(ext, contas, hoje, faturasStripe(db), subsDe(db), nomesStripe(db));
-  const meses = (n3) => {
+  const meses = (n4) => {
     const out = [];
-    for (let i = n3 - 1; i >= 0; i--) out.push(mesDe(somaMeses(`${mesRef}-01`, -i)));
+    for (let i = n4 - 1; i >= 0; i--) out.push(mesDe(somaMeses(`${mesRef}-01`, -i)));
     return out;
   };
-  const soma2 = (l, mes2, cat) => r26(l.filter((m) => mesDe(m.data) === mes2 && (!cat || m.cat === cat)).reduce((s2, m) => s2 + m.valor, 0));
-  const serie = meses(6).map((m) => ({ mes: m, entradas: soma2(entradas, m), saidas: soma2(despesas, m), resultado: r26(soma2(entradas, m) - soma2(despesas, m)) }));
+  const soma3 = (l, mes2, cat) => r26(l.filter((m) => mesDe(m.data) === mes2 && (!cat || m.cat === cat)).reduce((s2, m) => s2 + m.valor, 0));
+  const serie = meses(6).map((m) => ({ mes: m, entradas: soma3(entradas, m), saidas: soma3(despesas, m), resultado: r26(soma3(entradas, m) - soma3(despesas, m)) }));
   const atual = serie[serie.length - 1];
   const mDre = meses(12);
   const linha = (label, tipo, f) => ({ label, tipo, valores: mDre.map(f) });
-  const recBruta = (m) => soma2(comp.entradas, m);
-  const imp = (m) => soma2(comp.despesas, m, "Impostos e Taxas");
+  const recBruta = (m) => soma3(comp.entradas, m);
+  const imp = (m) => soma3(comp.despesas, m, "Impostos e Taxas");
   const dre = {
     meses: mDre.map(nomeMes),
     linhas: [
-      ...CATEGORIAS_RECEITA.map((c2) => linha(c2, "receita", (m) => soma2(comp.entradas, m, c2))),
+      ...CATEGORIAS_RECEITA.map((c2) => linha(c2, "receita", (m) => soma3(comp.entradas, m, c2))),
       linha("Receita bruta", "total", recBruta),
       linha("(-) Impostos e Taxas", "despesa", imp),
       linha("Receita l\xEDquida", "total", (m) => r26(recBruta(m) - imp(m))),
-      ...CATEGORIAS_DESPESA.filter((c2) => c2 !== "Impostos e Taxas").map((c2) => linha(`(-) ${c2}`, "despesa", (m) => soma2(comp.despesas, m, c2))),
-      linha("Resultado", "total", (m) => r26(recBruta(m) - soma2(comp.despesas, m)))
+      ...CATEGORIAS_DESPESA.filter((c2) => c2 !== "Impostos e Taxas").map((c2) => linha(`(-) ${c2}`, "despesa", (m) => soma3(comp.despesas, m, c2))),
+      linha("Resultado", "total", (m) => r26(recBruta(m) - soma3(comp.despesas, m)))
     ]
   };
-  const fechados = meses(4).slice(0, 3).filter((m) => soma2(despesas, m) > 0 || soma2(entradas, m) > 0);
-  const despesaMedia = fechados.length ? r26(fechados.reduce((s2, m) => s2 + soma2(despesas, m), 0) / fechados.length) : 0;
+  const fechados = meses(4).slice(0, 3).filter((m) => soma3(despesas, m) > 0 || soma3(entradas, m) > 0);
+  const despesaMedia = fechados.length ? r26(fechados.reduce((s2, m) => s2 + soma3(despesas, m), 0) / fechados.length) : 0;
   const mesesDeCaixa = despesaMedia > 0 ? Math.round(saldoInter / despesaMedia * 10) / 10 : null;
   const subs = rows(db, "select source, external_id, professional_id, label, list_price_brl, effective_price_brl, discount_ends_at, status from subscriptions");
   const { total: mrr } = mrrBySource(subs);
@@ -7304,7 +8392,7 @@ function finPainel(db, agora) {
   const foraMes = contas.filter((c2) => c2.tipo === "pagar" && c2.pago_em && c2.extrato_id === null && mesDe(c2.pago_em) === mesRef).reduce((s2, c2) => s2 + (c2.valor ?? 0), 0);
   const foraTotal = contas.filter((c2) => c2.tipo === "pagar" && c2.pago_em && c2.extrato_id === null).reduce((s2, c2) => s2 + (c2.valor ?? 0), 0);
   const alertas = [];
-  const brl4 = (n3) => n3.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const brl4 = (n4) => n4.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const atrasPagar = aPagar.filter((c2) => c2.status === "atrasado");
   if (atrasPagar.length) alertas.push({ id: "pagar-atrasado", tom: "critico", titulo: `${atrasPagar.length} conta${atrasPagar.length > 1 ? "s" : ""} a pagar vencida${atrasPagar.length > 1 ? "s" : ""}`, detalhe: `${brl4(atrasPagar.reduce((s2, c2) => s2 + (c2.valor ?? 0), 0))} em aberto: ${atrasPagar.slice(0, 3).map((c2) => c2.descricao).join(", ")}.` });
   const em7 = brtDay(agora + 7 * DIA2);
@@ -7314,7 +8402,7 @@ function finPainel(db, agora) {
   if (atrasReceber.length) alertas.push({ id: "receber-atrasado", tom: "atencao", titulo: `${atrasReceber.length} recebimento${atrasReceber.length > 1 ? "s" : ""} atrasado${atrasReceber.length > 1 ? "s" : ""}`, detalhe: `${atrasReceber.slice(0, 3).map((c2) => c2.descricao).join(", ")}. Se j\xE1 caiu no Inter, importe o extrato para conciliar.` });
   const mesAnt = mesDe(somaMeses(`${mesRef}-01`, -1));
   const guiaPaga = contas.some((c2) => c2.tipo === "pagar" && c2.categoria === "Impostos e Taxas" && c2.pago_em && mesDe(c2.pago_em) === mesRef);
-  const recAnt = soma2(entradas, mesAnt);
+  const recAnt = soma3(entradas, mesAnt);
   if (!guiaPaga && recAnt > 0) {
     const dia5 = Number(hoje.slice(8));
     alertas.push({ id: "guia-simples", tom: dia5 > 20 ? "critico" : "atencao", titulo: dia5 > 20 ? "Guia do Simples sem pagamento lan\xE7ado" : `Guia do Simples vence dia 20 (${20 - dia5 >= 0 ? `faltam ${20 - dia5} dias` : "hoje"})`, detalhe: `Referente a ${nomeMes(mesAnt)}. Estimativa ${brl4(r26(recAnt * cfg.aliquotaImpostos))} (${Math.round(cfg.aliquotaImpostos * 100)}% de ${brl4(recAnt)}); o valor real sai do PGDAS.` });
@@ -7322,8 +8410,8 @@ function finPainel(db, agora) {
   if (mesesDeCaixa !== null && mesesDeCaixa < 3) alertas.push({ id: "caixa-baixo", tom: mesesDeCaixa < 1.5 ? "critico" : "atencao", titulo: `Caixa cobre ${mesesDeCaixa.toLocaleString("pt-BR")} ${mesesDeCaixa === 1 ? "m\xEAs" : "meses"} de despesa`, detalhe: `Saldo do Inter ${brl4(saldoInter)} contra despesa m\xE9dia de ${brl4(despesaMedia)} por m\xEAs.` });
   if (foraMes > 0) alertas.push({ id: "fora-inter", tom: "info", titulo: `${brl4(r26(foraMes))} pagos fora do Inter neste m\xEAs`, detalhe: "Despesa paga no cart\xE3o ou do bolso. Entra no resultado, mas n\xE3o mexe no saldo do Inter: acompanhe o que voc\xEA precisa repor." });
   if (ultimo && (agora - diaMs(ultimo)) / DIA2 > 7) alertas.push({ id: "extrato-velho", tom: "info", titulo: "Extrato do Inter desatualizado", detalhe: `O \xFAltimo lan\xE7amento \xE9 de ${ultimo.slice(8)}/${ultimo.slice(5, 7)}. Importe o extrato recente para o saldo e a concilia\xE7\xE3o refletirem o banco.` });
-  const fechadosSemImposto = meses(4).slice(0, 3).filter((m) => soma2(despesas, m) > 0);
-  const custoAuto = fechadosSemImposto.length ? r26(fechadosSemImposto.reduce((t, m) => t + soma2(despesas, m) - soma2(despesas, m, "Impostos e Taxas"), 0) / fechadosSemImposto.length) : 0;
+  const fechadosSemImposto = meses(4).slice(0, 3).filter((m) => soma3(despesas, m) > 0);
+  const custoAuto = fechadosSemImposto.length ? r26(fechadosSemImposto.reduce((t, m) => t + soma3(despesas, m) - soma3(despesas, m, "Impostos e Taxas"), 0) / fechadosSemImposto.length) : 0;
   const premissas = finPremissas(db, custoAuto);
   const metaPol = row(db, "select value from policies where key = 'mrr_goal'");
   let meta = { valor: 1200, data: "31/12/2026" };
@@ -7338,7 +8426,7 @@ function finPainel(db, agora) {
   for (const h of hist) porDia.set(h.day, (porDia.get(h.day) ?? 0) + h.mrr_brl);
   const mrrSerie = [...porDia.entries()].map(([day, total]) => ({ day, total: r26(total) }));
   const tres = meses(4).slice(0, 3);
-  const gastoMkt = tres.reduce((t, m) => t + soma2(despesas, m, "Marketing e Vendas"), 0);
+  const gastoMkt = tres.reduce((t, m) => t + soma3(despesas, m, "Marketing e Vendas"), 0);
   const ind = indicadores({ mrr, clientes: ativos, mrrSerie, hoje, entradasMes: atual.entradas, resultadoMes: atual.resultado, churn: premissas.churn, meta, gastoMarketing3m: gastoMkt, clientesNovos3m: null });
   const desde = brtDay(agora - 90 * DIA2);
   let acc = 0;
@@ -7356,7 +8444,7 @@ function finPainel(db, agora) {
     if (!saldoPorDia.has(d) && saldoSerie.length === 0) ult = [...saldoPorDia.entries()].filter(([k]) => k < d).map(([, v]) => v).pop() ?? 0;
     saldoSerie.push({ data: d, saldo: ult });
   }
-  const despesasPorCategoria = CATEGORIAS_DESPESA.map((c2) => ({ categoria: c2, mes: soma2(despesas, mesRef, c2), tresMeses: r26(tres.reduce((t, m) => t + soma2(despesas, m, c2), 0) / 3) })).filter((x) => x.mes > 0 || x.tresMeses > 0).sort((a, b) => b.mes - a.mes || b.tresMeses - a.tresMeses);
+  const despesasPorCategoria = CATEGORIAS_DESPESA.map((c2) => ({ categoria: c2, mes: soma3(despesas, mesRef, c2), tresMeses: r26(tres.reduce((t, m) => t + soma3(despesas, m, c2), 0) / 3) })).filter((x) => x.mes > 0 || x.tresMeses > 0).sort((a, b) => b.mes - a.mes || b.tresMeses - a.tresMeses);
   const fluxo = (() => {
     const ini = brtDay(agora - 30 * DIA2);
     const fim = brtDay(agora + 150 * DIA2);
@@ -7486,6 +8574,28 @@ function createHandler(svc) {
         }
         return new Response(null, { status: 302, headers: { location: destino } });
       }
+      const pl = url.pathname.match(/^\/api\/p\/([\w-]{1,80})(?:\/(pdf|status|pagina))?$/);
+      if (pl) {
+        const [, token, parte] = pl;
+        const sem2 = { "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" };
+        try {
+          if (req.method === "GET" && parte === "pagina") {
+            pegarLink(brain2, token);
+            return new Response(PLANO_HTML, { status: 200, headers: { ...sem2, "content-type": "text/html; charset=utf-8", "content-security-policy": PLANO_CSP, "x-content-type-options": "nosniff" } });
+          }
+          if (req.method === "GET" && parte === "pdf") {
+            const l = pegarLink(brain2, token);
+            const bytes = pdfSemana(brain2, l.semana, l.responsavel, `${url.origin}/t/${token}`);
+            return new Response(bytes, { status: 200, headers: { ...sem2, "content-type": "application/pdf", "content-disposition": `attachment; filename="tarefas-${l.semana}${l.responsavel ? "-" + l.responsavel.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") : ""}.pdf"` } });
+          }
+          if (req.method === "GET" && !parte) return json(200, vistaDoLink(brain2, token), sem2);
+          if (req.method === "POST" && parte === "status") return json(200, marcarPeloLink(brain2, token, await readJson(req, 2e3)), sem2);
+        } catch (e) {
+          if (e instanceof BrainError) return json(e.code === "not_found" ? 404 : 400, { error: e.message }, sem2);
+          throw e;
+        }
+        return json(405, { error: "m\xE9todo n\xE3o permitido" }, sem2);
+      }
       if (req.method === "GET" && url.pathname.startsWith("/api/midia/")) return servirMidia(brain2, url.pathname.slice("/api/midia/".length));
       if (url.pathname === "/api/instagram/entrega" || url.pathname === "/api/instagram/contexto") {
         if (!tokenValido(svc.env, req)) return json(401, { error: "token inv\xE1lido" });
@@ -7497,6 +8607,21 @@ function createHandler(svc) {
       if (denied) return denied;
       const out = (status, body2) => json(status, body2, cors);
       if (req.method === "GET" && url.pathname === "/api/health") return out(200, { ok: true, server: "brain-server", llm: brain2.llm, sse: svc.sse === true });
+      if (req.method === "GET" && url.pathname === "/api/me") return out(200, usuarioAtual(req) ?? { id: "0", nome: "Felipe", email: "", papel: "admin", dono: true, precisaTrocar: false });
+      if (url.pathname === "/api/usuarios" || url.pathname === "/api/minha-senha") {
+        const eu = usuarioAtual(req);
+        if (url.pathname === "/api/usuarios") {
+          if (eu && eu.papel !== "admin") return out(403, { error: "S\xF3 o administrador gerencia usu\xE1rios." });
+          if (req.method === "GET") return out(200, { usuarios: listarUsuarios(brain2) });
+          if (req.method === "POST") return out(200, await usuarioAcao(brain2, await readJson(req)));
+        } else if (req.method === "POST") {
+          if (!eu || eu.dono) return out(409, { error: "A senha mestre fica nas configura\xE7\xF5es do servidor (BRAIN_PASSWORD)." });
+          const b = await readJson(req);
+          const ver3 = await trocarSenha(brain2, eu.id, String(b.atual ?? ""), String(b.nova ?? ""));
+          const cookie = svc.env.SESSION_SECRET ? sessionCookie(await makeSession(svc.env.SESSION_SECRET, brain2.clock(), eu.id, ver3), url.protocol === "https:") : "";
+          return json(200, { ok: true }, { ...cors, ...cookie ? { "set-cookie": cookie } : {} });
+        }
+      }
       if (req.method === "GET" && url.pathname === "/api/state") return out(200, snapshot());
       if (req.method === "GET" && url.pathname === "/api/dashboard") return out(200, dashboardData(brain2));
       if (req.method === "GET" && url.pathname === "/api/midia-detalhe") return out(200, midiaDetalhe(brain2, url.searchParams.get("tipo") ?? "", url.searchParams.get("metrica") ?? "", url.searchParams.get("de"), url.searchParams.get("ate")));
@@ -7504,11 +8629,18 @@ function createHandler(svc) {
       if (req.method === "GET" && url.pathname === "/api/financeiro") return out(200, finPainel(brain2.db, brain2.clock()));
       if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain2.db, brain2.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? "", url.searchParams.get("base") === "caixa" ? "caixa" : "competencia"));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
+      if (req.method === "GET" && url.pathname === "/api/instinct") return out(200, painel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...await gscPainelCompleto(brain2, svc.env, svc.fetch ?? fetch), ga: gaPainel(brain2, svc.env) });
+      if (req.method === "GET" && url.pathname === "/api/planejamento/pdf") {
+        const sm = url.searchParams.get("semana") ?? planPainel(brain2).semana, rp = url.searchParams.get("responsavel") ?? "";
+        const tk = criarLink(brain2, planPainel(brain2, sm).semana, rp);
+        return new Response(pdfSemana(brain2, sm, rp, `${url.origin}/t/${tk}`), { status: 200, headers: { ...cors, "content-type": "application/pdf", "content-disposition": `attachment; filename="tarefas-${sm}.pdf"`, "cache-control": "no-store" } });
+      }
       if (req.method === "GET" && url.pathname === "/api/planejamento") return out(200, planPainel(brain2, url.searchParams.get("semana") ?? void 0));
       if (req.method === "GET" && url.pathname === "/api/instagram") return out(200, igPainel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/linkedin") return out(200, liPainel(brain2, svc.env));
       if (req.method === "GET" && url.pathname === "/api/prospeccao") return out(200, prospeccaoPainel(brain2, svc.env));
+      if (req.method === "GET" && url.pathname === "/api/autonomos") return out(200, autonomosPainel(brain2));
       if (req.method === "GET" && url.pathname === "/api/crm/painel") {
         try {
           return out(200, await crmPainel(svc.env, brain2.clock(), (u, i) => (svc.fetch ?? fetch)(u, i), { atualizar: url.searchParams.get("atualizar") === "1" }));
@@ -7616,14 +8748,19 @@ function createHandler(svc) {
         const rota = url.pathname.slice("/api/prospeccao/".length);
         const f = (u, i) => (svc.fetch ?? fetch)(u, i);
         const ids = () => Array.isArray(body.ids) ? body.ids.map(Number).filter((x) => Number.isInteger(x) && x > 0) : [];
-        if (rota === "descoberta") return out(200, { message: await iniciarDescoberta(brain2, svc.env, { regiao: String(body.regiao ?? ""), busca: body.busca ? String(body.busca) : void 0, maximo: body.maximo ? Number(body.maximo) : void 0 }, f) });
+        if (rota === "descoberta") return out(200, { message: await iniciarDescoberta(brain2, svc.env, { regiao: String(body.regiao ?? ""), busca: body.busca ? String(body.busca) : void 0, maximo: body.maximo ? Number(body.maximo) : void 0, tipo: body.tipo === "autonomo" ? "autonomo" : "clinica" }, f) });
         if (rota === "enriquecer") return out(200, { message: await iniciarEnriquecimento(brain2, svc.env, ids().length ? ids() : null, f) });
         if (rota === "avancar") return out(200, await avancar(brain2, svc.env, f));
         if (rota === "enviar-crm") return out(200, await enviarAoCrm(brain2, svc.env, ids(), f));
         if (rota === "auto") return out(200, autoSet(brain2, { ativo: body.ativo === void 0 ? void 0 : body.ativo === true, notaMin: body.notaMin === void 0 ? void 0 : Number(body.notaMin), limiteDia: body.limiteDia === void 0 ? void 0 : Number(body.limiteDia) }));
         if (rota === "rotina") return out(200, rotinaSet(brain2, { ativo: body.ativo === void 0 ? void 0 : body.ativo === true, maximo: body.maximo === void 0 ? void 0 : Number(body.maximo) }));
+        if (rota === "instinct/sincronizar") return out(200, { message: await sincronizar(brain2, svc.env, f) });
+        if (rota === "instinct/preparar") return out(200, { message: await preparar(brain2, svc.env, f) });
+        if (rota === "instinct/config") return out(200, configurar(brain2, String(body.planilha ?? "")));
         if (rota === "rotina/rodar") return out(200, { message: await rodarRotina(brain2, svc.env, f, { forcar: true }) });
         if (rota === "emails/gerar") return out(200, gerarRascunhos(brain2));
+        if (rota === "autonomos/ativar") return out(200, autonomosAtivar(brain2, body.ativo === true));
+        if (rota === "autonomos/gerar") return out(200, gerarAutonomos(brain2));
         if (rota === "emails/enviar") return out(200, await aprovarEEnviar(brain2, svc.env, Array.isArray(body.ids) ? body.ids.map(String) : [], f));
         if (rota === "contato") {
           marcarContato(brain2, Number(body.id), body.acao === "sair" ? "sair" : "respondeu");
@@ -7674,7 +8811,7 @@ function createHandler(svc) {
         }
         if (rota === "importar-extrato") {
           const lido = lerExtratoInter(String(body.texto ?? ""));
-          const r = finImportarExtrato(brain2.db, agora, lido, (n3) => finAddExtrato(brain2.db, agora, n3, "inter"));
+          const r = finImportarExtrato(brain2.db, agora, lido, (n4) => finAddExtrato(brain2.db, agora, n4, "inter"));
           const conciliadas = conciliar(brain2.db);
           brain2.audit("voce", "financeiro_importar_extrato", void 0, { ...r, conciliadas });
           return out(200, { resumo: { ...r, conciliadas }, painel: finPainel(brain2.db, agora) });
@@ -7849,22 +8986,22 @@ function createHandler(svc) {
         return out(200, { reply, snapshot: snapshot() });
       }
       if (url.pathname === "/api/voz/falar") {
-        const chave2 = svc.env.OPENAI_API_KEY;
-        if (!chave2) return out(501, { error: "Sem OPENAI_API_KEY: uso a voz do navegador." });
+        const chave3 = svc.env.OPENAI_API_KEY;
+        if (!chave3) return out(501, { error: "Sem OPENAI_API_KEY: uso a voz do navegador." });
         const texto2 = String(body.texto ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
         if (!texto2) throw new BrainError("invalid", "Nada para falar.");
         const hoje = brtDay(brain2.clock());
         const uso = brain2.policy("voz_uso", { dia: hoje, n: 0 });
-        const n3 = uso.dia === hoje ? uso.n : 0;
+        const n4 = uso.dia === hoje ? uso.n : 0;
         const teto = Number(svc.env.VOZ_TETO_DIA ?? 600);
-        if (n3 >= teto) return out(429, { error: `Limite di\xE1rio de voz neural (${teto} falas) atingido: uso a voz do navegador.` });
+        if (n4 >= teto) return out(429, { error: `Limite di\xE1rio de voz neural (${teto} falas) atingido: uso a voz do navegador.` });
         const r = await (svc.fetch ?? fetch)("https://api.openai.com/v1/audio/speech", {
           method: "POST",
-          headers: { authorization: `Bearer ${chave2}`, "content-type": "application/json" },
+          headers: { authorization: `Bearer ${chave3}`, "content-type": "application/json" },
           body: JSON.stringify({ model: svc.env.VOZ_MODELO ?? "gpt-4o-mini-tts", voice: svc.env.VOZ_JARVIS ?? "onyx", input: texto2, response_format: "mp3", instructions: "Fale em portugu\xEAs do Brasil, com sotaque natural brasileiro. Tom de s\xF3cio experiente: calmo, direto e caloroso, ritmo de conversa, sem teatralidade." })
         });
         if (!r.ok) return out(502, { error: `A voz neural falhou (${r.status}): uso a voz do navegador.` });
-        brain2.setPolicy("voz_uso", { dia: hoje, n: n3 + 1 });
+        brain2.setPolicy("voz_uso", { dia: hoje, n: n4 + 1 });
         return new Response(r.body, { status: 200, headers: { "content-type": "audio/mpeg", "cache-control": "no-store", ...cors } });
       }
       if (url.pathname === "/api/integrations/check") {
@@ -7878,91 +9015,6 @@ function createHandler(svc) {
       return json(500, { error: "erro interno" });
     }
   };
-}
-
-// packages/core/src/auth.ts
-var enc = new TextEncoder();
-var COOKIE = "brain_session";
-var TTL_MS = 7 * 24 * 36e5;
-var b642 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-async function hmac(secret, data) {
-  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  return b642(await crypto.subtle.sign("HMAC", key, enc.encode(data)));
-}
-async function safeEqual(a, b) {
-  const [x, y] = await Promise.all([crypto.subtle.digest("SHA-256", enc.encode(a)), crypto.subtle.digest("SHA-256", enc.encode(b))]);
-  const A = new Uint8Array(x);
-  const B = new Uint8Array(y);
-  let d = 0;
-  for (let i = 0; i < A.length; i++) d |= A[i] ^ B[i];
-  return d === 0;
-}
-async function makeSession(secret, now) {
-  const exp = String(now + TTL_MS);
-  return `${exp}.${await hmac(secret, exp)}`;
-}
-async function verifySession(secret, token, now) {
-  if (!token) return false;
-  const [exp, sig] = token.split(".");
-  if (!exp || !sig || !/^\d+$/.test(exp) || Number(exp) < now) return false;
-  return safeEqual(sig, await hmac(secret, exp));
-}
-var readCookie = (req, name = COOKIE) => req.headers.get("cookie")?.split(/;\s*/).map((c2) => c2.split("=")).find(([k]) => k === name)?.[1];
-var sessionCookie = (token, secure) => `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${TTL_MS / 1e3}${secure ? "; Secure" : ""}`;
-var clearCookie = (secure) => `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure ? "; Secure" : ""}`;
-var j = (status, body, extra = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...extra } });
-var LoginLimiter = class {
-  constructor(max = 5, windowMs = 6e5) {
-    this.max = max;
-    this.windowMs = windowMs;
-  }
-  fails = [];
-  blocked(now) {
-    this.fails = this.fails.filter((t) => now - t < this.windowMs);
-    return this.fails.length >= this.max;
-  }
-  fail(now) {
-    this.fails.push(now);
-  }
-  reset() {
-    this.fails = [];
-  }
-};
-var LOGIN_HTML = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Synapsa Brain</title>
-<style>:root{color-scheme:light dark;--bg:#f6f5f2;--fg:#17201d;--mut:#66706b;--ac:#1f6b55;--bd:#d6d9d4}@media(prefers-color-scheme:dark){:root{--bg:#0f1513;--fg:#e8ede9;--mut:#8b9791;--ac:#4fb391;--bd:#2a3531}}
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif;padding:16px}
-form{width:min(340px,100%);display:grid;gap:12px}h1{font-size:20px;margin:0}p{margin:0;color:var(--mut)}
-input,button{font:inherit;padding:11px 12px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--fg)}button{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600;cursor:pointer}#e{color:#c0392b;min-height:1.2em}</style>
-<form id="f"><h1>Synapsa Brain</h1><p>Acesso restrito.</p><input id="p" type="password" placeholder="Senha" autocomplete="current-password" autofocus required><button>Entrar</button><div id="e" role="alert"></div></form>
-<script>f.onsubmit=async e=>{e.preventDefault();const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:p.value})});if(r.ok)location.reload();else document.getElementById('e').textContent=r.status===429?'Muitas tentativas. Espere 10 minutos.':r.status===503?'Login n\xE3o configurado no servidor.':'Senha incorreta.'}</script></html>`;
-function createAuth(env, limiter = new LoginLimiter(), clock = Date.now) {
-  const open = env.ALLOW_INSECURE_LOCAL === "1";
-  const configured = Boolean(env.BRAIN_PASSWORD && env.SESSION_SECRET);
-  const isAuthed = async (req) => open || configured && await verifySession(env.SESSION_SECRET, readCookie(req), clock());
-  const authorize = async (req, url) => {
-    if (url.pathname === "/api/login" && req.method === "POST") return login(req, url);
-    if (url.pathname === "/api/logout" && req.method === "POST") return j(200, { ok: true }, { "set-cookie": clearCookie(url.protocol === "https:") });
-    if (!open && !configured) return j(503, { error: "Login n\xE3o configurado: defina BRAIN_PASSWORD e SESSION_SECRET.", code: "not_configured" });
-    if (await isAuthed(req)) return null;
-    return j(401, { error: "Fa\xE7a login.", code: "auth" });
-  };
-  async function login(req, url) {
-    if (!configured) return j(503, { error: "Login n\xE3o configurado.", code: "not_configured" });
-    const now = clock();
-    if (limiter.blocked(now)) return j(429, { error: "Muitas tentativas.", code: "rate_limited" });
-    let pw = "";
-    try {
-      pw = String((await req.json()).password ?? "");
-    } catch {
-    }
-    if (!pw || !await safeEqual(pw, env.BRAIN_PASSWORD)) {
-      limiter.fail(now);
-      return j(401, { error: "Senha incorreta.", code: "auth" });
-    }
-    limiter.reset();
-    return j(200, { ok: true }, { "set-cookie": sessionCookie(await makeSession(env.SESSION_SECRET, now), url.protocol === "https:") });
-  }
-  return { authorize, isAuthed, configured: configured || open };
 }
 
 // packages/core/src/checks.ts
@@ -8171,9 +9223,9 @@ function planejar(brain2, i) {
 }
 
 // packages/core/src/jarvis-llm.ts
-var cap = (x, n3 = 12e3) => {
+var cap = (x, n4 = 12e3) => {
   const t = JSON.stringify(x);
-  return t.length > n3 ? `${t.slice(0, n3)}\u2026(cortado)` : t;
+  return t.length > n4 ? `${t.slice(0, n4)}\u2026(cortado)` : t;
 };
 var SYSTEM = `Voc\xEA \xE9 o Jarvis, o comandante da Central Synapsa. Fala com Felipe Dalpra, fundador da Synapsa, plataforma de IA para psic\xF3logos no Brasil.
 
@@ -8671,7 +9723,7 @@ var BrainDO = class extends DurableObject {
     brain2.on("prospeccao", () => void this.arm(2e4));
     const integrations = () => integrationsView(brain2.db, e, brain2.clock());
     const rules = ruleChat(brain2, integrations);
-    const auth = createAuth(e, new LoginLimiter());
+    const auth = createAuth(e, new LoginLimiter(), Date.now, armazemUsuarios(brain2));
     this.brain = brain2;
     this.handle = createHandler({
       brain: brain2,
@@ -8696,7 +9748,15 @@ var BrainDO = class extends DurableObject {
     } catch {
     }
     try {
+      gerarAutonomos(this.brain);
+    } catch {
+    }
+    try {
       await sincronizarGsc(this.brain, strings(this.env));
+    } catch {
+    }
+    try {
+      await sincronizar(this.brain, strings(this.env));
     } catch {
     }
     try {
@@ -8743,6 +9803,8 @@ var index_default = {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (url.pathname.startsWith("/api/")) return brain(env).fetch(req);
+    const t = /^\/t\/([\w-]{1,80})\/?$/.exec(url.pathname);
+    if (t && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/p/${t[1]}/pagina`));
     const auth = createAuth(env);
     const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": CSP, "x-content-type-options": "nosniff" };
     if (!auth.configured) return new Response("Login n\xE3o configurado: defina BRAIN_PASSWORD e SESSION_SECRET (wrangler secret put).", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
