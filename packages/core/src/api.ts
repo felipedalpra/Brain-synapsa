@@ -47,7 +47,31 @@ export interface Services {
   authorize?: (req: Request, url: URL) => Response | null | Promise<Response | null>;
 }
 
-export const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data: https://*.fbcdn.net https://*.cdninstagram.com; media-src 'self' blob: data:; frame-ancestors 'none'";
+/** Marca só as tags <script> de verdade: o corpo de um script não pode conter "</script>", então pulamos até o fim dele (o bundle tem "<script" dentro de strings). */
+function marcarScripts(html: string, nonce: string): string {
+  let out = "", i = 0;
+  for (;;) {
+    const j = html.slice(i).search(/<script(?=[\s>])/);
+    if (j < 0) return out + html.slice(i);
+    const a = i + j;
+    const fim = html.indexOf("</script>", a);
+    const f = fim < 0 ? html.length : fim + 9;
+    out += html.slice(i, a) + `<script nonce="${nonce}"` + html.slice(a + 7, f);
+    i = f;
+  }
+}
+
+/** Nonce por resposta: só os <script> que o servidor serviu rodam; script injetado por XSS não tem o nonce e é barrado. */
+export function comNonce(html: string, csp: string): { html: string; csp: string } {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = btoa(String.fromCharCode(...b));
+  return {
+    html: marcarScripts(html, nonce),
+    csp: csp.replace(/script-src ([^;]*)/, (_m, v: string) => `script-src ${v.replace(/\s*'unsafe-inline'/, "").trim()} 'nonce-${nonce}'`),
+  };
+}
+
+export const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data: https://*.fbcdn.net https://*.cdninstagram.com; media-src 'self' blob: data:; frame-ancestors 'none'";
 
 export const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
@@ -98,7 +122,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         const [, token, parte] = pl as unknown as [string, string, string | undefined];
         const sem = { "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" };
         try {
-          if (req.method === "GET" && parte === "pagina") { pegarLink(brain, token!); return new Response(PLANO_HTML, { status: 200, headers: { ...sem, "content-type": "text/html; charset=utf-8", "content-security-policy": PLANO_CSP, "x-content-type-options": "nosniff" } }); }
+          if (req.method === "GET" && parte === "pagina") { pegarLink(brain, token!); const n = comNonce(PLANO_HTML, PLANO_CSP); return new Response(n.html, { status: 200, headers: { ...sem, "content-type": "text/html; charset=utf-8", "content-security-policy": n.csp, "x-content-type-options": "nosniff" } }); }
           if (req.method === "GET" && parte === "pdf") {
             const l = pegarLink(brain, token!);
             const bytes = pdfSemana(brain, l.semana, l.responsavel, `${url.origin}/t/${token}`);
@@ -188,7 +212,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         if (!svc.indexHtml) return null;
         const html = svc.indexHtml();
         if (!html) return new Response("A Central ainda não foi compilada. Rode: npm run build", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
-        return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": CSP } });
+        const n = comNonce(html, CSP); return new Response(n.html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": n.csp } });
       }
       if (req.method !== "POST") return url.pathname === "/api/events" ? null : out(404, { error: "não encontrado" });
       const body = await readJson(req, url.pathname === "/api/financeiro/importar" || url.pathname === "/api/financeiro/importar-extrato" ? 2_000_000 : 64_000);

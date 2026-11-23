@@ -1667,6 +1667,7 @@ create table if not exists envios (
   detail text,
   at integer not null
 );
+create table if not exists lgpd_esquecidos (tipo text not null, valor text not null, em integer not null, primary key (tipo, valor));
 create table if not exists prospect_autonomo (prospect_id integer primary key);
 create table if not exists email_suppression (
   email text primary key,
@@ -1895,8 +1896,10 @@ var Brain = class extends Emitter {
     run(this.db, "insert into policies (key, value) values (?, ?) on conflict(key) do update set value = excluded.value", key, JSON.stringify(value));
     this.emit("change");
   }
+  /** Nome de quem está logado na requisição em curso; troca o ator genérico "voce" pelo usuário real. */
+  operador = null;
   audit(actor, action, ref, detail) {
-    run(this.db, "insert into audit_log (at, actor, action, ref, detail) values (?, ?, ?, ?, ?)", this.clock(), actor, action, ref ?? null, detail === void 0 ? null : JSON.stringify(detail));
+    run(this.db, "insert into audit_log (at, actor, action, ref, detail) values (?, ?, ?, ?, ?)", this.clock(), actor === "voce" && this.operador ? this.operador : actor, action, ref ?? null, detail === void 0 ? null : JSON.stringify(detail));
   }
   log(agentId, text, tone = "normal") {
     run(this.db, "insert into activity (agent_id, text, tone, at) values (?, ?, ?, ?)", agentId, text, tone, this.clock());
@@ -3097,8 +3100,9 @@ var DAY = 864e5;
 function suppress(brain2, email, reason) {
   run(brain2.db, "insert into email_suppression (email, reason, at) values (?, ?, ?) on conflict(email) do update set reason = excluded.reason, at = excluded.at", email.trim().toLowerCase(), reason, brain2.clock());
 }
+var politicaUrl = (env) => env.PRIVACY_URL ?? `${(env.BRAIN_PUBLIC_URL ?? "https://synapsa-brain.felipeodriosolladalpra.workers.dev").replace(/\/$/, "")}/privacidade`;
 var rodapeLinhas = (env, prospeccao = false, autonomo = false) => `${env.RESEND_SENDER_NAME ?? "Felipe Dalpra"}, Synapsa
-` + (prospeccao ? `${autonomo ? "Escrevi para o contato profissional que voc\xEA divulga publicamente." : "Escrevi para o contato que a sua cl\xEDnica divulga publicamente."} Para n\xE3o receber mais e-mails meus, responda SAIR.` : "Para n\xE3o receber mais e-mails meus, responda SAIR.");
+` + (prospeccao ? `${autonomo ? "Escrevi para o contato profissional que voc\xEA divulga publicamente." : "Escrevi para o contato que a sua cl\xEDnica divulga publicamente."} Para n\xE3o receber mais e-mails meus, responda SAIR. Privacidade e seus dados: ${politicaUrl(env)}` : "Para n\xE3o receber mais e-mails meus, responda SAIR.");
 var footer = (env, prospeccao = false, autonomo = false) => `
 
 --
@@ -3485,6 +3489,103 @@ async function fetchIgDia(version, igId, token, day) {
   return { day, reach, profile_views, link_taps, interacoes };
 }
 
+// packages/core/src/lgpd.ts
+var DAY2 = 864e5;
+var RETENCAO_MESES = 12;
+var digitos = (s2) => s2.replace(/\D/g, "");
+var esquecido = (brain2, tipo, valor) => !!row(brain2.db, "select 1 as x from lgpd_esquecidos where tipo = ? and valor = ?", tipo, tipo === "whatsapp" ? digitos(valor) : valor);
+var marcar = (brain2, tipo, valor) => {
+  if (valor) run(brain2.db, "insert or ignore into lgpd_esquecidos (tipo, valor, em) values (?, ?, ?)", tipo, valor, brain2.clock());
+};
+function esquecerContato(brain2, alvo, ator, bloquear = true) {
+  const emails = /* @__PURE__ */ new Set();
+  const zaps = /* @__PURE__ */ new Set();
+  const ids = /* @__PURE__ */ new Set();
+  if (alvo.email) emails.add(alvo.email.trim().toLowerCase());
+  if (alvo.whatsapp && digitos(alvo.whatsapp).length >= 8) zaps.add(digitos(alvo.whatsapp));
+  if (alvo.prospectId) ids.add(alvo.prospectId);
+  if (!emails.size && !zaps.size && !ids.size) throw new BrainError("invalid", "Informe o e-mail, o WhatsApp ou a cl\xEDnica a esquecer.");
+  for (const e of emails) for (const p of rows(brain2.db, "select id from prospects where lower(email) = ?", e)) ids.add(p.id);
+  for (const id of [...ids]) {
+    const p = row(brain2.db, "select email, telefone from prospects where id = ?", id);
+    if (!p) {
+      ids.delete(id);
+      continue;
+    }
+    if (p.email) emails.add(p.email.toLowerCase());
+    if (p.telefone && digitos(p.telefone).length >= 8) zaps.add(digitos(p.telefone));
+  }
+  let mensagens = 0;
+  const agora = brain2.clock();
+  for (const id of ids) {
+    for (const t of ["prospect_contato", "prospect_whatsapp", "prospect_autonomo"]) run(brain2.db, `delete from ${t} where prospect_id = ?`, id);
+    for (const r of rows(brain2.db, "select id from proposals where dedupe_key like ? or dedupe_key like ?", `prosp-${id}-%`, `aut-${id}-%`)) {
+      anonimizarProposta(brain2, r.id);
+      mensagens++;
+    }
+    run(brain2.db, "delete from inbound_emails where prospect_id = ?", id);
+    run(brain2.db, "update prospects set nome = 'Removido (LGPD)', cidade = null, endereco = null, telefone = null, site = null, instagram = null, email = null, email_fonte = null, consulta = null, crm_lead_id = null, status = 'removido', atualizado_em = ? where id = ?", agora, id);
+  }
+  for (const e of emails) {
+    for (const r of rows(brain2.db, "select id from proposals where lower(contact_ref) = ?", e)) {
+      anonimizarProposta(brain2, r.id);
+      mensagens++;
+    }
+    mensagens += rows(brain2.db, "select email_id from inbound_emails where lower(de) = ?", e).length;
+    run(brain2.db, "delete from inbound_emails where lower(de) = ?", e);
+    run(brain2.db, "update envios set to_ref = '[removido]', detail = null where lower(to_ref) = ?", e);
+    run(brain2.db, "delete from contact_log where lower(contact_ref) = ?", e);
+    run(brain2.db, "delete from consents where lower(contact_ref) = ?", e);
+    if (bloquear) run(brain2.db, "insert into email_suppression (email, reason, at) values (?, 'pediu a exclus\xE3o dos dados (LGPD)', ?) on conflict(email) do update set reason = excluded.reason, at = excluded.at", e, agora);
+  }
+  let instinct2 = 0;
+  for (const z of zaps) {
+    for (const l of rows(brain2.db, "select chave, whatsapp from instinct_leads")) {
+      if (l.whatsapp && digitos(l.whatsapp) === z) {
+        run(brain2.db, "delete from instinct_eventos where chave = ?", l.chave);
+        run(brain2.db, "delete from instinct_leads where chave = ?", l.chave);
+        marcar(brain2, "instinct", l.chave);
+        instinct2++;
+      }
+    }
+    marcar(brain2, "whatsapp", z);
+  }
+  brain2.audit("voce", "lgpd_esquecer", ids.size ? [...ids].join(",") : void 0, { prospects: ids.size, mensagens, instinct: instinct2, bloqueado: bloquear && emails.size > 0 });
+  brain2.emit("change");
+  return { prospects: ids.size, mensagens, instinct: instinct2, bloqueado: bloquear && emails.size > 0 };
+}
+function anonimizarProposta(brain2, id) {
+  run(brain2.db, "update proposals set title = '[removido \u2014 LGPD]', draft = null, why = '[removido]', contact_ref = null, payload = '{}', review_note = null where id = ?", id);
+  run(brain2.db, "update envios set to_ref = '[removido]', detail = null where proposal_id = ?", id);
+}
+function aplicarRetencao(brain2) {
+  const corte = brain2.clock() - RETENCAO_MESES * 30 * DAY2;
+  const frios = rows(
+    brain2.db,
+    `select p.id from prospects p left join prospect_contato c on c.prospect_id = p.id
+     where p.status not in ('removido', 'no_crm') and p.crm_lead_id is null and p.atualizado_em < ? and coalesce(c.respondeu, 0) = 0`,
+    corte
+  );
+  for (const f of frios) esquecerContato(brain2, { prospectId: f.id }, "sistema", false);
+  run(brain2.db, "delete from inbound_emails where at < ?", corte);
+  run(brain2.db, "update envios set detail = null where at < ? and detail is not null", corte);
+  if (frios.length) brain2.audit("sistema", "lgpd_retencao", void 0, { removidos: frios.length, meses: RETENCAO_MESES });
+  return frios.length;
+}
+var POLITICA_HTML = (contato) => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pol\xEDtica de Privacidade | Synapsa</title>
+<style>:root{color-scheme:light dark}body{margin:0;font:16px/1.65 system-ui,-apple-system,Segoe UI,sans-serif;background:#0b0b12;color:#e8e8f0}main{max-width:720px;margin:0 auto;padding:40px 20px 80px}h1{font-size:28px;margin:0 0 4px}h2{font-size:18px;margin:32px 0 6px;color:#b9a2ff}p,li{color:#c9c9d6}a{color:#8cc8ff}small{color:#8a8a9a}</style></head><body><main>
+<h1>Pol\xEDtica de Privacidade</h1><small>Synapsa \xB7 atualizada em novembro de 2026</small>
+<h2>Quem somos</h2><p>A Synapsa \xE9 uma plataforma para psic\xF3logos e cl\xEDnicas. Somos a controladora dos dados descritos aqui. Contato para qualquer assunto de privacidade: <a href="mailto:${contato}">${contato}</a>.</p>
+<h2>Quais dados usamos neste contato</h2><p>Quando escrevemos para uma cl\xEDnica ou psic\xF3logo, usamos s\xF3 dados profissionais que a pr\xF3pria pessoa divulga publicamente: nome do consult\xF3rio ou cl\xEDnica, cidade, telefone, site, Instagram e e-mail comercial. N\xE3o coletamos nem tratamos dados de pacientes nessa prospec\xE7\xE3o.</p>
+<h2>Para que usamos e por qu\xEA</h2><p>Para apresentar a Synapsa e oferecer uma conversa de 30 minutos. A base legal \xE9 o leg\xEDtimo interesse (LGPD, art. 7\xBA, IX): contato comercial entre empresas, com e-mail profissional p\xFAblico, limitado ao que \xE9 necess\xE1rio e sempre com sa\xEDda f\xE1cil.</p>
+<h2>Como parar de receber</h2><p>Responda SAIR a qualquer e-mail nosso, ou escreva para o contato acima. Paramos na hora e guardamos apenas o seu e-mail numa lista de bloqueio, para n\xE3o escrever de novo.</p>
+<h2>Seus direitos</h2><p>Voc\xEA pode pedir confirma\xE7\xE3o do tratamento, acesso, corre\xE7\xE3o, anonimiza\xE7\xE3o ou elimina\xE7\xE3o dos seus dados, portabilidade, informa\xE7\xE3o sobre com quem compartilhamos e a revoga\xE7\xE3o do que tiver autorizado (LGPD, art. 18). Respondemos em at\xE9 15 dias. Pedidos de elimina\xE7\xE3o s\xE3o feitos nos nossos sistemas e na ferramenta de prospec\xE7\xE3o.</p>
+<h2>Por quanto tempo guardamos</h2><p>Contatos de prospec\xE7\xE3o sem resposta s\xE3o eliminados ap\xF3s 12 meses sem intera\xE7\xE3o. Quem pede para sair fica apenas na lista de bloqueio.</p>
+<h2>Com quem compartilhamos</h2><p>Usamos fornecedores para operar o servi\xE7o: Cloudflare (hospedagem), Resend (envio de e-mail), Apify e Google (busca de dados p\xFAblicos e planilhas), e provedores de IA que ajudam a redigir mensagens. Alguns ficam fora do Brasil; nesses casos a transfer\xEAncia ocorre com as garantias previstas no art. 33 da LGPD. N\xE3o vendemos dados.</p>
+<h2>Seguran\xE7a</h2><p>Acesso restrito por login, conex\xF5es criptografadas, registro de a\xE7\xF5es e revis\xE3o peri\xF3dica de acessos.</p>
+<h2>Reclama\xE7\xF5es</h2><p>Se n\xE3o ficar satisfeito, voc\xEA pode contatar a Autoridade Nacional de Prote\xE7\xE3o de Dados (gov.br/anpd).</p>
+</main></body></html>`;
+
 // packages/core/src/gsc-analise.ts
 var sem = (s2) => s2.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 var LEGAL = /politica|termos|cookies|privacidade|forgot|login|cadastro|entrar/;
@@ -3632,7 +3733,7 @@ function recados(e) {
 }
 
 // packages/core/src/gsc.ts
-var DAY2 = 864e5;
+var DAY3 = 864e5;
 var ESCOPO = "https://www.googleapis.com/auth/webmasters.readonly";
 var SITES_PADRAO = [
   { id: "site", rotulo: "synapsa.com.br", siteUrl: "sc-domain:synapsa.com.br", tipo: "site" },
@@ -3712,18 +3813,18 @@ async function sincronizarGsc(brain2, env, f = fetch, opt = {}) {
   const hoje = dia2(agora);
   if (!opt.forcar && brain2.policy("gsc_ultima_sync", "") === hoje) return "Search Console j\xE1 sincronizado hoje.";
   const token = await tokenGoogle(chave3, agora, f);
-  const fim = dia2(agora - 2 * DAY2);
+  const fim = dia2(agora - 2 * DAY3);
   const fimMs = Date.parse(`${fim}T12:00:00Z`);
-  const janela = { atual: [dia2(fimMs - 27 * DAY2), fim], anterior: [dia2(fimMs - 55 * DAY2), dia2(fimMs - 28 * DAY2)] };
+  const janela = { atual: [dia2(fimMs - 27 * DAY3), fim], anterior: [dia2(fimMs - 55 * DAY3), dia2(fimMs - 28 * DAY3)] };
   const falhas = [];
   let linhas = 0;
   for (const s2 of sitesGsc(brain2)) {
     try {
       const ult = row(brain2.db, "select max(dia) as d from gsc_dia where site = ?", s2.id)?.d;
-      const ini = ult ? dia2(Date.parse(`${ult}T12:00:00Z`) - 4 * DAY2) : dia2(agora - 90 * DAY2);
+      const ini = ult ? dia2(Date.parse(`${ult}T12:00:00Z`) - 4 * DAY3) : dia2(agora - 90 * DAY3);
       const diario = await consultar(token, s2, { startDate: ini, endDate: fim, dimensions: ["date"], rowLimit: 500 }, f);
       const ultP = row(brain2.db, "select max(dia) as d from gsc_pagina_dia where site = ?", s2.id)?.d;
-      const iniP = ultP ? dia2(Date.parse(`${ultP}T12:00:00Z`) - 4 * DAY2) : dia2(agora - 90 * DAY2);
+      const iniP = ultP ? dia2(Date.parse(`${ultP}T12:00:00Z`) - 4 * DAY3) : dia2(agora - 90 * DAY3);
       const porPagina = await consultar(token, s2, { startDate: iniP, endDate: fim, dimensions: ["date", "page"] }, f);
       const agg = [];
       for (const periodo of ["atual", "anterior"]) {
@@ -3781,13 +3882,13 @@ function gscPainel(brain2, env) {
     const cob = cobertura(qAtual);
     const ops = oportunidades(qAtual, paginaDaBusca);
     const serieP = /* @__PURE__ */ new Map();
-    const iniSerie = dias.length ? dia2(Date.parse(`${dias[dias.length - 1].dia}T12:00:00Z`) - 27 * DAY2) : "0000-00-00";
+    const iniSerie = dias.length ? dia2(Date.parse(`${dias[dias.length - 1].dia}T12:00:00Z`) - 27 * DAY3) : "0000-00-00";
     for (const r of rows(brain2.db, "select pagina, dia, clicks, impressions from gsc_pagina_dia where site = ? and dia >= ?", s2.id, iniSerie)) {
       const m = serieP.get(r.pagina) ?? /* @__PURE__ */ new Map();
       m.set(r.dia, { clicks: r.clicks, impressions: r.impressions });
       serieP.set(r.pagina, m);
     }
-    const diasJanela = dias.length ? Array.from({ length: 28 }, (_, i) => dia2(Date.parse(`${iniSerie}T12:00:00Z`) + i * DAY2)) : [];
+    const diasJanela = dias.length ? Array.from({ length: 28 }, (_, i) => dia2(Date.parse(`${iniSerie}T12:00:00Z`) + i * DAY3)) : [];
     const buscasPorPagina = /* @__PURE__ */ new Map();
     for (const a of pq) buscasPorPagina.set(a.chave, [...buscasPorPagina.get(a.chave) ?? [], { busca: a.chave2, clicks: a.clicks, impressions: a.impressions, position: a.position }]);
     const paginas = de("page", "atual").sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 400).map((a) => {
@@ -3857,7 +3958,7 @@ async function gscPainelCompleto(brain2, env, f = fetch) {
   const c2 = crmClient(env, f);
   if (!site || !c2 || !site.ultimoDia) return p;
   try {
-    const fim = Date.parse(`${site.ultimoDia}T23:59:59-03:00`), ini = fim - 28 * DAY2;
+    const fim = Date.parse(`${site.ultimoDia}T23:59:59-03:00`), ini = fim - 28 * DAY3;
     const leads = (await c2.all("/leads", {}, 5)).data.filter((l) => {
       const t = Date.parse(String(l.created_at));
       return t >= ini && t <= fim;
@@ -3975,7 +4076,7 @@ async function sincronizar(brain2, env, f = fetch) {
     run(brain2.db, "delete from instinct_dia");
     run(brain2.db, "delete from instinct_leads");
     for (const x of dias) run(brain2.db, "insert or replace into instinct_dia (dia, tipo, abordados, responderam, reunioes, contas, assinantes) values (?, ?, ?, ?, ?, ?, ?)", x.dia, x.tipo, x.abordados, x.responderam, x.reunioes, x.contas, x.assinantes);
-    for (const x of leads) run(brain2.db, "insert or replace into instinct_leads (chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado) values (?, ?, ?, ?, ?, ?, ?, ?)", x.chave, x.nome, x.tipo, x.cidade, x.whatsapp, x.primeira, x.status, x.atualizado);
+    for (const x of leads.filter((l2) => !esquecido(brain2, "instinct", l2.chave) && !esquecido(brain2, "whatsapp", l2.whatsapp ?? ""))) run(brain2.db, "insert or replace into instinct_leads (chave, nome, tipo, cidade, whatsapp, primeira, status, atualizado) values (?, ?, ?, ?, ?, ?, ?, ?)", x.chave, x.nome, x.tipo, x.cidade, x.whatsapp, x.primeira, x.status, x.atualizado);
     for (const x of leads) {
       const ant = antes.get(x.chave);
       if (ant === x.status) continue;
@@ -5273,7 +5374,7 @@ function finImportarExtrato(db, agora, lido, adicionar) {
 }
 
 // packages/core/src/prospeccao-email.ts
-var DAY3 = 864e5;
+var DAY4 = 864e5;
 var ETAPAS = [0, 3, 7];
 var AGENTE = "prospeccao";
 function nomeCurto(nome) {
@@ -5382,11 +5483,11 @@ function gerarRascunhos(brain2) {
       continue;
     }
     const t0 = enviados.get(chave(a.id, 0));
-    if (!enviados.has(chave(a.id, 1)) && agora - t0 >= ETAPAS[1] * DAY3) {
+    if (!enviados.has(chave(a.id, 1)) && agora - t0 >= ETAPAS[1] * DAY4) {
       if (criar(brain2, a, 1)) followups++;
       continue;
     }
-    if (enviados.has(chave(a.id, 1)) && !enviados.has(chave(a.id, 2)) && agora - t0 >= ETAPAS[2] * DAY3) {
+    if (enviados.has(chave(a.id, 1)) && !enviados.has(chave(a.id, 2)) && agora - t0 >= ETAPAS[2] * DAY4) {
       if (criar(brain2, a, 2)) followups++;
     }
   }
@@ -5416,7 +5517,7 @@ function rascunhosPendentes(brain2) {
   });
 }
 function emailsResumo(brain2) {
-  const hoje = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and e.at > ? and pr.kind like 'prospeccao%'", brain2.clock() - DAY3)?.n ?? 0;
+  const hoje = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and e.at > ? and pr.kind like 'prospeccao%'", brain2.clock() - DAY4)?.n ?? 0;
   const total = row(brain2.db, "select count(*) as n from envios e join proposals pr on pr.id = e.proposal_id where e.status = 'enviado' and pr.kind like 'prospeccao%'")?.n ?? 0;
   return { enviadosHoje: hoje, capDia: Number(brain2.policy("prospect_email_daily_cap", 10)), enviadosTotal: total };
 }
@@ -5550,7 +5651,7 @@ ${fecha}`
 }
 
 // packages/core/src/autonomos.ts
-var DAY4 = 864e5;
+var DAY5 = 864e5;
 var AGENTE2 = "prospeccao";
 var GENERICO = /^(consult[oó]rio|espa[cç]o|cl[ií]nica|atendimento|psicologia|psic[oó]log[oa]s|centro|instituto|n[uú]cleo|terapia)$/i;
 function nomeAutonomo(nome) {
@@ -5589,7 +5690,7 @@ function gerarAutonomos(brain2) {
   const min = minDias(brain2);
   const st = estados(brain2);
   const limiteNovos = Math.max(1, Number(brain2.policy("autonomo_novos_dia", 10)));
-  let novosHoje = row(brain2.db, "select count(*) as n from proposals where dedupe_key like 'aut-%-e1' and created_at > ?", agora - DAY4)?.n ?? 0;
+  let novosHoje = row(brain2.db, "select count(*) as n from proposals where dedupe_key like 'aut-%-e1' and created_at > ?", agora - DAY5)?.n ?? 0;
   let novos = 0, followups = 0;
   for (const a of rows(brain2.db, alvosSql)) {
     const parou = !!(a.respondeu || a.sair) || suprimido2(brain2, a.email);
@@ -5604,7 +5705,7 @@ function gerarAutonomos(brain2) {
       etapa = 1;
     } else {
       if (ult.status === "rejeitada" || ult.etapa >= AUT_TOTAL || ult.enviadoEm === null) continue;
-      if (agora - ult.enviadoEm < Math.max(AUT_ESPERAS[ult.etapa], min) * DAY4) continue;
+      if (agora - ult.enviadoEm < Math.max(AUT_ESPERAS[ult.etapa], min) * DAY5) continue;
       etapa = ult.etapa + 1;
     }
     const host2 = (() => {
@@ -5664,7 +5765,7 @@ function autonomosPainel(brain2) {
     } else if (ult.enviadoEm === null) situacao = `e-mail ${ult.etapa} esperando o seu OK`;
     else {
       situacao = `${ult.etapa} de ${AUT_TOTAL} enviados`;
-      proximo = ult.enviadoEm + Math.max(AUT_ESPERAS[ult.etapa], min) * DAY4;
+      proximo = ult.enviadoEm + Math.max(AUT_ESPERAS[ult.etapa], min) * DAY5;
     }
     return { id: a.id, nome: a.nome, cidade: a.cidade, email: a.email, etapa: enviada, situacao, proximo };
   });
@@ -5694,7 +5795,7 @@ function autonomosPainel(brain2) {
 }
 
 // packages/core/src/prospeccao-whatsapp.ts
-var DAY5 = 864e5;
+var DAY6 = 864e5;
 var DIAS_FOLLOWUP = 4;
 function numeroWhatsapp(tel) {
   let d = String(tel ?? "").replace(/\D/g, "");
@@ -5716,7 +5817,7 @@ var linkWhatsapp = (numero, texto2) => `https://wa.me/${numero}?text=${encodeURI
 var capDia = (brain2) => Math.max(1, Math.min(30, Number(brain2.policy("prospect_whatsapp_daily", 10)) || 10));
 function enviadosHoje(brain2) {
   const dia5 = brtDay(brain2.clock());
-  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY5).filter((r) => brtDay(r.enviado_em) === dia5).length;
+  return rows(brain2.db, "select enviado_em from prospect_whatsapp where pulado = 0 and enviado_em > ?", brain2.clock() - 2 * DAY6).filter((r) => brtDay(r.enviado_em) === dia5).length;
 }
 function painelWhatsapp(brain2) {
   const cap2 = capDia(brain2);
@@ -5739,7 +5840,7 @@ function painelWhatsapp(brain2) {
     const e1 = feitas.find((x) => x.etapa === 1);
     let etapa = null;
     if (!e0) etapa = 0;
-    else if (!e1 && e0.pulado === 0 && agora - e0.enviado_em >= DIAS_FOLLOWUP * DAY5) etapa = 1;
+    else if (!e1 && e0.pulado === 0 && agora - e0.enviado_em >= DIAS_FOLLOWUP * DAY6) etapa = 1;
     if (etapa === null) continue;
     const texto2 = mensagemWhatsapp(p.nome, etapa);
     fila.push({ prospectId: p.id, nome: p.nome, cidade: p.cidade, telefone: p.telefone, etapa, texto: texto2, link: linkWhatsapp(n4.numero, texto2), nota: p.nota });
@@ -5756,7 +5857,7 @@ function marcarWhatsapp(brain2, prospectId, etapa, acao) {
 }
 
 // packages/core/src/ga.ts
-var DAY6 = 864e5;
+var DAY7 = 864e5;
 var ESCOPO2 = "https://www.googleapis.com/auth/analytics.readonly";
 var DATA = "https://analyticsdata.googleapis.com/v1beta";
 var ADMIN = "https://analyticsadmin.googleapis.com/v1beta";
@@ -5837,16 +5938,16 @@ async function sincronizarGa(brain2, env, f = fetch, opt = {}) {
     }
   }
   const token = await tokenGoogle(chave3, agora, f, ESCOPO2);
-  const fim = dia3(agora - DAY6);
+  const fim = dia3(agora - DAY7);
   const fimMs = Date.parse(`${fim}T12:00:00Z`);
-  const janela = { atual: [dia3(fimMs - 27 * DAY6), fim], anterior: [dia3(fimMs - 55 * DAY6), dia3(fimMs - 28 * DAY6)] };
+  const janela = { atual: [dia3(fimMs - 27 * DAY7), fim], anterior: [dia3(fimMs - 55 * DAY7), dia3(fimMs - 28 * DAY7)] };
   let dias = 0;
   for (const s2 of sitesGsc(brain2)) {
     const prop = props[s2.id];
     if (!prop) continue;
     try {
       const ult = row(brain2.db, "select max(dia) as d from ga_dia where site = ?", s2.id)?.d;
-      const ini = ult ? dia3(Date.parse(`${ult}T12:00:00Z`) - 3 * DAY6) : dia3(agora - 90 * DAY6);
+      const ini = ult ? dia3(Date.parse(`${ult}T12:00:00Z`) - 3 * DAY7) : dia3(agora - 90 * DAY7);
       const diario = await relatorio(f, token, prop, ini, fim, ["date"], METRICAS, 500);
       const agg = [];
       for (const periodo of ["atual", "anterior"]) {
@@ -5916,7 +6017,7 @@ function gaPainel(brain2, env) {
 // packages/core/src/planejamento.ts
 var RESPONSAVEIS_PADRAO = ["Felipe Dalpra", "Cassio", "Felipe Augusto"];
 var STATUS = /* @__PURE__ */ new Set(["pendente", "andamento", "concluida"]);
-var DAY7 = 864e5;
+var DAY8 = 864e5;
 function criarLink(brain2, semana, responsavel) {
   const ja = row(brain2.db, "select token from plan_links where semana = ? and responsavel = ? and revogado = 0", semana, responsavel);
   if (ja) return ja.token;
@@ -5930,10 +6031,10 @@ function segundaDe(dia5) {
   const d = /* @__PURE__ */ new Date(`${dia5}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) throw new BrainError("invalid", "Semana inv\xE1lida.");
   const dow = (d.getUTCDay() + 6) % 7;
-  return new Date(d.getTime() - dow * DAY7).toISOString().slice(0, 10);
+  return new Date(d.getTime() - dow * DAY8).toISOString().slice(0, 10);
 }
 var semanaAtual = (brain2) => segundaDe(brtDay(brain2.clock()));
-var somaDias2 = (dia5, n4) => new Date(Date.parse(`${dia5}T12:00:00Z`) + n4 * DAY7).toISOString().slice(0, 10);
+var somaDias2 = (dia5, n4) => new Date(Date.parse(`${dia5}T12:00:00Z`) + n4 * DAY8).toISOString().slice(0, 10);
 var responsaveis = (brain2) => brain2.policy("plan_responsaveis", RESPONSAVEIS_PADRAO);
 var ver = (l) => ({ id: l.id, semana: l.semana, tipo: l.tipo, titulo: l.titulo, dia: l.dia, formato: l.formato, responsavel: l.responsavel, status: l.status, pai: l.pai, ordem: l.ordem, notas: l.notas, criadoEm: l.criado_em, concluidoEm: l.concluido_em, veioDe: l.veio_de, concluidoPor: null, subtarefas: [] });
 function itensDa(brain2, semana) {
@@ -6289,8 +6390,8 @@ async function trocarSenha(brain2, id, atual, nova) {
 }
 
 // packages/core/src/plano-link.ts
-var DAY8 = 864e5;
-var somaDias3 = (dia5, n4) => new Date(Date.parse(`${dia5}T12:00:00Z`) + n4 * DAY8).toISOString().slice(0, 10);
+var DAY9 = 864e5;
+var somaDias3 = (dia5, n4) => new Date(Date.parse(`${dia5}T12:00:00Z`) + n4 * DAY9).toISOString().slice(0, 10);
 var DIAS2 = ["Segunda", "Ter\xE7a", "Quarta", "Quinta", "Sexta", "S\xE1bado", "Domingo"];
 function pegarLink(brain2, token) {
   const l = /^[0-9a-f]{48}$/.test(token) ? row(brain2.db, "select token, semana, responsavel, revogado from plan_links where token = ?", token) : void 0;
@@ -6464,7 +6565,7 @@ ${xref}
   return bytes;
 }
 var pdfSemana = (brain2, semana, responsavel, linkUrl) => pdfDaVista(vistaPublica(brain2, segundaDe(semana), responsavel), linkUrl);
-var PLANO_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+var PLANO_CSP = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 var PLANO_HTML = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Tarefas da semana \xB7 Synapsa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
@@ -7567,9 +7668,9 @@ async function rodarRotina(brain2, env, f = fetch, opts = {}) {
     return e instanceof Error ? e.message : "N\xE3o consegui iniciar a busca.";
   }
 }
-var digitos = (t) => (t ?? "").replace(/\D/g, "");
+var digitos2 = (t) => (t ?? "").replace(/\D/g, "");
 var emBR = (t) => {
-  const d = digitos(t);
+  const d = digitos2(t);
   return d.startsWith("55") && d.length >= 12 ? d.slice(2) : d;
 };
 async function enviarAoCrm(brain2, env, ids, f = fetch) {
@@ -8540,7 +8641,27 @@ function finPainel(db, agora) {
 }
 
 // packages/core/src/api.ts
-var CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data: https://*.fbcdn.net https://*.cdninstagram.com; media-src 'self' blob: data:; frame-ancestors 'none'";
+function marcarScripts(html, nonce) {
+  let out = "", i = 0;
+  for (; ; ) {
+    const j2 = html.slice(i).search(/<script(?=[\s>])/);
+    if (j2 < 0) return out + html.slice(i);
+    const a = i + j2;
+    const fim = html.indexOf("</script>", a);
+    const f = fim < 0 ? html.length : fim + 9;
+    out += html.slice(i, a) + `<script nonce="${nonce}"` + html.slice(a + 7, f);
+    i = f;
+  }
+}
+function comNonce(html, csp) {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = btoa(String.fromCharCode(...b));
+  return {
+    html: marcarScripts(html, nonce),
+    csp: csp.replace(/script-src ([^;]*)/, (_m, v) => `script-src ${v.replace(/\s*'unsafe-inline'/, "").trim()} 'nonce-${nonce}'`)
+  };
+}
+var CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data: https://*.fbcdn.net https://*.cdninstagram.com; media-src 'self' blob: data:; frame-ancestors 'none'";
 var json = (status, body, headers = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
 async function readJson(req, max = 64e3) {
   const text = await req.text();
@@ -8581,7 +8702,8 @@ function createHandler(svc) {
         try {
           if (req.method === "GET" && parte === "pagina") {
             pegarLink(brain2, token);
-            return new Response(PLANO_HTML, { status: 200, headers: { ...sem2, "content-type": "text/html; charset=utf-8", "content-security-policy": PLANO_CSP, "x-content-type-options": "nosniff" } });
+            const n4 = comNonce(PLANO_HTML, PLANO_CSP);
+            return new Response(n4.html, { status: 200, headers: { ...sem2, "content-type": "text/html; charset=utf-8", "content-security-policy": n4.csp, "x-content-type-options": "nosniff" } });
           }
           if (req.method === "GET" && parte === "pdf") {
             const l = pegarLink(brain2, token);
@@ -8603,8 +8725,10 @@ function createHandler(svc) {
         if (req.method === "POST" && url.pathname.endsWith("/entrega")) return json(200, receberPost(brain2, await readJson(req, 14e6), url.origin));
         return json(405, { error: "m\xE9todo n\xE3o permitido" });
       }
+      if (req.method === "GET" && url.pathname === "/api/privacidade") return new Response(POLITICA_HTML(svc.env.PRIVACY_CONTACT ?? "contato@synapsa.chat"), { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=3600", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'" } });
       const denied = await svc.authorize?.(req, url);
       if (denied) return denied;
+      brain2.operador = usuarioAtual(req)?.nome ?? null;
       const out = (status, body2) => json(status, body2, cors);
       if (req.method === "GET" && url.pathname === "/api/health") return out(200, { ok: true, server: "brain-server", llm: brain2.llm, sse: svc.sse === true });
       if (req.method === "GET" && url.pathname === "/api/me") return out(200, usuarioAtual(req) ?? { id: "0", nome: "Felipe", email: "", papel: "admin", dono: true, precisaTrocar: false });
@@ -8663,7 +8787,8 @@ function createHandler(svc) {
         if (!svc.indexHtml) return null;
         const html = svc.indexHtml();
         if (!html) return new Response("A Central ainda n\xE3o foi compilada. Rode: npm run build", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
-        return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": CSP } });
+        const n4 = comNonce(html, CSP);
+        return new Response(n4.html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": n4.csp } });
       }
       if (req.method !== "POST") return url.pathname === "/api/events" ? null : out(404, { error: "n\xE3o encontrado" });
       const body = await readJson(req, url.pathname === "/api/financeiro/importar" || url.pathname === "/api/financeiro/importar-extrato" ? 2e6 : 64e3);
@@ -8744,6 +8869,13 @@ function createHandler(svc) {
         }
         return out(400, { message: "Informe o site e o n\xFAmero da propriedade (s\xF3 d\xEDgitos), ou pe\xE7a para descobrir." });
       }
+      if (url.pathname === "/api/lgpd/esquecer") {
+        const eu = usuarioAtual(req);
+        if (eu && eu.papel !== "admin") return out(403, { error: "S\xF3 o administrador apaga dados de contatos." });
+        if (!body.confirmar) return out(409, { error: "Confirme a exclus\xE3o: isso n\xE3o d\xE1 para desfazer." });
+        return out(200, esquecerContato(brain2, { prospectId: body.prospectId ? Number(body.prospectId) : void 0, email: body.email ? String(body.email) : void 0, whatsapp: body.whatsapp ? String(body.whatsapp) : void 0 }, "voce", body.bloquear !== false));
+      }
+      if (url.pathname === "/api/lgpd/retencao") return out(200, { removidos: aplicarRetencao(brain2) });
       if (url.pathname.startsWith("/api/prospeccao/")) {
         const rota = url.pathname.slice("/api/prospeccao/".length);
         const f = (u, i) => (svc.fetch ?? fetch)(u, i);
@@ -9775,6 +9907,10 @@ var BrainDO = class extends DurableObject {
       await midiaRotina(this.brain, strings(this.env));
     } catch {
     }
+    try {
+      aplicarRetencao(this.brain);
+    } catch {
+    }
     const started = this.runner.tick();
     await this.runner.idle();
     return { ...rec, started };
@@ -9799,28 +9935,63 @@ var BrainDO = class extends DurableObject {
 
 // apps/edge/src/index.ts
 var brain = (env) => env.BRAIN.get(env.BRAIN.idFromName("brain"));
+var CABECALHOS = {
+  "strict-transport-security": "max-age=63072000; includeSubDomains",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "no-referrer",
+  "permissions-policy": "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()",
+  "cross-origin-opener-policy": "same-origin",
+  "cross-origin-resource-policy": "same-origin"
+};
+var protegida = (res, req) => {
+  const out = new Response(res.body, res);
+  for (const [k, v] of Object.entries(CABECALHOS)) out.headers.set(k, v);
+  if (new URL(req.url).pathname.startsWith("/api/midia/")) out.headers.set("cross-origin-resource-policy", "cross-origin");
+  if (new URL(req.url).pathname.startsWith("/api/") && !out.headers.has("cache-control")) out.headers.set("cache-control", "no-store");
+  return out;
+};
 var index_default = {
   async fetch(req, env) {
-    const url = new URL(req.url);
-    if (url.pathname.startsWith("/api/")) return brain(env).fetch(req);
-    const t = /^\/t\/([\w-]{1,80})\/?$/.exec(url.pathname);
-    if (t && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/p/${t[1]}/pagina`));
-    const auth = createAuth(env);
-    const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": CSP, "x-content-type-options": "nosniff" };
-    if (!auth.configured) return new Response("Login n\xE3o configurado: defina BRAIN_PASSWORD e SESSION_SECRET (wrangler secret put).", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
-    if (!await auth.isAuthed(req)) return new Response(LOGIN_HTML, { status: 401, headers });
-    const res = await env.ASSETS.fetch(req);
-    const out = new Response(res.body, res);
-    out.headers.set("content-security-policy", CSP);
-    out.headers.set("cache-control", "no-store");
-    out.headers.set("x-content-type-options", "nosniff");
-    return out;
+    return protegida(await tratar(req, env), req);
   },
   async scheduled(c2, env) {
     if (c2.cron === "0 13 * * 1-5") await brain(env).rotina();
     else await brain(env).daily();
   }
 };
+async function tratar(req, env) {
+  {
+    const url = new URL(req.url);
+    if (url.pathname.startsWith("/api/")) return brain(env).fetch(req);
+    if (url.pathname === "/privacidade" && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/privacidade`));
+    const t = /^\/t\/([\w-]{1,80})\/?$/.exec(url.pathname);
+    if (t && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/p/${t[1]}/pagina`));
+    const auth = createAuth(env);
+    const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" };
+    if (!auth.configured) return new Response("Login n\xE3o configurado: defina BRAIN_PASSWORD e SESSION_SECRET (wrangler secret put).", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
+    if (!await auth.isAuthed(req)) {
+      const l = comNonce(LOGIN_HTML, CSP);
+      return new Response(l.html, { status: 401, headers: { ...headers, "content-security-policy": l.csp } });
+    }
+    const res = await env.ASSETS.fetch(req);
+    if ((res.headers.get("content-type") ?? "").includes("text/html")) {
+      const n4 = comNonce(await res.text(), CSP);
+      const h = new Headers(res.headers);
+      h.delete("content-length");
+      h.delete("etag");
+      h.set("content-security-policy", n4.csp);
+      h.set("cache-control", "no-store");
+      h.set("x-content-type-options", "nosniff");
+      return new Response(n4.html, { status: res.status, headers: h });
+    }
+    const out = new Response(res.body, res);
+    out.headers.set("content-security-policy", CSP);
+    out.headers.set("cache-control", "no-store");
+    out.headers.set("x-content-type-options", "nosniff");
+    return out;
+  }
+}
 export {
   BrainDO,
   index_default as default

@@ -56,3 +56,18 @@ describe("LGPD", () => {
     expect(row<{ actor: string }>(brain.db, "select actor from audit_log order by id desc limit 1")!.actor).toBe("Cassio");
   });
 });
+
+import { comNonce, CSP } from "../src/api";
+import { PLANO_CSP } from "../src/plano-link";
+describe("CSP com nonce", () => {
+  it("tira unsafe-inline de script e marca todos os <script>", () => {
+    const r = comNonce('<script type="module">a()</script><p>x</p><script>b()</script>', CSP);
+    const n = /nonce-([^']+)'/.exec(r.csp)![1];
+    expect(r.csp).not.toMatch(/script-src[^;]*unsafe-inline/);
+    expect(r.html.split(`<script nonce="${n}"`)).toHaveLength(3); // nonce tem + e /: não vira regex
+    const bundle = comNonce('<script>var a="<script>"; var b="<script type=x>";</script>', CSP);
+    expect(bundle.html.match(/<script/g)).toHaveLength(3);
+    expect(bundle.html.match(/nonce=/g)).toHaveLength(1);
+    expect(comNonce("<script>1</script>", PLANO_CSP).csp).toMatch(/script-src 'self' 'nonce-/);
+  });
+});
