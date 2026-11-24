@@ -10088,14 +10088,6 @@ var BrainDO = class extends DurableObject {
     } catch {
     }
     try {
-      await sincronizarMercado(this.brain);
-    } catch {
-    }
-    try {
-      await gerarLeitura(this.brain, strings(this.env));
-    } catch {
-    }
-    try {
       await liRotina(this.brain, strings(this.env));
     } catch {
     }

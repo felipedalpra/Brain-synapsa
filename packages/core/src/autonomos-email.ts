@@ -27,7 +27,7 @@ export function montarAutonomo(d: DadosAutonomo, etapa: 1 | 2 | 3 | 4 | 5): { as
   };
   if (etapa === 2) return {
     assunto: frase(n, "o paciente certo precisa te encontrar"),
-    corpo: `${abre}\n\nQuem procura um psicólogo costuma comparar perfis antes de escolher. ${d.siteHost ? `O seu site já mostra CRP e contato, o que passa confiança. O que o perfil da Synapsa soma é` : "O perfil da Synapsa existe para isso:"} uma página com a sua marca, listada no nosso diretório de psicólogos, com agenda e formulário de entrada no mesmo lugar.\n\nO paciente te encontra, escolhe um horário e se cadastra sem ficar trocando mensagens. Para você, é um canal a mais de novos pacientes, que funciona sem depender só de indicação.\n\nDá para ver como fica o diretório aqui:\n\n${utm(DIRETORIO, "email", "prospeccao", "autonomos")}\n\nSe quiser o seu perfil no ar, é só responder este e-mail.\n\n${fecha}`,
+    corpo: `${abre}\n\nQuem procura um psicólogo costuma comparar perfis antes de escolher. ${d.siteHost ? `O seu site já mostra CRP e contato, o que passa confiança. O que o perfil da Synapsa soma é` : "O perfil da Synapsa existe para isso:"} uma página com a sua marca, listada no nosso diretório de psicólogos, com agenda e formulário de entrada no mesmo lugar.\n\nO paciente te encontra, escolhe um horário e se cadastra sem ficar trocando mensagens. Para você, é um canal a mais de novos pacientes, que funciona sem depender só de indicação.\n\nDá para conhecer a plataforma e criar a conta gratuita aqui:\n\n${utm(SITE, "email", "prospeccao", "autonomos")}\n\nSe quiser o seu perfil no ar, é só responder este e-mail.\n\n${fecha}`,
   };
   if (etapa === 3) return {
     assunto: frase(n, "quanto da sua semana vai para o administrativo?"),
