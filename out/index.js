@@ -8925,6 +8925,8 @@ function createHandler(svc) {
       if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain2.db, brain2.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? "", url.searchParams.get("base") === "caixa" ? "caixa" : "competencia"));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/instinct") return out(200, painel(brain2, svc.env));
+      if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, mercadoPainel(brain2, svc.env));
+      if (req.method === "GET" && url.pathname === "/api/leitura") return out(200, { ...leituraPainel(brain2), temChave: !!(svc.env.OPENAI_API_KEY || svc.env.ANTHROPIC_API_KEY) });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...await gscPainelCompleto(brain2, svc.env, svc.fetch ?? fetch), ga: gaPainel(brain2, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento/pdf") {
         const sm = url.searchParams.get("semana") ?? planPainel(brain2).semana, rp = url.searchParams.get("responsavel") ?? "";
@@ -9040,7 +9042,6 @@ function createHandler(svc) {
         }
         return out(400, { message: "Informe o site e o n\xFAmero da propriedade (s\xF3 d\xEDgitos), ou pe\xE7a para descobrir." });
       }
-      if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, mercadoPainel(brain2, svc.env));
       if (url.pathname === "/api/mercado/sincronizar") {
         try {
           return out(200, { message: await sincronizarMercado(brain2, svc.fetch ?? fetch, { forcar: true }) });
@@ -9048,7 +9049,6 @@ function createHandler(svc) {
           return out(200, { message: e instanceof Error ? e.message : String(e) });
         }
       }
-      if (req.method === "GET" && url.pathname === "/api/leitura") return out(200, { ...leituraPainel(brain2), temChave: !!(svc.env.OPENAI_API_KEY || svc.env.ANTHROPIC_API_KEY) });
       if (url.pathname === "/api/leitura/gerar") {
         try {
           const l = await gerarLeitura(brain2, svc.env, svc.fetch ?? fetch, { forcar: true });

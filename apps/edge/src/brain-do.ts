@@ -58,6 +58,8 @@ export class BrainDO extends DurableObject<Env> {
     const rec = this.runner.recover();
     try { gerarRascunhos(this.brain); } catch { /* follow-ups vencidos viram rascunho; erro aqui não pode parar a rotina */ }
     try { gerarAutonomos(this.brain); } catch { /* autônomos: follow-ups vencidos viram rascunho */ }
+    // Instagram primeiro: o Workers limita as chamadas externas por execução, e as sincronizações abaixo gastam esse orçamento antes da publicação.
+    try { await publicarDevidos(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro fica no próprio post, na Central */ }
     // Search Console: uma vez por dia (o próprio sincronizarGsc ignora se já rodou hoje); erro aqui não para a rotina.
     try { await sincronizarGsc(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece como último erro no painel de SEO */ }
     // Placar do Instinct (planilha do Google): lê todo dia; erro fica guardado no painel de prospecção.
@@ -66,8 +68,6 @@ export class BrainDO extends DurableObject<Env> {
     // Radar do mercado (autocomplete do Google, uma vez por semana) e a leitura do dia, depois de todas as sincronizações acima.
     try { await sincronizarMercado(this.brain); } catch { /* o aviso aparece no painel de SEO */ }
     try { await gerarLeitura(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao atualizar pela Central */ }
-    // Instagram: publica o post aprovado cujo horário chegou (no máximo 1 por dia, por padrão).
-    try { await publicarDevidos(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro fica no próprio post, na Central */ }
     // LinkedIn: segunda, quarta e sexta deixa o post do dia pronto para aprovar.
     try { await liRotina(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao gerar pela Central */ }
     // Meta e Instagram: uma leitura por dia para a análise de Anúncios e Instagram sempre ter dado fresco.
