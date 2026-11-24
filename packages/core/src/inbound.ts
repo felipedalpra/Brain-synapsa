@@ -1,3 +1,4 @@
+import { utm } from "./utm";
 // Respostas dos leads de prospecção. O Resend recebe em respostas@<domínio de prospecção> e avisa por webhook (email.received).
 // O Brain lê, classifica, para a sequência de follow-up, encaminha pro seu Gmail e deixa um rascunho de resposta esperando o seu OK.
 import type { Brain } from "./brain";
@@ -55,7 +56,7 @@ export function acharProspect(brain: Brain, de: string): { id: number; nome: str
 }
 
 export function rascunhoResposta(nome: string): string {
-  return `Olá! Obrigado por responder.\n\nVamos marcar a demonstração de 30 minutos da Synapsa para a ${nomeCurto(nome)}? Me diga o dia e o horário que ficam melhores para vocês que eu encaixo na minha agenda. Se preferirem ver antes, o site é ${SITE_CLINICAS}.\n\nAbraço,\nFelipe Dalpra`;
+  return `Olá! Obrigado por responder.\n\nVamos marcar a demonstração de 30 minutos da Synapsa para a ${nomeCurto(nome)}? Me diga o dia e o horário que ficam melhores para vocês que eu encaixo na minha agenda. Se preferirem ver antes, o site é ${utm(SITE_CLINICAS, "email", "resposta", "clinicas")}.\n\nAbraço,\nFelipe Dalpra`;
 }
 
 async function buscarCorpo(env: Env, id: string, f: typeof fetch): Promise<{ text: string; html: string; headers: Record<string, string> }> {

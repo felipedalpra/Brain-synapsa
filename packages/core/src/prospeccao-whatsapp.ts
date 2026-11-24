@@ -1,3 +1,4 @@
+import { utm } from "./utm";
 // Fila diária de WhatsApp: o Brain monta a lista e a mensagem; quem abre o WhatsApp e envia é você, um por um.
 // Sem API de WhatsApp de propósito: o envio manual protege o seu número contra banimento.
 import { BrainError, brtDay, type Brain } from "./brain";
@@ -27,7 +28,7 @@ export function numeroWhatsapp(tel: string | null | undefined): { numero: string
 export function mensagemWhatsapp(nome: string, etapa: 0 | 1): string {
   const n = nomeCurto(nome);
   return etapa === 0
-    ? `Olá, tudo bem? Aqui é o Felipe, da Synapsa. Ajudamos clínicas de psicologia como a ${n} a centralizar toda a operação num só lugar, tirar processos manuais e automatizar as tarefas administrativas, para a equipe ganhar tempo. Posso te mostrar em uma demonstração de 30 minutos? Mais detalhes em ${SITE_CLINICAS}`
+    ? `Olá, tudo bem? Aqui é o Felipe, da Synapsa. Ajudamos clínicas de psicologia como a ${n} a centralizar toda a operação num só lugar, tirar processos manuais e automatizar as tarefas administrativas, para a equipe ganhar tempo. Posso te mostrar em uma demonstração de 30 minutos? Mais detalhes em ${utm(SITE_CLINICAS, "whatsapp", "prospeccao", "clinicas")}`
     : `Oi! Só retomando minha mensagem sobre a ${n}. Se fizer sentido ver a demonstração de 30 minutos, é só me avisar o melhor dia e horário. Se não for o momento, sem problema algum.`;
 }
 

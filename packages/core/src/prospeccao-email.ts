@@ -1,3 +1,4 @@
+import { utm } from "./utm";
 // E-mail de prospecção: o Brain só escreve rascunhos. Cada um vai para Aprovações e só sai depois do seu OK.
 // Modelo fixo (sem IA): previsível, passa pelo compliance e é fácil de ajustar aqui.
 import type { Brain } from "./brain";
@@ -29,18 +30,18 @@ export function montarEmail(a: Alvo, etapa: 0 | 1 | 2): { assunto: string; corpo
   if (etapa === 0) {
     return {
       assunto: `Menos trabalho manual na operação da ${nome}`,
-      corpo: `Olá, pessoal da ${nome}!\n\nSou o Felipe, fundador da Synapsa.${equipe} Em clínicas desse tamanho, boa parte do tempo da equipe vai para tarefas administrativas feitas à mão, com agenda, financeiro, cadastros e controles espalhados em lugares diferentes.\n\nA Synapsa centraliza toda a operação da clínica em uma só plataforma, tira os processos manuais do dia a dia e automatiza as tarefas administrativas, para a equipe gastar menos tempo com burocracia.\n\nVocês podem conhecer em ${SITE_CLINICAS}. Se quiserem ver na prática, posso mostrar em uma demonstração de 30 minutos. É só responder com um dia e horário que funcionem para vocês.\n\nAbraço,\nFelipe Dalpra`,
+      corpo: `Olá, pessoal da ${nome}!\n\nSou o Felipe, fundador da Synapsa.${equipe} Em clínicas desse tamanho, boa parte do tempo da equipe vai para tarefas administrativas feitas à mão, com agenda, financeiro, cadastros e controles espalhados em lugares diferentes.\n\nA Synapsa centraliza toda a operação da clínica em uma só plataforma, tira os processos manuais do dia a dia e automatiza as tarefas administrativas, para a equipe gastar menos tempo com burocracia.\n\nVocês podem conhecer em ${utm(SITE_CLINICAS, "email", "prospeccao", "clinicas")}. Se quiserem ver na prática, posso mostrar em uma demonstração de 30 minutos. É só responder com um dia e horário que funcionem para vocês.\n\nAbraço,\nFelipe Dalpra`,
     };
   }
   if (etapa === 1) {
     return {
       assunto: `Voltando ao meu e-mail sobre a ${nome}`,
-      corpo: `Olá, pessoal da ${nome}!\n\nPassando só para retomar meu e-mail de alguns dias atrás. Se centralizar a operação da clínica e reduzir o trabalho manual da equipe é um tema para vocês, dá para ver como funciona em ${SITE_CLINICAS}.\n\nPosso também mostrar na prática em 30 minutos. Me diga qual dia e horário ficam bons.\n\nAbraço,\nFelipe Dalpra`,
+      corpo: `Olá, pessoal da ${nome}!\n\nPassando só para retomar meu e-mail de alguns dias atrás. Se centralizar a operação da clínica e reduzir o trabalho manual da equipe é um tema para vocês, dá para ver como funciona em ${utm(SITE_CLINICAS, "email", "prospeccao", "clinicas")}.\n\nPosso também mostrar na prática em 30 minutos. Me diga qual dia e horário ficam bons.\n\nAbraço,\nFelipe Dalpra`,
     };
   }
   return {
     assunto: `Último contato sobre a ${nome}`,
-    corpo: `Olá, pessoal da ${nome}!\n\nEste é meu último e-mail, para não encher a caixa de vocês. Se em algum momento quiserem ver como a Synapsa centraliza a operação e automatiza as tarefas administrativas de uma clínica, o site é ${SITE_CLINICAS}, e a demonstração de 30 minutos é só responder aqui.\n\nDesejo uma ótima semana para a equipe.\n\nAbraço,\nFelipe Dalpra`,
+    corpo: `Olá, pessoal da ${nome}!\n\nEste é meu último e-mail, para não encher a caixa de vocês. Se em algum momento quiserem ver como a Synapsa centraliza a operação e automatiza as tarefas administrativas de uma clínica, o site é ${utm(SITE_CLINICAS, "email", "prospeccao", "clinicas")}, e a demonstração de 30 minutos é só responder aqui.\n\nDesejo uma ótima semana para a equipe.\n\nAbraço,\nFelipe Dalpra`,
   };
 }
 

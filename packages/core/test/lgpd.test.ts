@@ -71,3 +71,13 @@ describe("CSP com nonce", () => {
     expect(comNonce("<script>1</script>", PLANO_CSP).csp).toMatch(/script-src 'self' 'nonce-/);
   });
 });
+
+import { utm } from "../src/utm";
+import { montarEmail } from "../src/prospeccao-email";
+describe("UTM", () => {
+  it("marca o link do e-mail para clínicas", () => {
+    expect(utm("synapsa.com.br/clinicas", "email", "prospeccao", "clinicas")).toBe("synapsa.com.br/clinicas?utm_source=email&utm_medium=prospeccao&utm_campaign=clinicas");
+    expect(utm("https://x.com/a?b=1", "a", "b", "c")).toContain("?b=1&utm_source=a");
+    expect(montarEmail({ id: 1, nome: "Clínica Sol", cidade: "SP", crp_count: 3 }, 0).corpo).toContain("synapsa.com.br/clinicas?utm_source=email&utm_medium=prospeccao&utm_campaign=clinicas");
+  });
+});
