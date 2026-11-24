@@ -100,6 +100,8 @@ create table if not exists envios (
   detail text,
   at integer not null
 );
+create table if not exists mercado_sugestoes (semana text not null, semente text not null, sugestao text not null, pos integer not null, primary key (semana, semente, sugestao));
+create table if not exists leituras (dia text primary key, resumo text not null, decisoes text not null, fatos text not null, criado_em integer not null);
 create table if not exists lgpd_esquecidos (tipo text not null, valor text not null, em integer not null, primary key (tipo, valor));
 create table if not exists prospect_autonomo (prospect_id integer primary key);
 create table if not exists email_suppression (

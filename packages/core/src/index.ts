@@ -49,3 +49,5 @@ export * from "./plano-link";
 export * from "./usuarios";
 export * from "./lgpd";
 export * from "./utm";
+export * from "./mercado";
+export * from "./leitura";

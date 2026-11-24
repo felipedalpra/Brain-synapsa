@@ -5373,6 +5373,12 @@ function finImportarExtrato(db, agora, lido, adicionar) {
   return { lidos: lido.itens.length, novos: novos.length, jaExistiam: lido.itens.length - novos.length, saldoDoExtrato: lido.saldoFinal, saldoNoBrain: saldo, confere: lido.saldoFinal === null ? null : Math.abs(saldo - lido.saldoFinal) < 5e-3 };
 }
 
+// packages/core/src/utm.ts
+function utm(url, source, medium, campaign) {
+  const q = `utm_source=${source}&utm_medium=${medium}&utm_campaign=${campaign}`;
+  return url + (url.includes("?") ? "&" : "?") + q;
+}
+
 // packages/core/src/prospeccao-email.ts
 var DAY4 = 864e5;
 var ETAPAS = [0, 3, 7];
@@ -5395,7 +5401,7 @@ Sou o Felipe, fundador da Synapsa.${equipe} Em cl\xEDnicas desse tamanho, boa pa
 
 A Synapsa centraliza toda a opera\xE7\xE3o da cl\xEDnica em uma s\xF3 plataforma, tira os processos manuais do dia a dia e automatiza as tarefas administrativas, para a equipe gastar menos tempo com burocracia.
 
-Voc\xEAs podem conhecer em ${SITE_CLINICAS}. Se quiserem ver na pr\xE1tica, posso mostrar em uma demonstra\xE7\xE3o de 30 minutos. \xC9 s\xF3 responder com um dia e hor\xE1rio que funcionem para voc\xEAs.
+Voc\xEAs podem conhecer em ${utm(SITE_CLINICAS, "email", "prospeccao", "clinicas")}. Se quiserem ver na pr\xE1tica, posso mostrar em uma demonstra\xE7\xE3o de 30 minutos. \xC9 s\xF3 responder com um dia e hor\xE1rio que funcionem para voc\xEAs.
 
 Abra\xE7o,
 Felipe Dalpra`
@@ -5406,7 +5412,7 @@ Felipe Dalpra`
       assunto: `Voltando ao meu e-mail sobre a ${nome}`,
       corpo: `Ol\xE1, pessoal da ${nome}!
 
-Passando s\xF3 para retomar meu e-mail de alguns dias atr\xE1s. Se centralizar a opera\xE7\xE3o da cl\xEDnica e reduzir o trabalho manual da equipe \xE9 um tema para voc\xEAs, d\xE1 para ver como funciona em ${SITE_CLINICAS}.
+Passando s\xF3 para retomar meu e-mail de alguns dias atr\xE1s. Se centralizar a opera\xE7\xE3o da cl\xEDnica e reduzir o trabalho manual da equipe \xE9 um tema para voc\xEAs, d\xE1 para ver como funciona em ${utm(SITE_CLINICAS, "email", "prospeccao", "clinicas")}.
 
 Posso tamb\xE9m mostrar na pr\xE1tica em 30 minutos. Me diga qual dia e hor\xE1rio ficam bons.
 
@@ -5418,7 +5424,7 @@ Felipe Dalpra`
     assunto: `\xDAltimo contato sobre a ${nome}`,
     corpo: `Ol\xE1, pessoal da ${nome}!
 
-Este \xE9 meu \xFAltimo e-mail, para n\xE3o encher a caixa de voc\xEAs. Se em algum momento quiserem ver como a Synapsa centraliza a opera\xE7\xE3o e automatiza as tarefas administrativas de uma cl\xEDnica, o site \xE9 ${SITE_CLINICAS}, e a demonstra\xE7\xE3o de 30 minutos \xE9 s\xF3 responder aqui.
+Este \xE9 meu \xFAltimo e-mail, para n\xE3o encher a caixa de voc\xEAs. Se em algum momento quiserem ver como a Synapsa centraliza a opera\xE7\xE3o e automatiza as tarefas administrativas de uma cl\xEDnica, o site \xE9 ${utm(SITE_CLINICAS, "email", "prospeccao", "clinicas")}, e a demonstra\xE7\xE3o de 30 minutos \xE9 s\xF3 responder aqui.
 
 Desejo uma \xF3tima semana para a equipe.
 
@@ -5574,7 +5580,7 @@ Quando a sua pr\xE1tica crescer, o plano Essencial libera a plataforma inteira.
 
 Faz sentido eu te mostrar em 15 minutos? \xC9 s\xF3 responder este e-mail. Se preferir ver antes, a plataforma est\xE1 aqui:
 
-${SITE}
+${utm(SITE, "email", "prospeccao", "autonomos")}
 
 ${fecha}`
   };
@@ -5588,7 +5594,7 @@ O paciente te encontra, escolhe um hor\xE1rio e se cadastra sem ficar trocando m
 
 D\xE1 para ver como fica o diret\xF3rio aqui:
 
-${DIRETORIO}
+${utm(DIRETORIO, "email", "prospeccao", "autonomos")}
 
 Se quiser o seu perfil no ar, \xE9 s\xF3 responder este e-mail.
 
@@ -5610,7 +5616,7 @@ Menos tempo com burocracia, mais tempo para atender (e para descansar).
 
 Quantas horas por semana v\xE3o para isso hoje? Se quiser, te mostro como ficaria em 15 minutos. \xC9 s\xF3 responder este e-mail, ou conhecer a plataforma aqui:
 
-${SITE}
+${utm(SITE, "email", "prospeccao", "autonomos")}
 
 ${fecha}`
   };
@@ -5628,7 +5634,7 @@ Hoje, como voc\xEA acompanha a evolu\xE7\xE3o dos seus pacientes?
 
 Se quiser ver como funciona, veja como funciona aqui:
 
-${SITE}
+${utm(SITE, "email", "prospeccao", "autonomos")}
 
 ${fecha}`
   };
@@ -5642,7 +5648,7 @@ Em resumo: a Synapsa te ajuda a ser encontrado, a organizar a pr\xE1tica e a evo
 
 Se fizer sentido, \xE9 s\xF3 responder este e-mail ou conhecer a plataforma:
 
-${SITE}
+${utm(SITE, "email", "prospeccao", "autonomos")}
 
 Se n\xE3o for o momento, tudo bem. Para n\xE3o receber mais nada, responda SAIR.
 
@@ -5811,7 +5817,7 @@ function numeroWhatsapp(tel) {
 }
 function mensagemWhatsapp(nome, etapa) {
   const n4 = nomeCurto(nome);
-  return etapa === 0 ? `Ol\xE1, tudo bem? Aqui \xE9 o Felipe, da Synapsa. Ajudamos cl\xEDnicas de psicologia como a ${n4} a centralizar toda a opera\xE7\xE3o num s\xF3 lugar, tirar processos manuais e automatizar as tarefas administrativas, para a equipe ganhar tempo. Posso te mostrar em uma demonstra\xE7\xE3o de 30 minutos? Mais detalhes em ${SITE_CLINICAS}` : `Oi! S\xF3 retomando minha mensagem sobre a ${n4}. Se fizer sentido ver a demonstra\xE7\xE3o de 30 minutos, \xE9 s\xF3 me avisar o melhor dia e hor\xE1rio. Se n\xE3o for o momento, sem problema algum.`;
+  return etapa === 0 ? `Ol\xE1, tudo bem? Aqui \xE9 o Felipe, da Synapsa. Ajudamos cl\xEDnicas de psicologia como a ${n4} a centralizar toda a opera\xE7\xE3o num s\xF3 lugar, tirar processos manuais e automatizar as tarefas administrativas, para a equipe ganhar tempo. Posso te mostrar em uma demonstra\xE7\xE3o de 30 minutos? Mais detalhes em ${utm(SITE_CLINICAS, "whatsapp", "prospeccao", "clinicas")}` : `Oi! S\xF3 retomando minha mensagem sobre a ${n4}. Se fizer sentido ver a demonstra\xE7\xE3o de 30 minutos, \xE9 s\xF3 me avisar o melhor dia e hor\xE1rio. Se n\xE3o for o momento, sem problema algum.`;
 }
 var linkWhatsapp = (numero, texto2) => `https://wa.me/${numero}?text=${encodeURIComponent(texto2)}`;
 var capDia = (brain2) => Math.max(1, Math.min(30, Number(brain2.policy("prospect_whatsapp_daily", 10)) || 10));
@@ -7224,7 +7230,7 @@ function acharProspect(brain2, de) {
 function rascunhoResposta(nome) {
   return `Ol\xE1! Obrigado por responder.
 
-Vamos marcar a demonstra\xE7\xE3o de 30 minutos da Synapsa para a ${nomeCurto(nome)}? Me diga o dia e o hor\xE1rio que ficam melhores para voc\xEAs que eu encaixo na minha agenda. Se preferirem ver antes, o site \xE9 ${SITE_CLINICAS}.
+Vamos marcar a demonstra\xE7\xE3o de 30 minutos da Synapsa para a ${nomeCurto(nome)}? Me diga o dia e o hor\xE1rio que ficam melhores para voc\xEAs que eu encaixo na minha agenda. Se preferirem ver antes, o site \xE9 ${utm(SITE_CLINICAS, "email", "resposta", "clinicas")}.
 
 Abra\xE7o,
 Felipe Dalpra`;

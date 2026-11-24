@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { Leitura } from "./Leitura";
 // Gerado a partir do build de produção de 12/11/2026 (conversor mecânico). Nomes locais ainda minificados; ajuste ao mexer na tela.
 import * as React from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
@@ -113,6 +114,7 @@ export function Dashboard({ midia = false }) {
       ) : null}
         {!midia ? (
 <>
+      <Leitura />
       <section className="kpis" aria-label="Números principais">
         <div className="kpi kpi-hero">
           <span>MRR</span>

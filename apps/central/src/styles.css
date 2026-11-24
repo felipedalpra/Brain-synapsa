@@ -3504,3 +3504,14 @@ body.rec-mode .office-line > span:not(.chip-vitrine) {
 @media (max-width: 760px) { .ac-tab thead { display: none; } .ac-tab tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--line); } .ac-tab td { display: block; border: 0; padding: 3px 8px; } .ac-acoes { justify-content: flex-start; } }
 .top-dir { display: flex; align-items: center; gap: 8px; justify-self: end; }
 .eu { margin-left: 0; }
+
+/* Leitura do dia */
+.leitura-lista{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:10px}
+.leitura-item{border:1px solid var(--line,rgba(255,255,255,.12));border-left-width:3px;border-radius:10px;padding:12px 14px}
+.leitura-item p{margin:6px 0 0}
+.leitura-item small{opacity:.65;margin-right:4px}
+.leitura-item.imp-alto{border-left-color:#8b5cf6}
+.leitura-item.imp-medio{border-left-color:#38bdf8}
+.leitura-item.imp-baixo{border-left-color:rgba(255,255,255,.3)}
+.leitura-topo{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.leitura-topo b{flex:1 1 220px}

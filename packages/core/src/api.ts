@@ -28,6 +28,8 @@ import { sincronizarFaturasStripe } from "./fin-stripe";
 import { sincronizarAssinaturasStripe } from "./handlers";
 import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finClassificarExtrato, finIgnorarExtrato, finPagarConta, finDetalhe, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
 import { TEAMS, AGENTS } from "@brain/shared";
+import { gerarLeitura, leituraPainel } from "./leitura";
+import { mercadoPainel, sincronizarMercado } from "./mercado";
 import { esquecerContato, aplicarRetencao, POLITICA_HTML } from "./lgpd";
 
 export interface Services {
@@ -294,6 +296,14 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
           return out(200, { message: "Propriedade salva." });
         }
         return out(400, { message: "Informe o site e o número da propriedade (só dígitos), ou peça para descobrir." });
+      }
+      if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, mercadoPainel(brain, svc.env));
+      if (url.pathname === "/api/mercado/sincronizar") {
+        try { return out(200, { message: await sincronizarMercado(brain, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) }); } catch (e) { return out(200, { message: e instanceof Error ? e.message : String(e) }); }
+      }
+      if (req.method === "GET" && url.pathname === "/api/leitura") return out(200, { ...leituraPainel(brain), temChave: !!(svc.env.OPENAI_API_KEY || svc.env.ANTHROPIC_API_KEY) });
+      if (url.pathname === "/api/leitura/gerar") {
+        try { const l = await gerarLeitura(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }); return out(200, { ...leituraPainel(brain), message: l ? "Leitura atualizada." : "Sem leitura." }); } catch (e) { return out(200, { ...leituraPainel(brain), message: e instanceof Error ? e.message : String(e) }); }
       }
       if (url.pathname === "/api/lgpd/esquecer") {
         const eu = usuarioAtual(req);

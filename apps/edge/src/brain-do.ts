@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, publicarDevidos, liRotina, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, publicarDevidos, liRotina, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -63,6 +63,9 @@ export class BrainDO extends DurableObject<Env> {
     // Placar do Instinct (planilha do Google): lê todo dia; erro fica guardado no painel de prospecção.
     try { await instinctSincronizar(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece no painel do Instinct */ }
     try { await sincronizarGa(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece como último erro do GA4 */ }
+    // Radar do mercado (autocomplete do Google, uma vez por semana) e a leitura do dia, depois de todas as sincronizações acima.
+    try { await sincronizarMercado(this.brain); } catch { /* o aviso aparece no painel de SEO */ }
+    try { await gerarLeitura(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao atualizar pela Central */ }
     // Instagram: publica o post aprovado cujo horário chegou (no máximo 1 por dia, por padrão).
     try { await publicarDevidos(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro fica no próprio post, na Central */ }
     // LinkedIn: segunda, quarta e sexta deixa o post do dia pronto para aprovar.

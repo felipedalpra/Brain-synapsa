@@ -7,6 +7,7 @@ import { avisos } from "./Avisos";
 import { Barras, Funil, LinhaInterativa, Mini, dd, fmt, fmt1, pct } from "./seo-charts";
 import { Chips, Delta, Kpi, normaliza, useOrdem } from "./seo-ui";
 import { Analytics } from "./Analytics";
+import { Mercado } from "./Mercado";
 
 const curto = (u) => u.replace(/^https?:\/\/(www\.)?/, "");
 /** Páginas (perfis do diretório, páginas do site). Clique na linha para ver as buscas que levaram até ela. */
@@ -323,8 +324,8 @@ export function Seo() {
     <div className="stack">
       <section className="panel">
         <div className="seo-head">
-          <h2>{vista === "ga" ? "Google Analytics" : "Search Console"}</h2>
-          <Chips valor={vista} onChange={setVista} opcoes={[{ id: "gsc", rotulo: "Search Console" }, { id: "ga", rotulo: "Google Analytics" }]} />
+          <h2>{vista === "ga" ? "Google Analytics" : vista === "mercado" ? "Mercado" : "Search Console"}</h2>
+          <Chips valor={vista} onChange={setVista} opcoes={[{ id: "gsc", rotulo: "Search Console" }, { id: "ga", rotulo: "Google Analytics" }, { id: "mercado", rotulo: "Mercado" }]} />
           <button type="button" className="btn" disabled={busy} onClick={sincronizar}>{busy ? "Sincronizando…" : "Sincronizar agora"}</button>
         </div>
         <p className="muted">
@@ -335,7 +336,7 @@ export function Seo() {
           {sites.map((s) => <button key={s.id} type="button" role="tab" aria-selected={atual.id === s.id} className={atual.id === s.id ? "on" : ""} onClick={() => setSite(s.id)}>{s.rotulo}</button>)}
         </div>
       </section>
-      {vista === "ga"
+      {vista === "mercado" ? <Mercado /> : vista === "ga"
         ? <Analytics ga={dados.ga} sites={sites} site={atual.id} onRecarregar={carregar} />
         : <VisaoSite key={atual.id} s={atual} funil={dados.funil} gaSite={dados.ga?.sites?.find((x) => x.id === atual.id)} />}
     </div>
