@@ -16,13 +16,17 @@ export interface Leitura { dia: string; resumo: string; decisoes: Decisao[]; cri
 const SISTEMA = `Você é o analista de crescimento da Synapsa, plataforma para psicólogos e clínicas no Brasil. Fala com o Felipe, fundador. Escreva em português, direto, sem enrolação, sem corporativês.
 Posicionamento: ecossistema de desenvolvimento profissional do psicólogo, e para clínicas centralizar a operação e tirar processo manual. Nunca sugira o ângulo de abandono de paciente, adesão ou acompanhamento entre sessões.
 Meta atual: MRR de R$1.200 até o fim de dezembro de 2026. Todo conselho precisa ajudar a chegar nisso: receita, aquisição ou retenção.
-Regras: use SÓ os números do bloco FATOS; nunca invente número, nome ou fonte. Cada decisão cita a evidência com o número. Se o dado for pouco (amostra pequena), diga isso em vez de concluir. Ordene por impacto. No máximo 5 decisões.
+Regras: use SÓ os números do bloco FATOS, sem citar nomes de campos nem caminhos do JSON (escreva em linguagem de gente); não repita nada de ja_resolvido; nunca invente número, nome ou fonte. Cada decisão cita a evidência com o número. Se o dado for pouco (amostra pequena), diga isso em vez de concluir. Ordene por impacto. No máximo 5 decisões.
 Responda APENAS com JSON válido neste formato, sem markdown:
 {"resumo":"2 frases sobre o momento do negócio","decisoes":[{"titulo":"curto, no imperativo","porque":"evidência com número","acao":"o que fazer hoje ou nesta semana, concreto","onde":"seo|analytics|prospeccao|instinct|financeiro|mercado","impacto":"alto|medio|baixo"}]}`;
 
 /** Junta o que o Brain já sabe em um bloco pequeno, sem dado pessoal de lead nem de paciente. */
 export function fatos(brain: Brain, env: Env): Record<string, unknown> {
-  const f: Record<string, unknown> = { hoje: brtDay(brain.clock()) };
+  const f: Record<string, unknown> = {
+    hoje: brtDay(brain.clock()),
+    // Contexto que o Felipe já tratou: o modelo não deve pedir de novo.
+    ja_resolvido: ["O evento-chave do GA4 é 'purchase'; ele só registra quando há compra, então fica vazio sem venda recente. Não sugira criar outro evento-chave.", "Links de e-mail, WhatsApp e resposta do Brain já saem com UTM; falta só UTM nos links manuais (bio, DM, Instinct)."],
+  };
   try {
     f.search_console = gscPainel(brain, env).sites.map((s) => ({
       site: s.rotulo, atual: s.atual, anterior: s.anterior, marca: s.marca.clicks, semMarca: s.naoMarca.clicks,

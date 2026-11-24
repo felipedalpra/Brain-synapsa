@@ -1667,6 +1667,8 @@ create table if not exists envios (
   detail text,
   at integer not null
 );
+create table if not exists mercado_sugestoes (semana text not null, semente text not null, sugestao text not null, pos integer not null, primary key (semana, semente, sugestao));
+create table if not exists leituras (dia text primary key, resumo text not null, decisoes text not null, fatos text not null, criado_em integer not null);
 create table if not exists lgpd_esquecidos (tipo text not null, valor text not null, em integer not null, primary key (tipo, valor));
 create table if not exists prospect_autonomo (prospect_id integer primary key);
 create table if not exists email_suppression (
@@ -8646,6 +8648,165 @@ function finPainel(db, agora) {
   };
 }
 
+// packages/core/src/mercado.ts
+var SEMENTES = [
+  "sistema para psic\xF3logo",
+  "software para cl\xEDnica de psicologia",
+  "agenda para psic\xF3logo",
+  "prontu\xE1rio psic\xF3logo",
+  "cobran\xE7a de pacientes psic\xF3logo",
+  "como atrair pacientes psic\xF3logo",
+  "psic\xF3logo online",
+  "gest\xE3o de cl\xEDnica de psicologia",
+  "intelig\xEAncia artificial para psic\xF3logos"
+];
+var VARIACOES = ["", " pre\xE7o", " para"];
+var DAY10 = 864e5;
+function semanaDe2(agora) {
+  const d = /* @__PURE__ */ new Date(`${brtDay(agora)}T12:00:00Z`);
+  const dow = (d.getUTCDay() + 6) % 7;
+  return brtDay(d.getTime() - dow * DAY10);
+}
+async function sugestoes(f, q) {
+  const r = await f(`https://suggestqueries.google.com/complete/search?client=firefox&hl=pt-BR&gl=br&q=${encodeURIComponent(q)}`, { headers: { "user-agent": "Mozilla/5.0" } });
+  if (!r.ok) throw new BrainError("invalid", `Autocomplete do Google respondeu ${r.status}.`);
+  const j2 = await r.json();
+  return (Array.isArray(j2?.[1]) ? j2[1] : []).map((s2) => String(s2).trim().toLowerCase()).filter(Boolean);
+}
+async function sincronizarMercado(brain2, f = fetch, opt = {}) {
+  const semana = semanaDe2(brain2.clock());
+  if (!opt.forcar && row(brain2.db, "select 1 as x from mercado_sugestoes where semana = ? limit 1", semana)) return "Radar do mercado j\xE1 atualizado nesta semana.";
+  let n4 = 0, falhas = 0;
+  for (const semente of SEMENTES) {
+    const vistos = /* @__PURE__ */ new Set();
+    for (const v of VARIACOES) {
+      try {
+        (await sugestoes(f, semente + v)).forEach((s2, i) => {
+          if (vistos.has(s2)) return;
+          vistos.add(s2);
+          run(brain2.db, "insert or replace into mercado_sugestoes (semana, semente, sugestao, pos) values (?, ?, ?, ?)", semana, semente, s2, i);
+          n4++;
+        });
+      } catch {
+        falhas++;
+      }
+    }
+  }
+  brain2.setPolicy("mercado_estado", { ultima: brain2.clock(), erro: n4 === 0 ? "O Google n\xE3o devolveu sugest\xF5es. Tente de novo mais tarde." : null });
+  if (!n4) throw new BrainError("invalid", "O Google n\xE3o devolveu sugest\xF5es. Tente de novo mais tarde.");
+  brain2.emit("change");
+  return `Radar do mercado atualizado: ${n4} buscas sugeridas${falhas ? ` (${falhas} consultas falharam)` : ""}.`;
+}
+function mercadoPainel(brain2, env) {
+  const est = brain2.policy("mercado_estado", {});
+  const sem2 = row(brain2.db, "select max(semana) as semana from mercado_sugestoes")?.semana ?? null;
+  const ant = sem2 ? row(brain2.db, "select max(semana) as semana from mercado_sugestoes where semana < ?", sem2)?.semana ?? null : null;
+  const atual = sem2 ? rows(brain2.db, "select semente, sugestao, pos from mercado_sugestoes where semana = ? order by semente, pos", sem2) : [];
+  const antes = new Set(ant ? rows(brain2.db, "select sugestao from mercado_sugestoes where semana = ?", ant).map((x) => x.sugestao) : []);
+  const grupos = SEMENTES.map((semente) => ({ semente, itens: atual.filter((a) => a.semente === semente).map((a) => ({ texto: a.sugestao, nova: !!ant && !antes.has(a.sugestao) })) })).filter((g) => g.itens.length);
+  const novas = ant ? atual.filter((a) => !antes.has(a.sugestao)).slice(0, 30).map((a) => ({ texto: a.sugestao, semente: a.semente })) : [];
+  const subindo = [];
+  try {
+    for (const s2 of gscPainel(brain2, env).sites) for (const q of s2.queries) {
+      const a = q.anterior?.impressions ?? 0;
+      if (q.impressions >= 5 && q.impressions >= a * 1.5) subindo.push({ texto: q.chave, site: s2.rotulo, impressoes: q.impressions, antes: a, posicao: Math.round(q.position * 10) / 10, cliques: q.clicks });
+    }
+  } catch {
+  }
+  subindo.sort((x, y) => y.impressoes - x.impressoes);
+  return { semana: sem2, ultima: est.ultima ?? null, erro: est.erro ?? null, grupos, novas, subindo: subindo.slice(0, 15) };
+}
+
+// packages/core/src/leitura.ts
+var SISTEMA2 = `Voc\xEA \xE9 o analista de crescimento da Synapsa, plataforma para psic\xF3logos e cl\xEDnicas no Brasil. Fala com o Felipe, fundador. Escreva em portugu\xEAs, direto, sem enrola\xE7\xE3o, sem corporativ\xEAs.
+Posicionamento: ecossistema de desenvolvimento profissional do psic\xF3logo, e para cl\xEDnicas centralizar a opera\xE7\xE3o e tirar processo manual. Nunca sugira o \xE2ngulo de abandono de paciente, ades\xE3o ou acompanhamento entre sess\xF5es.
+Meta atual: MRR de R$1.200 at\xE9 o fim de dezembro de 2026. Todo conselho precisa ajudar a chegar nisso: receita, aquisi\xE7\xE3o ou reten\xE7\xE3o.
+Regras: use S\xD3 os n\xFAmeros do bloco FATOS; nunca invente n\xFAmero, nome ou fonte. Cada decis\xE3o cita a evid\xEAncia com o n\xFAmero. Se o dado for pouco (amostra pequena), diga isso em vez de concluir. Ordene por impacto. No m\xE1ximo 5 decis\xF5es.
+Responda APENAS com JSON v\xE1lido neste formato, sem markdown:
+{"resumo":"2 frases sobre o momento do neg\xF3cio","decisoes":[{"titulo":"curto, no imperativo","porque":"evid\xEAncia com n\xFAmero","acao":"o que fazer hoje ou nesta semana, concreto","onde":"seo|analytics|prospeccao|instinct|financeiro|mercado","impacto":"alto|medio|baixo"}]}`;
+function fatos(brain2, env) {
+  const f = { hoje: brtDay(brain2.clock()) };
+  try {
+    f.search_console = gscPainel(brain2, env).sites.map((s2) => ({
+      site: s2.rotulo,
+      atual: s2.atual,
+      anterior: s2.anterior,
+      marca: s2.marca.clicks,
+      semMarca: s2.naoMarca.clicks,
+      topBuscas: s2.queries.slice(0, 8).map((q) => ({ busca: q.chave, cliques: q.clicks, impressoes: q.impressions, posicao: Math.round(q.position * 10) / 10 })),
+      oportunidades: s2.oportunidades.slice(0, 5).map((o) => ({ busca: o.chave, impressoes: o.impressions, posicao: Math.round(o.position * 10) / 10, acao: o.acao })),
+      recados: s2.recados.slice(0, 4)
+    }));
+  } catch {
+  }
+  try {
+    f.analytics = gaPainel(brain2, env).sites.map((s2) => ({ site: s2.rotulo, atual: s2.atual, anterior: s2.anterior, canais: s2.canais.slice(0, 4).map((c2) => ({ canal: c2.chave, sessoes: c2.sessoes })), recados: s2.recados.slice(0, 4) }));
+  } catch {
+  }
+  try {
+    const i = painel(brain2, env);
+    f.instinct_whatsapp = { ultimos30: i.ultimos30.total, anteriores30: i.anteriores30, clinicas: i.ultimos30.clinicas, influenciadoras: i.ultimos30.influenciadoras, funil: i.funil };
+  } catch {
+  }
+  const st = {};
+  for (const r of rows(brain2.db, "select status, count(*) as n from prospects group by status")) st[r.status] = r.n;
+  f.prospeccao_clinicas = { porStatus: st, respostas: row(brain2.db, "select count(*) as n from prospect_contato where coalesce(respondeu,0) = 1")?.n ?? 0 };
+  try {
+    const subs = rows(brain2.db, "select * from subscriptions");
+    const m = mrrBySource(subs);
+    f.mrr = { total: Math.round(m.total * 100) / 100, clientesAtivos: Object.values(m.bySource).reduce((a, x) => a + x.count, 0), meta: 1200 };
+  } catch {
+  }
+  try {
+    const m = mercadoPainel(brain2, env);
+    f.mercado = { novasBuscasNoGoogle: m.novas.slice(0, 12).map((n4) => n4.texto), buscasSubindoNoSeuSite: m.subindo.slice(0, 6) };
+  } catch {
+  }
+  return f;
+}
+var IMPACTOS = /* @__PURE__ */ new Set(["alto", "medio", "baixo"]);
+function lerResposta(txt) {
+  const bruto = txt.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  const j2 = JSON.parse(bruto.slice(bruto.indexOf("{"), bruto.lastIndexOf("}") + 1));
+  const decisoes = (Array.isArray(j2.decisoes) ? j2.decisoes : []).slice(0, 5).map((d) => ({
+    titulo: String(d?.titulo ?? "").slice(0, 120),
+    porque: String(d?.porque ?? "").slice(0, 400),
+    acao: String(d?.acao ?? "").slice(0, 400),
+    onde: String(d?.onde ?? "").slice(0, 20),
+    impacto: IMPACTOS.has(d?.impacto) ? d.impacto : "medio"
+  })).filter((d) => d.titulo && d.acao);
+  if (!decisoes.length) throw new Error("sem decis\xF5es");
+  return { resumo: String(j2.resumo ?? "").slice(0, 400), decisoes };
+}
+async function gerarLeitura(brain2, env, f = fetch, opt = {}) {
+  if (brain2.killed()) return null;
+  const dia5 = brtDay(brain2.clock());
+  if (!opt.forcar && row(brain2.db, "select 1 as x from leituras where dia = ?", dia5)) return null;
+  const cfg = llmConfig(env, "agent");
+  if (!cfg) throw new BrainError("invalid", "Falta a chave do modelo (OPENAI_API_KEY ou ANTHROPIC_API_KEY) nos secrets do Brain.");
+  const base = fatos(brain2, env);
+  let saida = null;
+  for (let t = 0; t < 2 && !saida; t++) {
+    const r = await callLlm(cfg, { system: SISTEMA2, messages: [{ role: "user", content: `FATOS:
+${JSON.stringify(base)}` }], maxTokens: 1200 }, f);
+    try {
+      saida = lerResposta(textOf(r.content));
+    } catch {
+    }
+  }
+  if (!saida) throw new BrainError("invalid", "O modelo n\xE3o devolveu uma leitura v\xE1lida. Tente de novo.");
+  const agora = brain2.clock();
+  run(brain2.db, "insert or replace into leituras (dia, resumo, decisoes, fatos, criado_em) values (?, ?, ?, ?, ?)", dia5, saida.resumo, JSON.stringify(saida.decisoes), JSON.stringify(base), agora);
+  brain2.audit("sistema", "leitura_gerou", dia5);
+  brain2.emit("change");
+  return { dia: dia5, ...saida, criadoEm: agora };
+}
+function leituraPainel(brain2) {
+  const l = row(brain2.db, "select * from leituras order by dia desc limit 1");
+  const anteriores = rows(brain2.db, "select dia, resumo from leituras order by dia desc limit 8 offset 1");
+  return { atual: l ? { dia: l.dia, resumo: l.resumo, decisoes: JSON.parse(l.decisoes), criadoEm: l.criado_em } : null, anteriores, temChave: true };
+}
+
 // packages/core/src/api.ts
 function marcarScripts(html, nonce) {
   let out = "", i = 0;
@@ -8874,6 +9035,23 @@ function createHandler(svc) {
           return out(200, { message: "Propriedade salva." });
         }
         return out(400, { message: "Informe o site e o n\xFAmero da propriedade (s\xF3 d\xEDgitos), ou pe\xE7a para descobrir." });
+      }
+      if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, mercadoPainel(brain2, svc.env));
+      if (url.pathname === "/api/mercado/sincronizar") {
+        try {
+          return out(200, { message: await sincronizarMercado(brain2, svc.fetch ?? fetch, { forcar: true }) });
+        } catch (e) {
+          return out(200, { message: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      if (req.method === "GET" && url.pathname === "/api/leitura") return out(200, { ...leituraPainel(brain2), temChave: !!(svc.env.OPENAI_API_KEY || svc.env.ANTHROPIC_API_KEY) });
+      if (url.pathname === "/api/leitura/gerar") {
+        try {
+          const l = await gerarLeitura(brain2, svc.env, svc.fetch ?? fetch, { forcar: true });
+          return out(200, { ...leituraPainel(brain2), message: l ? "Leitura atualizada." : "Sem leitura." });
+        } catch (e) {
+          return out(200, { ...leituraPainel(brain2), message: e instanceof Error ? e.message : String(e) });
+        }
       }
       if (url.pathname === "/api/lgpd/esquecer") {
         const eu = usuarioAtual(req);
@@ -9899,6 +10077,14 @@ var BrainDO = class extends DurableObject {
     }
     try {
       await sincronizarGa(this.brain, strings(this.env));
+    } catch {
+    }
+    try {
+      await sincronizarMercado(this.brain);
+    } catch {
+    }
+    try {
+      await gerarLeitura(this.brain, strings(this.env));
     } catch {
     }
     try {
