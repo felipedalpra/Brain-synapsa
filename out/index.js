@@ -8721,11 +8721,15 @@ function mercadoPainel(brain2, env) {
 var SISTEMA2 = `Voc\xEA \xE9 o analista de crescimento da Synapsa, plataforma para psic\xF3logos e cl\xEDnicas no Brasil. Fala com o Felipe, fundador. Escreva em portugu\xEAs, direto, sem enrola\xE7\xE3o, sem corporativ\xEAs.
 Posicionamento: ecossistema de desenvolvimento profissional do psic\xF3logo, e para cl\xEDnicas centralizar a opera\xE7\xE3o e tirar processo manual. Nunca sugira o \xE2ngulo de abandono de paciente, ades\xE3o ou acompanhamento entre sess\xF5es.
 Meta atual: MRR de R$1.200 at\xE9 o fim de dezembro de 2026. Todo conselho precisa ajudar a chegar nisso: receita, aquisi\xE7\xE3o ou reten\xE7\xE3o.
-Regras: use S\xD3 os n\xFAmeros do bloco FATOS; nunca invente n\xFAmero, nome ou fonte. Cada decis\xE3o cita a evid\xEAncia com o n\xFAmero. Se o dado for pouco (amostra pequena), diga isso em vez de concluir. Ordene por impacto. No m\xE1ximo 5 decis\xF5es.
+Regras: use S\xD3 os n\xFAmeros do bloco FATOS, sem citar nomes de campos nem caminhos do JSON (escreva em linguagem de gente); n\xE3o repita nada de ja_resolvido; nunca invente n\xFAmero, nome ou fonte. Cada decis\xE3o cita a evid\xEAncia com o n\xFAmero. Se o dado for pouco (amostra pequena), diga isso em vez de concluir. Ordene por impacto. No m\xE1ximo 5 decis\xF5es.
 Responda APENAS com JSON v\xE1lido neste formato, sem markdown:
 {"resumo":"2 frases sobre o momento do neg\xF3cio","decisoes":[{"titulo":"curto, no imperativo","porque":"evid\xEAncia com n\xFAmero","acao":"o que fazer hoje ou nesta semana, concreto","onde":"seo|analytics|prospeccao|instinct|financeiro|mercado","impacto":"alto|medio|baixo"}]}`;
 function fatos(brain2, env) {
-  const f = { hoje: brtDay(brain2.clock()) };
+  const f = {
+    hoje: brtDay(brain2.clock()),
+    // Contexto que o Felipe já tratou: o modelo não deve pedir de novo.
+    ja_resolvido: ["O evento-chave do GA4 \xE9 'purchase'; ele s\xF3 registra quando h\xE1 compra, ent\xE3o fica vazio sem venda recente. N\xE3o sugira criar outro evento-chave.", "Links de e-mail, WhatsApp e resposta do Brain j\xE1 saem com UTM; falta s\xF3 UTM nos links manuais (bio, DM, Instinct)."]
+  };
   try {
     f.search_console = gscPainel(brain2, env).sites.map((s2) => ({
       site: s2.rotulo,

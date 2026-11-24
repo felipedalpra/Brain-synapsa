@@ -180,6 +180,8 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain.db, brain.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? "", url.searchParams.get("base") === "caixa" ? "caixa" : "competencia"));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/instinct") return out(200, instinctPainel(brain, svc.env));
+      if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, mercadoPainel(brain, svc.env));
+      if (req.method === "GET" && url.pathname === "/api/leitura") return out(200, { ...leituraPainel(brain), temChave: !!(svc.env.OPENAI_API_KEY || svc.env.ANTHROPIC_API_KEY) });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento/pdf") {
         const sm = url.searchParams.get("semana") ?? planPainel(brain).semana, rp = url.searchParams.get("responsavel") ?? "";
@@ -297,11 +299,9 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         }
         return out(400, { message: "Informe o site e o número da propriedade (só dígitos), ou peça para descobrir." });
       }
-      if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, mercadoPainel(brain, svc.env));
       if (url.pathname === "/api/mercado/sincronizar") {
         try { return out(200, { message: await sincronizarMercado(brain, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) }); } catch (e) { return out(200, { message: e instanceof Error ? e.message : String(e) }); }
       }
-      if (req.method === "GET" && url.pathname === "/api/leitura") return out(200, { ...leituraPainel(brain), temChave: !!(svc.env.OPENAI_API_KEY || svc.env.ANTHROPIC_API_KEY) });
       if (url.pathname === "/api/leitura/gerar") {
         try { const l = await gerarLeitura(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }); return out(200, { ...leituraPainel(brain), message: l ? "Leitura atualizada." : "Sem leitura." }); } catch (e) { return out(200, { ...leituraPainel(brain), message: e instanceof Error ? e.message : String(e) }); }
       }
