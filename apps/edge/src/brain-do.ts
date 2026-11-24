@@ -66,8 +66,9 @@ export class BrainDO extends DurableObject<Env> {
     try { await instinctSincronizar(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece no painel do Instinct */ }
     try { await sincronizarGa(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* aparece como último erro do GA4 */ }
     // Radar do mercado (autocomplete do Google, uma vez por semana) e a leitura do dia, depois de todas as sincronizações acima.
-    try { await sincronizarMercado(this.brain); } catch { /* o aviso aparece no painel de SEO */ }
-    try { await gerarLeitura(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao atualizar pela Central */ }
+    // DESATIVADO por enquanto (a pedido): radar do mercado e Leitura do dia seguem disponíveis pelos botões da Central, mas não rodam sozinhos.
+    // try { await sincronizarMercado(this.brain); } catch { /* o aviso aparece no painel de SEO */ }
+    // try { await gerarLeitura(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao atualizar pela Central */ }
     // LinkedIn: segunda, quarta e sexta deixa o post do dia pronto para aprovar.
     try { await liRotina(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao gerar pela Central */ }
     // Meta e Instagram: uma leitura por dia para a análise de Anúncios e Instagram sempre ter dado fresco.

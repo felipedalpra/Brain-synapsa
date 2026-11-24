@@ -10072,6 +10072,10 @@ var BrainDO = class extends DurableObject {
     } catch {
     }
     try {
+      await publicarDevidos(this.brain, strings(this.env));
+    } catch {
+    }
+    try {
       await sincronizarGsc(this.brain, strings(this.env));
     } catch {
     }
@@ -10089,10 +10093,6 @@ var BrainDO = class extends DurableObject {
     }
     try {
       await gerarLeitura(this.brain, strings(this.env));
-    } catch {
-    }
-    try {
-      await publicarDevidos(this.brain, strings(this.env));
     } catch {
     }
     try {
