@@ -108,6 +108,12 @@ export async function sincronizarGa(brain: Brain, env: Env, f: typeof fetch = fe
         for (const r of await relatorio(f, token, prop, a, b, [])) agg.push({ tipo: "total", periodo, k1: "total", k2: "", m: r.m });
         const grupos: [string, string][] = [["canal", "sessionDefaultChannelGroup"], ["origem", "sessionSourceMedium"], ["entrada", "landingPage"], ["pagina", "pagePath"], ["aparelho", "deviceCategory"], ["pais", "country"]];
         for (const [tipo, dim] of grupos) for (const r of await relatorio(f, token, prop, a, b, [dim], METRICAS, tipo === "entrada" || tipo === "pagina" ? 1000 : 60)) agg.push({ tipo, periodo, k1: r.dims[0] || "(não informado)", k2: "", m: r.m });
+        // Campanha (utm_campaign) junto da origem/meio: separa clínicas de autônomos, WhatsApp de e-mail. Só entra o que tem campanha marcada.
+        for (const r of await relatorio(f, token, prop, a, b, ["sessionSourceMedium", "sessionCampaignName"], METRICAS, 100)) {
+          const camp = r.dims[1] ?? "";
+          if (!camp || camp === "(not set)" || camp === "(direct)" || camp === "(organic)" || camp === "(referral)") continue;
+          agg.push({ tipo: "campanha", periodo, k1: `${r.dims[0] || "(não informado)"} · ${camp}`, k2: "", m: r.m });
+        }
         for (const r of await relatorio(f, token, prop, a, b, ["eventName"], ["eventCount", "totalUsers"], 100)) agg.push({ tipo: "evento", periodo, k1: r.dims[0]!, k2: "", m: { ...ZERO, eventos: r.m.sessoes, usuarios: r.m.usuarios } });
       }
       for (const r of diario) {
@@ -133,7 +139,7 @@ export interface GaItem extends M { chave: string; anterior: { sessoes: number; 
 export interface GaSite {
   id: string; rotulo: string; propriedade: string | null; ultimoDia: string | null;
   serie: ({ dia: string } & M)[]; atual: M; anterior: M;
-  canais: GaItem[]; origens: GaItem[]; entradas: GaItem[]; paginas: GaItem[]; aparelhos: GaItem[]; paises: GaItem[]; eventos: GaItem[];
+  canais: GaItem[]; origens: GaItem[]; campanhas: GaItem[]; entradas: GaItem[]; paginas: GaItem[]; aparelhos: GaItem[]; paises: GaItem[]; eventos: GaItem[];
   recados: string[];
 }
 export interface GaPainel { configurado: boolean; ultimoErro: string | null; ultimaSync: string | null; sites: GaSite[] }
@@ -169,7 +175,7 @@ export function gaPainel(brain: Brain, env: Env): GaPainel {
       });
     };
     const base = { atual: total("atual"), anterior: total("anterior"), canais: lista("canal", 12), entradas: lista("entrada", 300, true), eventos: lista("evento", 30) };
-    return { id: s.id, rotulo: s.rotulo, propriedade: props[s.id] ?? null, ultimoDia: serie.at(-1)?.dia ?? null, serie, ...base, origens: lista("origem", 30), paginas: lista("pagina", 300, true), aparelhos: lista("aparelho", 6), paises: lista("pais", 12), recados: serie.length ? recadosGa(base) : [] };
+    return { id: s.id, rotulo: s.rotulo, propriedade: props[s.id] ?? null, ultimoDia: serie.at(-1)?.dia ?? null, serie, ...base, origens: lista("origem", 30), campanhas: lista("campanha", 30), paginas: lista("pagina", 300, true), aparelhos: lista("aparelho", 6), paises: lista("pais", 12), recados: serie.length ? recadosGa(base) : [] };
   });
   return { configurado: !!lerChave(env) && Object.keys(props).length > 0, ultimoErro: brain.policy<string | null>("ga_ultimo_erro", null), ultimaSync: brain.policy<string | null>("ga_ultima_sync", null), sites };
 }

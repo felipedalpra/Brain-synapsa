@@ -36,7 +36,7 @@ export function fatos(brain: Brain, env: Env): Record<string, unknown> {
     }));
   } catch { /* sem Search Console */ }
   try {
-    f.analytics = gaPainel(brain, env).sites.map((s) => ({ site: s.rotulo, atual: s.atual, anterior: s.anterior, canais: s.canais.slice(0, 4).map((c) => ({ canal: c.chave, sessoes: c.sessoes })), recados: s.recados.slice(0, 4) }));
+    f.analytics = gaPainel(brain, env).sites.map((s) => ({ site: s.rotulo, atual: s.atual, anterior: s.anterior, canais: s.canais.slice(0, 4).map((c) => ({ canal: c.chave, sessoes: c.sessoes })), campanhas: s.campanhas.slice(0, 8).map((c) => ({ campanha: c.chave, sessoes: c.sessoes, anterior: c.anterior.sessoes })), recados: s.recados.slice(0, 4) }));
   } catch { /* sem GA4 */ }
   try {
     const i = instinctPainel(brain, env as never);

@@ -150,6 +150,14 @@ function VisaoGa({ g, gsc }) {
               <Barras itens={g.canais.map((c) => ({ rotulo: CANAL[c.chave] ?? c.chave, valor: c.sessoes, detalhe: `${pct(taxa(c.engajadas, c.sessoes))} engajadas · ${fmt(c.usuarios)} pessoas · ${fmt(c.eventos)} eventos-chave` }))} />
             </section>
             <section>
+              <h3>Campanhas (UTM)</h3>
+              {g.campanhas && g.campanhas.length ? (
+                <Barras itens={g.campanhas.slice(0, 15).map((c) => ({ rotulo: c.chave, valor: c.sessoes, detalhe: `${pct(taxa(c.engajadas, c.sessoes))} engajadas · ${fmt(c.eventos)} eventos-chave` }))} />
+              ) : (
+                <p className="muted">Ainda sem sessões com campanha. Aparece depois da próxima sincronização, quando alguém abrir um link com utm_campaign. O GA4 só conta quem aceita cookies e atrasa de 24 a 48 horas.</p>
+              )}
+            </section>
+            <section>
               <h3>Origem e meio</h3>
               <Barras itens={g.origens.slice(0, 15).map((c) => ({ rotulo: c.chave, valor: c.sessoes, detalhe: `${pct(taxa(c.engajadas, c.sessoes))} engajadas · ${fmt(c.eventos)} eventos-chave` }))} />
             </section>

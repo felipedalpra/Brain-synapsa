@@ -7031,7 +7031,6 @@ Regras: m\xE1ximo 1200 caracteres; 3 a 5 hashtags no final; frases curtas; nada 
 Proibido: prometer resultado cl\xEDnico, cura ou garantia; desconto, promo\xE7\xE3o ou urg\xEAncia artificial; dado ou caso cl\xEDnico de paciente; estat\xEDstica ou n\xFAmero inventado (s\xF3 use n\xFAmero se for citar quem publicou e o ano); citar concorrente; dizer que a Synapsa garante conformidade com a NR 1.
 Responda s\xF3 com o texto do post, sem t\xEDtulo nem explica\xE7\xE3o.`;
 var row22 = (l) => ({ id: l.id, status: l.status, categoria: l.categoria, texto: l.texto, criadoEm: l.criado_em, publicadoEm: l.publicado_em, permalink: l.permalink, erro: l.erro, manual: l.manual === 1 });
-var diaDePostar = (agora) => [1, 3, 5].includes((/* @__PURE__ */ new Date(`${brtDay(agora)}T12:00:00Z`)).getUTCDay());
 function proximoTema(brain2) {
   const ult = new Map(rows(brain2.db, "select categoria, max(criado_em) as u from li_posts group by categoria").map((r) => [r.categoria, r.u]));
   return [...TEMAS2].sort((a, b) => (ult.get(a.categoria) ?? 0) - (ult.get(b.categoria) ?? 0))[0];
@@ -7186,15 +7185,6 @@ async function liPublicar(brain2, env, id, f = fetch) {
     run(brain2.db, "update li_posts set status = 'falhou', erro = ? where id = ?", msg2.slice(0, 300), id);
     brain2.emit("change");
     throw e;
-  }
-}
-async function liRotina(brain2, env, f = fetch) {
-  if (brain2.policy("li_gerar", true) === false || !diaDePostar(brain2.clock())) return null;
-  try {
-    const r = await liGerar(brain2, env, f);
-    return r ? `Post do LinkedIn pronto: ${r.categoria}.` : null;
-  } catch (e) {
-    return e instanceof Error ? e.message : String(e);
   }
 }
 
@@ -10084,10 +10074,6 @@ var BrainDO = class extends DurableObject {
     }
     try {
       await sincronizarGa(this.brain, strings(this.env));
-    } catch {
-    }
-    try {
-      await liRotina(this.brain, strings(this.env));
     } catch {
     }
     try {
