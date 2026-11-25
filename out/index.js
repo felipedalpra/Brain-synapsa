@@ -5555,7 +5555,6 @@ var AUT_ESPERAS = [0, 2, 2, 3, 3];
 var AUT_TOTAL = AUT_ESPERAS.length;
 var ASSINATURA = "Synapsa. Onde a pr\xE1tica evolui.";
 var SITE = "https://synapsa.com.br";
-var DIRETORIO = "https://synapsa.chat/psicologos";
 var frase = (n4, t) => n4 ? `${n4}, ${t}` : t.charAt(0).toUpperCase() + t.slice(1);
 var emCidade = (c2) => c2 ? ` em ${c2}` : "";
 function montarAutonomo(d, etapa) {
@@ -5594,9 +5593,9 @@ Quem procura um psic\xF3logo costuma comparar perfis antes de escolher. ${d.site
 
 O paciente te encontra, escolhe um hor\xE1rio e se cadastra sem ficar trocando mensagens. Para voc\xEA, \xE9 um canal a mais de novos pacientes, que funciona sem depender s\xF3 de indica\xE7\xE3o.
 
-D\xE1 para ver como fica o diret\xF3rio aqui:
+D\xE1 para conhecer a plataforma e criar a conta gratuita aqui:
 
-${utm(DIRETORIO, "email", "prospeccao", "autonomos")}
+${utm(SITE, "email", "prospeccao", "autonomos")}
 
 Se quiser o seu perfil no ar, \xE9 s\xF3 responder este e-mail.
 
