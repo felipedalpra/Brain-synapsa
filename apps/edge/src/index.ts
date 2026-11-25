@@ -32,6 +32,7 @@ export default {
 
   async scheduled(c: ScheduledController, env: Env): Promise<void> {
     if (c.cron === "0 13 * * 1-5") await brain(env).rotina(); // 10h em Brasília, dias úteis
+    else if (c.cron === "0 17 * * 1") await brain(env).semanal(); // segunda, 14h em Brasília: relatório semanal
     else await brain(env).daily();
   },
 } satisfies ExportedHandler<Env>;

@@ -8,6 +8,14 @@ export const SEMENTES = [
   "sistema para psicólogo", "software para clínica de psicologia", "agenda para psicólogo", "prontuário psicólogo",
   "cobrança de pacientes psicólogo", "como atrair pacientes psicólogo", "psicólogo online", "gestão de clínica de psicologia", "inteligência artificial para psicólogos",
 ];
+
+/** Termos com que PACIENTES procuram terapia: tendências de busca para diretório, conteúdo e relatório dos psicólogos. */
+export const CIDADES = ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Porto Alegre", "Curitiba", "Brasília", "Salvador", "Recife", "Fortaleza", "Florianópolis"];
+export const SEMENTES_PACIENTES = [
+  "terapia online", "terapia online com psicólogo", "quanto custa terapia", "como escolher um psicólogo", "psicólogo perto de mim",
+  "terapia para ansiedade", "terapia de casal", "psicólogo para adolescente",
+  ...CIDADES.map((c) => `psicólogo em ${c}`),
+];
 const VARIACOES = ["", " preço", " para"];
 const DAY = 86_400_000;
 
@@ -49,6 +57,36 @@ export async function sincronizarMercado(brain: Brain, f: typeof fetch = fetch, 
   return `Radar do mercado atualizado: ${n} buscas sugeridas${falhas ? ` (${falhas} consultas falharam)` : ""}.`;
 }
 
+
+/** Uma vez por semana (1 consulta por termo, ~18 chamadas): guarda o que o Google sugere para quem procura terapia. */
+export async function sincronizarPacientes(brain: Brain, f: typeof fetch = fetch, opt: { forcar?: boolean } = {}): Promise<string> {
+  const semana = semanaDe(brain.clock());
+  const lista = SEMENTES_PACIENTES.map((x) => `'${x.replace(/'/g, "''")}'`).join(",");
+  if (!opt.forcar && row(brain.db, `select 1 as x from mercado_sugestoes where semana = ? and semente in (${lista}) limit 1`, semana)) return "Tendências de busca por terapia já atualizadas nesta semana.";
+  let n = 0, falhas = 0;
+  for (const semente of SEMENTES_PACIENTES) {
+    try {
+      (await sugestoes(f, semente)).forEach((s, i) => { run(brain.db, "insert or replace into mercado_sugestoes (semana, semente, sugestao, pos) values (?, ?, ?, ?)", semana, semente, s, i); n++; });
+    } catch { falhas++; }
+  }
+  if (!n) throw new BrainError("invalid", "O Google não devolveu sugestões. Tente de novo mais tarde.");
+  return `Tendências de busca por terapia atualizadas: ${n} buscas${falhas ? ` (${falhas} consultas falharam)` : ""}.`;
+}
+
+export interface TendenciasPacientes { semana: string | null; novas: { texto: string; semente: string }[]; porTema: { semente: string; itens: { texto: string; nova: boolean }[] }[] }
+
+export function tendenciasPacientes(brain: Brain): TendenciasPacientes {
+  const lista = SEMENTES_PACIENTES.map((x) => `'${x.replace(/'/g, "''")}'`).join(",");
+  const sem = row<{ semana: string | null }>(brain.db, `select max(semana) as semana from mercado_sugestoes where semente in (${lista})`)?.semana ?? null;
+  if (!sem) return { semana: null, novas: [], porTema: [] };
+  const ant = row<{ semana: string | null }>(brain.db, `select max(semana) as semana from mercado_sugestoes where semente in (${lista}) and semana < ?`, sem)?.semana ?? null;
+  const atual = rows<{ semente: string; sugestao: string }>(brain.db, `select semente, sugestao from mercado_sugestoes where semana = ? and semente in (${lista}) order by semente, pos`, sem);
+  const antes = new Set(ant ? rows<{ sugestao: string }>(brain.db, `select sugestao from mercado_sugestoes where semana = ? and semente in (${lista})`, ant).map((x) => x.sugestao) : []);
+  const porTema = SEMENTES_PACIENTES.map((semente) => ({ semente, itens: atual.filter((a) => a.semente === semente).map((a) => ({ texto: a.sugestao, nova: !!ant && !antes.has(a.sugestao) })) })).filter((g) => g.itens.length);
+  const novas = ant ? atual.filter((a) => !antes.has(a.sugestao)).slice(0, 30).map((a) => ({ texto: a.sugestao, semente: a.semente })) : [];
+  return { semana: sem, novas, porTema };
+}
+
 export interface MercadoPainel {
   semana: string | null; ultima: number | null; erro: string | null;
   grupos: { semente: string; itens: { texto: string; nova: boolean }[] }[];
@@ -59,10 +97,12 @@ export interface MercadoPainel {
 
 export function mercadoPainel(brain: Brain, env: Env): MercadoPainel {
   const est = brain.policy<{ ultima?: number | null; erro?: string | null }>("mercado_estado", {});
-  const sem = row<{ semana: string }>(brain.db, "select max(semana) as semana from mercado_sugestoes")?.semana ?? null;
-  const ant = sem ? row<{ semana: string }>(brain.db, "select max(semana) as semana from mercado_sugestoes where semana < ?", sem)?.semana ?? null : null;
-  const atual = sem ? rows<{ semente: string; sugestao: string; pos: number }>(brain.db, "select semente, sugestao, pos from mercado_sugestoes where semana = ? order by semente, pos", sem) : [];
-  const antes = new Set(ant ? rows<{ sugestao: string }>(brain.db, "select sugestao from mercado_sugestoes where semana = ?", ant).map((x) => x.sugestao) : []);
+  const lista = SEMENTES.map((x) => `'${x.replace(/'/g, "''")}'`).join(",");
+  const sem = row<{ semana: string | null }>(brain.db, `select max(semana) as semana from mercado_sugestoes where semente in (${lista})`)?.semana ?? null;
+  const ant = sem ? row<{ semana: string | null }>(brain.db, `select max(semana) as semana from mercado_sugestoes where semente in (${lista}) and semana < ?`, sem)?.semana ?? null : null;
+  const so = new Set<string>(SEMENTES);
+  const atual = (sem ? rows<{ semente: string; sugestao: string; pos: number }>(brain.db, "select semente, sugestao, pos from mercado_sugestoes where semana = ? order by semente, pos", sem) : []).filter((a) => so.has(a.semente));
+  const antes = new Set(ant ? rows<{ sugestao: string }>(brain.db, `select sugestao from mercado_sugestoes where semana = ? and semente in (${lista})`, ant).map((x) => x.sugestao) : []);
   const grupos = SEMENTES.map((semente) => ({ semente, itens: atual.filter((a) => a.semente === semente).map((a) => ({ texto: a.sugestao, nova: !!ant && !antes.has(a.sugestao) })) })).filter((g) => g.itens.length);
   const novas = ant ? atual.filter((a) => !antes.has(a.sugestao)).slice(0, 30).map((a) => ({ texto: a.sugestao, semente: a.semente })) : [];
   const subindo: MercadoPainel["subindo"] = [];

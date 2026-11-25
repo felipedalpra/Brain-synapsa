@@ -23,9 +23,43 @@ export function Mercado() {
       setBusy(false);
     }
   };
+  const acao = async (fn, ok) => {
+    setBusy(true);
+    try {
+      const r = await fn();
+      avisos.push({ kind: r.message.startsWith(ok) ? "ok" : "erro", title: r.message });
+      carregar();
+    } catch (e) {
+      avisos.push({ kind: "erro", title: e instanceof Error ? e.message : "Não deu certo." });
+    } finally {
+      setBusy(false);
+    }
+  };
   if (!d) return <p className="empty">Carregando…</p>;
   return (
     <div className="stack">
+      <section className="panel">
+        <div className="seo-head">
+          <h2>O que as pessoas buscam sobre terapia</h2>
+          <button type="button" className="btn" disabled={busy} onClick={() => acao(api.pacientesSincronizar, "Tendências")}>{busy ? "Consultando o Google…" : "Atualizar tendências"}</button>
+        </div>
+        <p className="muted">
+          Sugestões do Google para quem procura terapia (online, preço, como escolher, e as principais cidades). Atualiza sozinho toda segunda; "nova" marca o que não existia na semana anterior.
+        </p>
+        {d.pacientes && d.pacientes.novas.length ? <p>{d.pacientes.novas.map((n, i) => <span key={i} className="chip on" title={n.semente}>{n.texto}</span>)}</p> : <p className="muted">{d.pacientes && d.pacientes.semana ? "Nada novo desde a semana passada." : "Ainda sem leitura: clique em atualizar tendências."}</p>}
+        {d.pacientes && d.pacientes.porTema.length ? d.pacientes.porTema.map((g) => (
+          <p key={g.semente}><strong>{g.semente}</strong><br />{g.itens.map((x, i) => <span key={i} className={`chip${x.nova ? " on" : ""}`}>{x.texto}</span>)}</p>
+        )) : null}
+      </section>
+      <section className="panel">
+        <div className="seo-head">
+          <h2>Relatório semanal por e-mail</h2>
+          <button type="button" className="btn" disabled={busy} onClick={() => acao(api.relatorioEnviar, "Relatório enviado")}>{busy ? "Montando o relatório…" : "Enviar agora"}</button>
+        </div>
+        <p className="muted">
+          Toda segunda, às 14h, chega em {d.relatorioEmail}: de onde vem o tráfego (Google e Meta), o que mudou desde a semana anterior, o diretório e as tendências de busca. Último envio automático: {d.relatorioUltimo ? `semana de ${d.relatorioUltimo.split("-").reverse().join("/")}` : "ainda não enviado"}.
+        </p>
+      </section>
       <section className="panel">
         <div className="seo-head">
           <h2>O que o mercado procura</h2>

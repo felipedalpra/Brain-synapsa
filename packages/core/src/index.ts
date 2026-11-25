@@ -50,4 +50,5 @@ export * from "./usuarios";
 export * from "./lgpd";
 export * from "./utm";
 export * from "./mercado";
+export * from "./relatorio-semanal";
 export * from "./leitura";

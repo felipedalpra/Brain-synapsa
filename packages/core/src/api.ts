@@ -29,7 +29,8 @@ import { sincronizarAssinaturasStripe } from "./handlers";
 import { conciliar, finAddCobranca, finAddConta, finAddExtrato, finAddManual, finDesfazerPagamento, finClassificarExtrato, finIgnorarExtrato, finPagarConta, finDetalhe, finPainel, finRemoverCobranca, finRemoverConta, finRemoverManual, finSetAliquota, finSetCobranca, finSetPremissas, finNovaVenda, type ContaIn, type ExtratoIn, type VendaIn } from "./fin";
 import { TEAMS, AGENTS } from "@brain/shared";
 import { gerarLeitura, leituraPainel } from "./leitura";
-import { mercadoPainel, sincronizarMercado } from "./mercado";
+import { mercadoPainel, sincronizarMercado, sincronizarPacientes, tendenciasPacientes } from "./mercado";
+import { enviarRelatorioSemanal } from "./relatorio-semanal";
 import { esquecerContato, aplicarRetencao, POLITICA_HTML } from "./lgpd";
 
 export interface Services {
@@ -180,7 +181,7 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/financeiro/detalhe") return out(200, finDetalhe(brain.db, brain.clock(), url.searchParams.get("linha") ?? "", url.searchParams.get("mes") ?? "", url.searchParams.get("base") === "caixa" ? "caixa" : "competencia"));
       if (req.method === "GET" && url.pathname === "/api/voz") return out(200, { neural: !!svc.env.OPENAI_API_KEY, voz: svc.env.VOZ_JARVIS ?? "onyx" });
       if (req.method === "GET" && url.pathname === "/api/instinct") return out(200, instinctPainel(brain, svc.env));
-      if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, mercadoPainel(brain, svc.env));
+      if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, { ...mercadoPainel(brain, svc.env), pacientes: tendenciasPacientes(brain), relatorioEmail: brain.policy<string>("relatorio_email", "felipeodriosolladalpra@gmail.com"), relatorioUltimo: brain.policy<string>("relatorio_semanal_ultimo", "") });
       if (req.method === "GET" && url.pathname === "/api/leitura") return out(200, { ...leituraPainel(brain), temChave: !!(svc.env.OPENAI_API_KEY || svc.env.ANTHROPIC_API_KEY) });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento/pdf") {
@@ -298,6 +299,12 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
           return out(200, { message: "Propriedade salva." });
         }
         return out(400, { message: "Informe o site e o número da propriedade (só dígitos), ou peça para descobrir." });
+      }
+      if (url.pathname === "/api/mercado/pacientes") {
+        try { return out(200, { message: await sincronizarPacientes(brain, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) }); } catch (e) { return out(200, { message: e instanceof Error ? e.message : String(e) }); }
+      }
+      if (url.pathname === "/api/relatorio/semanal/enviar") {
+        try { return out(200, { message: await enviarRelatorioSemanal(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) }); } catch (e) { return out(200, { message: e instanceof Error ? e.message : String(e) }); }
       }
       if (url.pathname === "/api/mercado/sincronizar") {
         try { return out(200, { message: await sincronizarMercado(brain, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) }); } catch (e) { return out(200, { message: e instanceof Error ? e.message : String(e) }); }

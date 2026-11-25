@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, publicarDevidos, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, sincronizarPacientes, enviarRelatorioSemanal, publicarDevidos, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -77,6 +77,13 @@ export class BrainDO extends DurableObject<Env> {
     const started = this.runner.tick();
     await this.runner.idle();
     return { ...rec, started };
+  }
+
+  /** Segunda, 14h (Brasília), em execução própria (o Workers limita as chamadas externas por execução): tendências de busca por terapia e relatório semanal por e-mail. */
+  async semanal(): Promise<string> {
+    const env = strings(this.env as Record<string, unknown>);
+    try { await sincronizarPacientes(this.brain); } catch { /* o relatório sai mesmo sem as tendências */ }
+    try { return await enviarRelatorioSemanal(this.brain, env); } catch (e) { return e instanceof Error ? e.message : String(e); }
   }
 
   /** Dias úteis, 10h (Brasília): começa a busca do dia. Ler sites, CRM e rascunhos encadeiam sozinhos quando cada etapa termina. */

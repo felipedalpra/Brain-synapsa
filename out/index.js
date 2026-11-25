@@ -5962,6 +5962,11 @@ async function sincronizarGa(brain2, env, f = fetch, opt = {}) {
         for (const r of await relatorio(f, token, prop, a, b, [])) agg.push({ tipo: "total", periodo, k1: "total", k2: "", m: r.m });
         const grupos = [["canal", "sessionDefaultChannelGroup"], ["origem", "sessionSourceMedium"], ["entrada", "landingPage"], ["pagina", "pagePath"], ["aparelho", "deviceCategory"], ["pais", "country"]];
         for (const [tipo, dim] of grupos) for (const r of await relatorio(f, token, prop, a, b, [dim], METRICAS, tipo === "entrada" || tipo === "pagina" ? 1e3 : 60)) agg.push({ tipo, periodo, k1: r.dims[0] || "(n\xE3o informado)", k2: "", m: r.m });
+        for (const r of await relatorio(f, token, prop, a, b, ["sessionSourceMedium", "sessionCampaignName"], METRICAS, 100)) {
+          const camp = r.dims[1] ?? "";
+          if (!camp || camp === "(not set)" || camp === "(direct)" || camp === "(organic)" || camp === "(referral)") continue;
+          agg.push({ tipo: "campanha", periodo, k1: `${r.dims[0] || "(n\xE3o informado)"} \xB7 ${camp}`, k2: "", m: r.m });
+        }
         for (const r of await relatorio(f, token, prop, a, b, ["eventName"], ["eventCount", "totalUsers"], 100)) agg.push({ tipo: "evento", periodo, k1: r.dims[0], k2: "", m: { ...ZERO, eventos: r.m.sessoes, usuarios: r.m.usuarios } });
       }
       for (const r of diario) {
@@ -6016,7 +6021,7 @@ function gaPainel(brain2, env) {
       });
     };
     const base = { atual: total("atual"), anterior: total("anterior"), canais: lista("canal", 12), entradas: lista("entrada", 300, true), eventos: lista("evento", 30) };
-    return { id: s2.id, rotulo: s2.rotulo, propriedade: props[s2.id] ?? null, ultimoDia: serie.at(-1)?.dia ?? null, serie, ...base, origens: lista("origem", 30), paginas: lista("pagina", 300, true), aparelhos: lista("aparelho", 6), paises: lista("pais", 12), recados: serie.length ? recadosGa(base) : [] };
+    return { id: s2.id, rotulo: s2.rotulo, propriedade: props[s2.id] ?? null, ultimoDia: serie.at(-1)?.dia ?? null, serie, ...base, origens: lista("origem", 30), campanhas: lista("campanha", 30), paginas: lista("pagina", 300, true), aparelhos: lista("aparelho", 6), paises: lista("pais", 12), recados: serie.length ? recadosGa(base) : [] };
   });
   return { configurado: !!lerChave(env) && Object.keys(props).length > 0, ultimoErro: brain2.policy("ga_ultimo_erro", null), ultimaSync: brain2.policy("ga_ultima_sync", null), sites };
 }
@@ -8733,7 +8738,7 @@ function fatos(brain2, env) {
   } catch {
   }
   try {
-    f.analytics = gaPainel(brain2, env).sites.map((s2) => ({ site: s2.rotulo, atual: s2.atual, anterior: s2.anterior, canais: s2.canais.slice(0, 4).map((c2) => ({ canal: c2.chave, sessoes: c2.sessoes })), recados: s2.recados.slice(0, 4) }));
+    f.analytics = gaPainel(brain2, env).sites.map((s2) => ({ site: s2.rotulo, atual: s2.atual, anterior: s2.anterior, canais: s2.canais.slice(0, 4).map((c2) => ({ canal: c2.chave, sessoes: c2.sessoes })), campanhas: s2.campanhas.slice(0, 8).map((c2) => ({ campanha: c2.chave, sessoes: c2.sessoes, anterior: c2.anterior.sessoes })), recados: s2.recados.slice(0, 4) }));
   } catch {
   }
   try {

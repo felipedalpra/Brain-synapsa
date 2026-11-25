@@ -19,17 +19,18 @@ export const rodapeLinhas = (env: Env, prospeccao = false, autonomo = false) =>
   (prospeccao ? `${autonomo ? "Escrevi para o contato profissional que você divulga publicamente." : "Escrevi para o contato que a sua clínica divulga publicamente."} Para não receber mais e-mails meus, responda SAIR. Privacidade e seus dados: ${politicaUrl(env)}` : "Para não receber mais e-mails meus, responda SAIR.");
 export const footer = (env: Env, prospeccao = false, autonomo = false) => `\n\n--\n${rodapeLinhas(env, prospeccao, autonomo)}`;
 
-export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: string; subject: string; body: string; prospeccao?: boolean; autonomo?: boolean; html?: boolean }, f: typeof fetch = fetch): Promise<string> {
+export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: string; subject: string; body: string; prospeccao?: boolean; autonomo?: boolean; html?: boolean; interno?: boolean }, f: typeof fetch = fetch): Promise<string> {
   const from = p.prospeccao ? env.RESEND_FROM_PROSPECCAO : env.RESEND_FROM;
   if (!env.RESEND_API_KEY || !from) throw new BrainError("invalid", "Falta RESEND_API_KEY e RESEND_FROM nos secrets do Brain.");
   const to = p.to.trim().toLowerCase();
   if (!EMAIL_RE.test(to)) throw new BrainError("invalid", "E-mail do destinatário inválido.");
   if (!p.subject.trim()) throw new BrainError("invalid", "Falta o assunto.");
-  if (row(brain.db, "select 1 as x from email_suppression where email = ?", to)) throw new BrainError("invalid", "Esse contato pediu para sair ou deu erro de entrega. Não envio.");
+  if (!p.interno && row(brain.db, "select 1 as x from email_suppression where email = ?", to)) throw new BrainError("invalid", "Esse contato pediu para sair ou deu erro de entrega. Não envio.");
   const now = brain.clock();
   const cap = brain.policy("email_daily_cap", 20);
   const today = row<{ n: number }>(brain.db, "select count(*) as n from envios where channel = 'email' and status = 'enviado' and at > ?", now - DAY)?.n ?? 0;
-  if (today >= cap) throw new BrainError("invalid", `Limite de ${cap} e-mails por dia atingido. Ele sobe aos poucos para proteger o domínio.`);
+  // Relatório interno (para o próprio Felipe) não conta no limite de prospecção nem leva rodapé de saída.
+  if (!p.interno && today >= cap) throw new BrainError("invalid", `Limite de ${cap} e-mails por dia atingido. Ele sobe aos poucos para proteger o domínio.`);
   // Prospecção: as respostas chegam no Resend (RESEND_INBOUND) e o Brain as lê; sem isso, volta para o seu Gmail.
   const replyTo = (p.prospeccao && env.RESEND_INBOUND) || env.RESEND_REPLY_TO;
   const res = await f("https://api.resend.com/emails", {
@@ -39,10 +40,10 @@ export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: str
       from,
       to: [to],
       subject: p.subject.slice(0, 200),
-      text: p.body + footer(env, p.prospeccao === true, p.autonomo === true),
-      ...(p.html ? { html: emailHtml(p.body, rodapeLinhas(env, p.prospeccao === true, p.autonomo === true)) } : {}),
+      text: p.interno ? p.body : p.body + footer(env, p.prospeccao === true, p.autonomo === true),
+      ...(p.html ? { html: emailHtml(p.body, p.interno ? "Relatório automático do Synapsa Brain." : rodapeLinhas(env, p.prospeccao === true, p.autonomo === true)) } : {}),
       ...(replyTo ? { reply_to: replyTo } : {}),
-      headers: { "List-Unsubscribe": `<mailto:${replyTo ?? "sair@synapsa.chat"}?subject=SAIR>` },
+      ...(p.interno ? {} : { headers: { "List-Unsubscribe": `<mailto:${replyTo ?? "sair@synapsa.chat"}?subject=SAIR>` } }),
     }),
   });
   const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
