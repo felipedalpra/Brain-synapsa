@@ -15,7 +15,6 @@ import {
   Users,
   Wallet,
   Images,
-  Linkedin,
   Megaphone,
 } from "lucide-react";
 import { Q, Ze } from "./shared-inline";
@@ -36,7 +35,6 @@ import { Acessos } from "./components/Acessos";
 import { api } from "./api";
 import { Avisos } from "./components/Avisos";
 import { Instagram } from "./components/Instagram";
-import { LinkedIn } from "./components/LinkedIn";
 
 export const Du = [
   {
@@ -80,11 +78,6 @@ export const Du = [
     icon: Images,
   },
   {
-    id: "linkedin",
-    label: "LinkedIn",
-    icon: Linkedin,
-  },
-  {
     id: "equipes",
     label: "Equipes",
     icon: Users,
@@ -114,7 +107,7 @@ export const Du = [
 export const GRUPOS = [
   { id: "g-comando", label: "Comando", icon: Radio, filhos: ["comando", "escritorio", "aprovacoes"] },
   { id: "g-negocio", label: "Negócio", icon: LayoutDashboard, filhos: ["dashboard", "crm", "financeiro"] },
-  { id: "g-marketing", label: "Marketing", icon: Images, filhos: ["seo", "midia", "instagram", "linkedin"] },
+  { id: "g-marketing", label: "Marketing", icon: Images, filhos: ["seo", "midia", "instagram"] },
   { id: "g-ia", label: "Agentes de IA", icon: Bot, filhos: ["equipes", "agentes"] },
   { id: "g-config", label: "Integrações", icon: Plug, filhos: ["integracoes", "acesso"] },
 ];
@@ -268,7 +261,6 @@ export function App() {
         {o === "financeiro" ? <Financeiro /> : null}
         {o === "seo" ? <Seo /> : null}
         {o === "instagram" ? <Instagram /> : null}
-        {o === "linkedin" ? <LinkedIn /> : null}
         {o === "equipes" ? (
           <Equipes teamId={i} setTeamId={(d) => m("equipes", d)} goApprovals={() => m("aprovacoes")} />
         ) : null}

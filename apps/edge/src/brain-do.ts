@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, publicarDevidos, liRotina, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, publicarDevidos, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -69,8 +69,8 @@ export class BrainDO extends DurableObject<Env> {
     // DESATIVADO por enquanto (a pedido): radar do mercado e Leitura do dia seguem disponíveis pelos botões da Central, mas não rodam sozinhos.
     // try { await sincronizarMercado(this.brain); } catch { /* o aviso aparece no painel de SEO */ }
     // try { await gerarLeitura(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao atualizar pela Central */ }
-    // LinkedIn: segunda, quarta e sexta deixa o post do dia pronto para aprovar.
-    try { await liRotina(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao gerar pela Central */ }
+    // LinkedIn: DESATIVADO (a pedido). O código do LinkedIn segue no Brain, sem rodar sozinho e sem aba na Central; para religar, volte esta linha e o item de menu.
+    // try { await liRotina(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o erro aparece ao gerar pela Central */ }
     // Meta e Instagram: uma leitura por dia para a análise de Anúncios e Instagram sempre ter dado fresco.
     try { await midiaRotina(this.brain, strings(this.env as Record<string, unknown>)); } catch { /* o aviso aparece ao atualizar pela Central */ }
     try { aplicarRetencao(this.brain); } catch { /* retenção LGPD: erro aqui não para a rotina */ }
