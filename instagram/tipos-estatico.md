@@ -31,4 +31,4 @@ Rode `node instagram/escolher.mjs` (com BRAIN_URL e IG_TOKEN). Ele diz o formato
 
 Se o tipo escolhido repetir tema ou ângulo recente do contexto, ou exigir fato que você não pode confirmar (tipos 3, 5, 13), pule para o próximo da lista. Registre no resumo final qual tipo usou.
 
-**Importante para o Brain aprender:** no `post.json` de todo estático, escreva o campo `pilar` exatamente como o `escolher.mjs` devolve (`estático · <nome do tipo>`). É por esse campo que o desempenho de cada tipo é somado.
+**Importante para o Brain aprender:** no `post.json` de todo estático, termine o campo `pilar` com o `sufixoPilar` que o `escolher.mjs` devolve. Exemplo: `"pilar": "Jornada do psicólogo | estático · frase de colega"`. É por esse final que o desempenho de cada tipo é somado; o início continua sendo o pilar de conteúdo.

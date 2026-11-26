@@ -26,7 +26,7 @@ if (base && token) {
     if (r.ok) ctx = await r.json();
   } catch { /* sem rede: usa o rodízio */ }
 }
-const fixo = (motivo) => saida({ dia, formato: "estatico", tipo: rodizio.nome, numero: rodizio.numero, motivo });
+const fixo = (motivo) => saida({ dia, formato: "estatico", tipo: rodizio.nome, numero: rodizio.numero, motivo, sufixoPilar: ` | estático · ${rodizio.nome.toLowerCase()}` });
 if (!ctx?.desempenho) fixo("Rodízio fixo da data (o Brain não devolveu desempenho).");
 
 const medidos = new Map(ctx.desempenho.tipos.map((t) => [t.tipo.toLowerCase(), t]));
@@ -52,4 +52,4 @@ let alvo = ((s ^ (s >>> 16)) >>> 0) / 4294967296 * total, i = 0;
 while (alvo >= pesos[i]) { alvo -= pesos[i]; i++; }
 const t = tipos[i];
 const m = medidos.get(t.nome.toLowerCase());
-saida({ dia, formato: "estatico", tipo: t.nome, numero: t.numero, motivo: m && m.n >= 2 ? `Esse tipo teve taxa de ação ${(m.taxaAcao * 100).toFixed(1)}% em ${m.n} posts (mediana ${(mediana * 100).toFixed(1)}%).` : "Tipo ainda pouco medido: entra para o Brain aprender." , pilar: `estático · ${t.nome.toLowerCase()}` });
+saida({ dia, formato: "estatico", tipo: t.nome, numero: t.numero, motivo: m && m.n >= 2 ? `Esse tipo teve taxa de ação ${(m.taxaAcao * 100).toFixed(1)}% em ${m.n} posts (mediana ${(mediana * 100).toFixed(1)}%).` : "Tipo ainda pouco medido: entra para o Brain aprender." , sufixoPilar: ` | estático · ${t.nome.toLowerCase()}` });

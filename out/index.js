@@ -6760,7 +6760,7 @@ function revisarTexto(texto2) {
 var MATURIDADES = /* @__PURE__ */ new Set(["existe", "piloto", "plano", "educativo"]);
 function receberPost(brain2, body, origem) {
   const s2 = (k, max) => String(body[k] ?? "").trim().slice(0, max);
-  const legenda = s2("legenda", 2200), tema = s2("tema", 160), pilar = s2("pilar", 60), textos = s2("textos", 6e3), creditos = s2("creditos", 600), chave3 = s2("chave", 120);
+  const legenda = s2("legenda", 2200), tema = s2("tema", 160), pilar = s2("pilar", 100), textos = s2("textos", 6e3), creditos = s2("creditos", 600), chave3 = s2("chave", 120);
   const maturidade = s2("maturidade", 20) || "educativo";
   const slides = Array.isArray(body.slides) ? body.slides.map(String) : [];
   if (!legenda || !tema) throw new BrainError("invalid", "Faltou tema ou legenda.");
@@ -6817,7 +6817,7 @@ function igPainel(brain2, env) {
   const ls = rows(brain2.db, "select * from ig_posts order by case status when 'pendente' then 0 when 'falhou' then 1 when 'aprovado' then 2 else 3 end, agendado_para desc limit 60");
   return { configurado: !!(env.META_SYSTEM_USER_TOKEN && env.META_IG_ID), tokenEntrega: !!env.IG_INGEST_TOKEN, auto: brain2.policy("ig_auto_publicar", false) === true, posts: ls.map((l) => ver2(brain2, l)) };
 }
-var PREFIXO_TIPO = /^est[aá]tico\s*[·:\-]\s*/i;
+var TIPO_NO_PILAR = /est[aá]tico\s*[·:]\s*([^|]+)$/i;
 function resumir(l) {
   if (!l.length) return { n: 0, alcanceMedio: 0, taxaAcao: 0 };
   return { n: l.length, alcanceMedio: Math.round(l.reduce((t, x) => t + x.alcance, 0) / l.length), taxaAcao: Math.round(l.reduce((t, x) => t + x.acao / x.alcance, 0) / l.length * 1e4) / 1e4 };
@@ -6831,8 +6831,10 @@ function igDesempenho(brain2) {
   const car = ls.filter((l) => /carousel|album/i.test(l.tipo ?? ""));
   const est = ls.filter((l) => !/carousel|album/i.test(l.tipo ?? ""));
   const por = /* @__PURE__ */ new Map();
-  for (const l of est) if (PREFIXO_TIPO.test(l.pilar)) {
-    const k = l.pilar.replace(PREFIXO_TIPO, "").trim().toLowerCase();
+  for (const l of est) {
+    const m = TIPO_NO_PILAR.exec(l.pilar);
+    if (!m) continue;
+    const k = m[1].trim().toLowerCase();
     por.set(k, [...por.get(k) ?? [], ponto(l)]);
   }
   return { formatos: { carrossel: resumir(car.map(ponto)), estatico: resumir(est.map(ponto)) }, tipos: [...por].map(([tipo, v]) => ({ tipo, ...resumir(v) })).sort((a, b) => b.taxaAcao - a.taxaAcao) };

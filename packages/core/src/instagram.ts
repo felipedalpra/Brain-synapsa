@@ -41,7 +41,7 @@ const MATURIDADES = new Set(["existe", "piloto", "plano", "educativo"]);
 
 export function receberPost(brain: Brain, body: Record<string, unknown>, origem: string): { id: string; status: IgStatus; agendadoPara: number } {
   const s = (k: string, max: number) => String(body[k] ?? "").trim().slice(0, max);
-  const legenda = s("legenda", 2200), tema = s("tema", 160), pilar = s("pilar", 60), textos = s("textos", 6000), creditos = s("creditos", 600), chave = s("chave", 120);
+  const legenda = s("legenda", 2200), tema = s("tema", 160), pilar = s("pilar", 100), textos = s("textos", 6000), creditos = s("creditos", 600), chave = s("chave", 120);
   const maturidade = s("maturidade", 20) || "educativo";
   const slides = Array.isArray(body.slides) ? (body.slides as unknown[]).map(String) : [];
   if (!legenda || !tema) throw new BrainError("invalid", "Faltou tema ou legenda.");
@@ -96,14 +96,14 @@ export function igPainel(brain: Brain, env: Env): IgPainel {
 export interface IgDesempenhoItem { n: number; alcanceMedio: number; taxaAcao: number }
 export interface IgDesempenho { formatos: { carrossel: IgDesempenhoItem; estatico: IgDesempenhoItem }; tipos: (IgDesempenhoItem & { tipo: string })[] }
 
-const PREFIXO_TIPO = /^est[aá]tico\s*[·:\-]\s*/i;
+const TIPO_NO_PILAR = /est[aá]tico\s*[·:]\s*([^|]+)$/i;
 function resumir(l: { alcance: number; acao: number }[]): IgDesempenhoItem {
   if (!l.length) return { n: 0, alcanceMedio: 0, taxaAcao: 0 };
   return { n: l.length, alcanceMedio: Math.round(l.reduce((t, x) => t + x.alcance, 0) / l.length), taxaAcao: Math.round((l.reduce((t, x) => t + x.acao / x.alcance, 0) / l.length) * 10_000) / 10_000 };
 }
 
 /** Como cada formato e cada tipo de estático performou. Taxa de ação = (salvos + compartilhamentos + comentários) / alcance.
- *  O tipo do estático vem do campo `pilar` do post, escrito como "estático · <nome do tipo>". */
+ *  O tipo do estático vem do fim do campo `pilar`, escrito como "<pilar de conteúdo> | estático · <nome do tipo>". */
 export function igDesempenho(brain: Brain): IgDesempenho {
   const ls = rows<{ pilar: string; tipo: string | null; alcance: number | null; salvos: number | null; compartilhados: number | null; comentarios: number | null }>(brain.db,
     "select p.pilar, m.tipo, m.alcance, m.salvos, m.compartilhados, m.comentarios from ig_posts p join ig_post_metricas m on m.media_id = p.media_id where p.status = 'publicado' and m.alcance > 0");
@@ -111,7 +111,7 @@ export function igDesempenho(brain: Brain): IgDesempenho {
   const car = ls.filter((l) => /carousel|album/i.test(l.tipo ?? ""));
   const est = ls.filter((l) => !/carousel|album/i.test(l.tipo ?? ""));
   const por = new Map<string, ReturnType<typeof ponto>[]>();
-  for (const l of est) if (PREFIXO_TIPO.test(l.pilar)) { const k = l.pilar.replace(PREFIXO_TIPO, "").trim().toLowerCase(); por.set(k, [...(por.get(k) ?? []), ponto(l)]); }
+  for (const l of est) { const m = TIPO_NO_PILAR.exec(l.pilar); if (!m) continue; const k = m[1]!.trim().toLowerCase(); por.set(k, [...(por.get(k) ?? []), ponto(l)]); }
   return { formatos: { carrossel: resumir(car.map(ponto)), estatico: resumir(est.map(ponto)) }, tipos: [...por].map(([tipo, v]) => ({ tipo, ...resumir(v) })).sort((a, b) => b.taxaAcao - a.taxaAcao) };
 }
 
