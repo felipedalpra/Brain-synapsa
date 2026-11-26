@@ -48,6 +48,10 @@ async function tratar(req: Request, env: Env): Promise<Response> {
     const t = /^\/t\/([\w-]{1,80})\/?$/.exec(url.pathname);
     if (t && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/p/${t[1]}/pagina`));
 
+    // Relatório de presença digital de um psicólogo do diretório: link secreto, sem login.
+    const dr = /^\/d\/([0-9a-f]{1,64})\/?$/.exec(url.pathname);
+    if (dr && req.method === "GET") return brain(env).fetch(new Request(`${url.origin}/api/d/${dr[1]}/pagina`));
+
     // Páginas: só depois do login. O Worker confere o cookie (assinatura), sem acordar o Durable Object.
     const auth = createAuth(env as unknown as Record<string, string | undefined>);
     const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" };

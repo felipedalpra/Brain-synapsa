@@ -93,12 +93,35 @@ export function igPainel(brain: Brain, env: Env): IgPainel {
 }
 
 /** Para a sessão que cria o conteúdo não repetir tema: o que já foi feito e o que está na fila. Sem imagens. */
-export function igContexto(brain: Brain): { recentes: { tema: string; pilar: string; maturidade: string; status: IgStatus; dia: string; motivoRejeicao?: string }[]; pendentes: number; proximoLivre: number } {
+export interface IgDesempenhoItem { n: number; alcanceMedio: number; taxaAcao: number }
+export interface IgDesempenho { formatos: { carrossel: IgDesempenhoItem; estatico: IgDesempenhoItem }; tipos: (IgDesempenhoItem & { tipo: string })[] }
+
+const PREFIXO_TIPO = /^est[aá]tico\s*[·:\-]\s*/i;
+function resumir(l: { alcance: number; acao: number }[]): IgDesempenhoItem {
+  if (!l.length) return { n: 0, alcanceMedio: 0, taxaAcao: 0 };
+  return { n: l.length, alcanceMedio: Math.round(l.reduce((t, x) => t + x.alcance, 0) / l.length), taxaAcao: Math.round((l.reduce((t, x) => t + x.acao / x.alcance, 0) / l.length) * 10_000) / 10_000 };
+}
+
+/** Como cada formato e cada tipo de estático performou. Taxa de ação = (salvos + compartilhamentos + comentários) / alcance.
+ *  O tipo do estático vem do campo `pilar` do post, escrito como "estático · <nome do tipo>". */
+export function igDesempenho(brain: Brain): IgDesempenho {
+  const ls = rows<{ pilar: string; tipo: string | null; alcance: number | null; salvos: number | null; compartilhados: number | null; comentarios: number | null }>(brain.db,
+    "select p.pilar, m.tipo, m.alcance, m.salvos, m.compartilhados, m.comentarios from ig_posts p join ig_post_metricas m on m.media_id = p.media_id where p.status = 'publicado' and m.alcance > 0");
+  const ponto = (l: (typeof ls)[number]) => ({ alcance: l.alcance ?? 0, acao: (l.salvos ?? 0) + (l.compartilhados ?? 0) + (l.comentarios ?? 0) });
+  const car = ls.filter((l) => /carousel|album/i.test(l.tipo ?? ""));
+  const est = ls.filter((l) => !/carousel|album/i.test(l.tipo ?? ""));
+  const por = new Map<string, ReturnType<typeof ponto>[]>();
+  for (const l of est) if (PREFIXO_TIPO.test(l.pilar)) { const k = l.pilar.replace(PREFIXO_TIPO, "").trim().toLowerCase(); por.set(k, [...(por.get(k) ?? []), ponto(l)]); }
+  return { formatos: { carrossel: resumir(car.map(ponto)), estatico: resumir(est.map(ponto)) }, tipos: [...por].map(([tipo, v]) => ({ tipo, ...resumir(v) })).sort((a, b) => b.taxaAcao - a.taxaAcao) };
+}
+
+export function igContexto(brain: Brain): { recentes: { tema: string; pilar: string; maturidade: string; status: IgStatus; dia: string; motivoRejeicao?: string }[]; pendentes: number; proximoLivre: number; desempenho: IgDesempenho } {
   const ls = rows<Linha>(brain.db, "select * from ig_posts order by criado_em desc limit 60");
   const fila = ls.filter((l) => l.status === "pendente" || l.status === "aprovado");
   return {
     recentes: ls.map((l) => ({ tema: l.tema, pilar: l.pilar, maturidade: l.maturidade, status: l.status, dia: new Date(l.agendado_para).toISOString().slice(0, 10), ...(l.status === "rejeitado" && l.erro ? { motivoRejeicao: l.erro } : {}) })),
     pendentes: fila.length, proximoLivre: Math.max(brain.clock(), ...fila.map((l) => l.agendado_para)),
+    desempenho: igDesempenho(brain),
   };
 }
 

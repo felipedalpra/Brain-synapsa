@@ -52,3 +52,5 @@ export * from "./utm";
 export * from "./mercado";
 export * from "./relatorio-semanal";
 export * from "./leitura";
+export * from "./leads-quentes";
+export * from "./diretorio-relatorio";

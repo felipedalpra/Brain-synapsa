@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, sincronizarPacientes, enviarRelatorioSemanal, publicarDevidos, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, sincronizarPacientes, enviarRelatorioSemanal, rotinaLeadsQuentes, publicarDevidos, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -88,7 +88,9 @@ export class BrainDO extends DurableObject<Env> {
 
   /** Dias úteis, 10h (Brasília): começa a busca do dia. Ler sites, CRM e rascunhos encadeiam sozinhos quando cada etapa termina. */
   async rotina(): Promise<string> {
-    const msg = await rodarRotina(this.brain, strings(this.env as Record<string, unknown>));
+    const env = strings(this.env as Record<string, unknown>);
+    const msg = await rodarRotina(this.brain, env);
+    try { await rotinaLeadsQuentes(this.brain, env); } catch { /* o aviso de lead quente nunca derruba a rotina */ }
     await this.arm(20_000);
     return msg;
   }

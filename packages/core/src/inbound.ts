@@ -4,6 +4,8 @@ import { utm } from "./utm";
 import type { Brain } from "./brain";
 import { suppress } from "./dispatch";
 import { row, rows, run } from "./sql";
+import { callLlm, llmConfig, textOf } from "./llm";
+import { linkWhatsapp } from "./leads-quentes";
 import { marcarContato, nomeCurto, SITE_CLINICAS } from "./prospeccao-email";
 
 type Env = Record<string, string | undefined>;
@@ -57,6 +59,31 @@ export function acharProspect(brain: Brain, de: string): { id: number; nome: str
 
 export function rascunhoResposta(nome: string): string {
   return `Olá! Obrigado por responder.\n\nVamos marcar a demonstração de 30 minutos da Synapsa para a ${nomeCurto(nome)}? Me diga o dia e o horário que ficam melhores para vocês que eu encaixo na minha agenda. Se preferirem ver antes, o site é ${utm(SITE_CLINICAS, "email", "resposta", "clinicas")}.\n\nAbraço,\nFelipe Dalpra`;
+}
+
+export type Intencao = "quer_demo" | "duvida_preco" | "duvida_produto" | "adiar" | "outro";
+const ROTULO_INTENCAO: Record<Intencao, string> = { quer_demo: "quer ver a plataforma", duvida_preco: "perguntou de preço", duvida_produto: "tem dúvida sobre o produto", adiar: "pediu para falar depois", outro: "respondeu" };
+
+const SISTEMA_RESPOSTA = `Você escreve a resposta do Felipe Dalpra, fundador da Synapsa, a um lead de prospecção que respondeu o e-mail. A Synapsa é o ecossistema de desenvolvimento profissional do psicólogo (perfil público, agenda, ficha de entrada, financeiro, evolução com dados) e, para clínicas, centraliza a operação e tira processo manual.
+Regras: português, 3 a 6 linhas, tom humano e direto; responda ao que a pessoa escreveu; proponha a próxima etapa (demonstração de 15 a 30 minutos) e peça dia e horário; NÃO invente preço, desconto, prazo, funcionalidade ou número (se perguntarem preço, diga que o plano Essencial libera a plataforma inteira e que explica os valores na conversa); NÃO fale de abandono de paciente, adesão ou acompanhamento entre sessões; termine com "Abraço," e "Felipe Dalpra".
+Responda APENAS com JSON: {"intencao":"quer_demo|duvida_preco|duvida_produto|adiar|outro","resposta":"texto da resposta"}`;
+
+/** Lê o que o lead escreveu e devolve a intenção e uma resposta sob medida. Sem modelo ou com erro, cai no texto fixo. */
+export async function respostaSobMedida(env: Env, nome: string, texto: string, f: typeof fetch): Promise<{ intencao: Intencao; rascunho: string }> {
+  const padrao = { intencao: "outro" as Intencao, rascunho: rascunhoResposta(nome) };
+  const cfg = llmConfig(env, "agent");
+  if (!cfg || !texto.trim()) return padrao;
+  try {
+    const r = await callLlm(cfg, { system: SISTEMA_RESPOSTA, messages: [{ role: "user", content: `Lead: ${nomeCurto(nome)}\nO que ele escreveu:\n${texto.slice(0, 1200)}` }], maxTokens: 500 }, f);
+    const bruto = textOf(r.content).trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const j = JSON.parse(bruto.slice(bruto.indexOf("{"), bruto.lastIndexOf("}") + 1)) as { intencao?: string; resposta?: string };
+    const resposta = String(j.resposta ?? "").trim().slice(0, 1200);
+    if (resposta.length < 20) return padrao;
+    const intencao = (j.intencao && j.intencao in ROTULO_INTENCAO ? j.intencao : "outro") as Intencao;
+    return { intencao, rascunho: resposta };
+  } catch {
+    return padrao;
+  }
 }
 
 async function buscarCorpo(env: Env, id: string, f: typeof fetch): Promise<{ text: string; html: string; headers: Record<string, string> }> {
@@ -121,17 +148,19 @@ export async function tratarRecebido(brain: Brain, env: Env, d: Recebido, f: typ
   // Resposta de verdade: para os follow-ups, avisa você e deixa o rascunho de retorno para aprovar.
   if (p) marcarContato(brain, p.id, "respondeu");
   const nome = p?.nome ?? de;
-  const rascunho = rascunhoResposta(nome);
+  const { intencao, rascunho } = await respostaSobMedida(env, nome, textoNovo(text), f);
+  const tel = p ? row<{ telefone: string | null }>(brain.db, "select telefone from prospects where id = ?", p.id)?.telefone ?? null : null;
+  const wa = linkWhatsapp(tel, `Oi! Aqui é o Felipe, da Synapsa. Vi sua resposta ao meu e-mail e queria combinar a conversa por aqui. Qual dia e horário ficam bons para você?`);
   brain.addProposal({
     agentId: "prospeccao", kind: "resposta_lead", channel: "email", risk: "medio", impactoBrl: 79,
-    title: `Responder ${nomeCurto(nome)}`,
+    title: `Responder ${nomeCurto(nome)} (${ROTULO_INTENCAO[intencao]})`,
     draft: rascunho,
-    why: `${nomeCurto(nome)} respondeu o e-mail de prospecção: “${trecho.slice(0, 220).replace(/\s+/g, " ")}”. Rascunho para marcar a demonstração de 30 minutos. Ajuste antes de aprovar.`,
+    why: `${nomeCurto(nome)} respondeu o e-mail de prospecção (${ROTULO_INTENCAO[intencao]}): “${trecho.slice(0, 220).replace(/\s+/g, " ")}”. A resposta foi escrita a partir do que ele disse. Revise antes de aprovar.`,
     contactRef: de,
-    payload: { envio: { tipo: "email", para: de, assunto: assunto.toLowerCase().startsWith("re:") ? assunto : `Re: ${assunto || "Synapsa"}`, remetente: "prospeccao" }, prospeccao: { prospectId: p?.id ?? null, resposta: true }, base: "legitimo_interesse_b2b" },
+    payload: { envio: { tipo: "email", para: de, assunto: assunto.toLowerCase().startsWith("re:") ? assunto : `Re: ${assunto || "Synapsa"}`, remetente: "prospeccao" }, prospeccao: { prospectId: p?.id ?? null, resposta: true, intencao }, base: "legitimo_interesse_b2b" },
     dedupeKey: `resp-${id}`,
   });
-  await encaminhar(env, `[Resposta] ${nome}: ${assunto}`, de, `${de} respondeu:\n\n${trecho}\n\nO rascunho de retorno já está em Aprovações na Central.`, f);
+  await encaminhar(env, `[Resposta] ${nome}: ${ROTULO_INTENCAO[intencao]}`, de, `${nome} respondeu (${ROTULO_INTENCAO[intencao]}):\n\n${trecho}\n\nResposta sugerida (já está em Aprovações na Central, é só revisar e aprovar):\n\n${rascunho}${wa ? `\n\nOu chame no WhatsApp, a mensagem já vai pronta:\n${wa}` : ""}`, f);
   brain.audit("sistema", "prospeccao_respondeu_por_email", de, { prospectId: p?.id });
   brain.emit("change");
   return { tipo, prospectId: p?.id };

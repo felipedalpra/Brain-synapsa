@@ -31,6 +31,8 @@ import { TEAMS, AGENTS } from "@brain/shared";
 import { gerarLeitura, leituraPainel } from "./leitura";
 import { mercadoPainel, sincronizarMercado, sincronizarPacientes, tendenciasPacientes } from "./mercado";
 import { enviarRelatorioSemanal } from "./relatorio-semanal";
+import { linkDoPsicologo, linksDosPsicologos, paginaDoPsicologo, perfisDoDiretorio, revogarLinkDoPsicologo } from "./diretorio-relatorio";
+import { avisarLeadsQuentes } from "./leads-quentes";
 import { esquecerContato, aplicarRetencao, POLITICA_HTML } from "./lgpd";
 
 export interface Services {
@@ -117,6 +119,14 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         try { await liCallback(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch, url.origin, url.searchParams.get("code") ?? "", url.searchParams.get("state") ?? ""); }
         catch (e) { brain.audit("sistema", "li_conexao_falhou", e instanceof Error ? e.message.slice(0, 200) : "erro"); destino = `/?linkedin=erro#linkedin`; }
         return new Response(null, { status: 302, headers: { location: destino } });
+      }
+
+      // Relatório de presença digital de um psicólogo: o token do link é o segredo.
+      const dl = url.pathname.match(/^\/api\/d\/([0-9a-f]{1,64})\/pagina$/);
+      if (dl && req.method === "GET") {
+        const cab = { "cache-control": "no-store", "x-robots-tag": "noindex, nofollow", "content-type": "text/html; charset=utf-8", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" };
+        try { return new Response(paginaDoPsicologo(brain, svc.env, dl[1]!), { status: 200, headers: cab }); }
+        catch (e) { if (e instanceof BrainError) return new Response(`<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><body style="font:16px sans-serif;padding:32px">${e.message}</body>`, { status: 404, headers: cab }); throw e; }
       }
 
       // Tarefas da semana compartilhadas com o time: o token do link é o segredo. Só lê e marca como concluída.
@@ -299,6 +309,17 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
           return out(200, { message: "Propriedade salva." });
         }
         return out(400, { message: "Informe o site e o número da propriedade (só dígitos), ou peça para descobrir." });
+      }
+      if (req.method === "GET" && url.pathname === "/api/diretorio/psicologos") return out(200, { ...perfisDoDiretorio(brain, svc.env), links: linksDosPsicologos(brain) });
+      if (req.method === "POST" && url.pathname === "/api/diretorio/psicologos/link") {
+        const b = (await readJson(req, 2_000)) as { slug?: string; revogar?: boolean };
+        try {
+          if (b.revogar) { revogarLinkDoPsicologo(brain, String(b.slug ?? "")); return out(200, { ok: true }); }
+          return out(200, { ...linkDoPsicologo(brain, svc.env, String(b.slug ?? "")), caminho: "/d/" });
+        } catch (e) { if (e instanceof BrainError) return out(400, { error: e.message }); throw e; }
+      }
+      if (req.method === "POST" && url.pathname === "/api/leads-quentes/avisar") {
+        try { return out(200, { message: `${await avisarLeadsQuentes(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)} avisos enviados.` }); } catch (e) { return out(200, { message: e instanceof Error ? e.message : String(e) }); }
       }
       if (url.pathname === "/api/mercado/pacientes") {
         try { return out(200, { message: await sincronizarPacientes(brain, (svc.fetch ?? fetch) as typeof fetch, { forcar: true }) }); } catch (e) { return out(200, { message: e instanceof Error ? e.message : String(e) }); }

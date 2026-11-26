@@ -43,6 +43,7 @@ export function esquecerContato(brain: Brain, alvo: { prospectId?: number; email
     for (const t of ["prospect_contato", "prospect_whatsapp", "prospect_autonomo"]) run(brain.db, `delete from ${t} where prospect_id = ?`, id);
     for (const r of rows<{ id: string }>(brain.db, "select id from proposals where dedupe_key like ? or dedupe_key like ?", `prosp-${id}-%`, `aut-${id}-%`)) { anonimizarProposta(brain, r.id); mensagens++; }
     run(brain.db, "delete from inbound_emails where prospect_id = ?", id);
+    run(brain.db, "delete from lead_clique where prospect_id = ?", id);
     // Mantém a linha com o place_id para a busca do Google não trazer a mesma pessoa de volta.
     run(brain.db, "update prospects set nome = 'Removido (LGPD)', cidade = null, endereco = null, telefone = null, site = null, instagram = null, email = null, email_fonte = null, consulta = null, crm_lead_id = null, status = 'removido', atualizado_em = ? where id = ?", agora, id);
   }

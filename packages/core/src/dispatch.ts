@@ -19,7 +19,7 @@ export const rodapeLinhas = (env: Env, prospeccao = false, autonomo = false) =>
   (prospeccao ? `${autonomo ? "Escrevi para o contato profissional que você divulga publicamente." : "Escrevi para o contato que a sua clínica divulga publicamente."} Para não receber mais e-mails meus, responda SAIR. Privacidade e seus dados: ${politicaUrl(env)}` : "Para não receber mais e-mails meus, responda SAIR.");
 export const footer = (env: Env, prospeccao = false, autonomo = false) => `\n\n--\n${rodapeLinhas(env, prospeccao, autonomo)}`;
 
-export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: string; subject: string; body: string; prospeccao?: boolean; autonomo?: boolean; html?: boolean; interno?: boolean }, f: typeof fetch = fetch): Promise<string> {
+export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: string; subject: string; body: string; prospeccao?: boolean; autonomo?: boolean; html?: boolean; htmlPronto?: string; interno?: boolean }, f: typeof fetch = fetch): Promise<string> {
   const from = p.prospeccao ? env.RESEND_FROM_PROSPECCAO : env.RESEND_FROM;
   if (!env.RESEND_API_KEY || !from) throw new BrainError("invalid", "Falta RESEND_API_KEY e RESEND_FROM nos secrets do Brain.");
   const to = p.to.trim().toLowerCase();
@@ -41,7 +41,7 @@ export async function sendEmail(brain: Brain, env: Env, p: { id: string; to: str
       to: [to],
       subject: p.subject.slice(0, 200),
       text: p.interno ? p.body : p.body + footer(env, p.prospeccao === true, p.autonomo === true),
-      ...(p.html ? { html: emailHtml(p.body, p.interno ? "Relatório automático do Synapsa Brain." : rodapeLinhas(env, p.prospeccao === true, p.autonomo === true)) } : {}),
+      ...(p.htmlPronto ? { html: p.htmlPronto } : p.html ? { html: emailHtml(p.body, p.interno ? "Relatório automático do Synapsa Brain." : rodapeLinhas(env, p.prospeccao === true, p.autonomo === true)) } : {}),
       ...(replyTo ? { reply_to: replyTo } : {}),
       ...(p.interno ? {} : { headers: { "List-Unsubscribe": `<mailto:${replyTo ?? "sair@synapsa.chat"}?subject=SAIR>` } }),
     }),

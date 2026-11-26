@@ -75,7 +75,7 @@ export function gerarAutonomos(brain: Brain): { novos: number; followups: number
       etapa = ult.etapa + 1;
     }
     const host = (() => { try { return a.site ? new URL(a.site.startsWith("http") ? a.site : `https://${a.site}`).hostname.replace(/^www\./, "") : null; } catch { return null; } })();
-    const m = montarAutonomo({ nome: nomeAutonomo(a.nome), cidade: a.cidade, siteHost: host, whatsapp: a.whatsapp_no_site === 1 }, etapa as 1 | 2 | 3 | 4 | 5);
+    const m = montarAutonomo({ id: a.id, nome: nomeAutonomo(a.nome), cidade: a.cidade, siteHost: host, whatsapp: a.whatsapp_no_site === 1 }, etapa as 1 | 2 | 3 | 4 | 5);
     const email = a.email.toLowerCase();
     const id = brain.addProposal({
       agentId: AGENTE, kind: "prospeccao_autonomo", channel: "email", risk: "medio", impactoBrl: 79,

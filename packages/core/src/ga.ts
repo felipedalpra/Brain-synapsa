@@ -71,6 +71,28 @@ export async function descobrirPropriedades(brain: Brain, env: Env, f: typeof fe
   return { achadas, vistas };
 }
 
+/** Visitas dos últimos 28 dias por código de lead (utm_content) no site principal. Uma só chamada ao GA4. */
+export async function gaConteudoPorLead(brain: Brain, env: Env, f: typeof fetch = fetch): Promise<{ codigo: string; sessoes: number; ultimo: string }[]> {
+  const chave = lerChave(env);
+  const props = propriedadesGa(brain);
+  const site = sitesGsc(brain).find((s) => s.tipo !== "diretorio" && props[s.id]);
+  if (!chave || !site) return [];
+  const agora = brain.clock();
+  const token = await tokenGoogle(chave, agora, f, ESCOPO);
+  const r = await relatorio(f, token, props[site.id]!, dia(agora - 27 * DAY), dia(agora), ["sessionManualAdContent", "date"], ["sessions"], 1000);
+  const por = new Map<string, { sessoes: number; ultimo: string }>();
+  for (const l of r) {
+    const codigo = l.dims[0] ?? "", d = l.dims[1] ?? "";
+    if (!/^l[0-9a-z]{1,8}$/.test(codigo)) continue;
+    const data = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+    const x = por.get(codigo) ?? { sessoes: 0, ultimo: "" };
+    x.sessoes += l.m.sessoes;
+    if (data > x.ultimo) x.ultimo = data;
+    por.set(codigo, x);
+  }
+  return [...por].map(([codigo, v]) => ({ codigo, ...v }));
+}
+
 export async function sincronizarGa(brain: Brain, env: Env, f: typeof fetch = fetch, opt: { forcar?: boolean } = {}): Promise<string> {
   const chave = lerChave(env);
   if (!chave) return "GA4 não configurado (falta o segredo GSC_SERVICE_ACCOUNT).";
