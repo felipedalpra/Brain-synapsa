@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, sincronizarPacientes, enviarRelatorioSemanal, rotinaLeadsQuentes, publicarDevidos, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
+import { Brain, avancar as prospAvancar, gerarRascunhos, gerarAutonomos, rodarRotina, sincronizarGsc, sincronizarGa, instinctSincronizar, aplicarRetencao, sincronizarMercado, gerarLeitura, sincronizarPacientes, enviarRelatorioSemanal, rotinaLeadsQuentes, atualizarDados, estadoFrescor, publicarDevidos, midiaRotina, LoginLimiter, armazemUsuarios, Runner, SCHEMA, complianceReviewer, createAuth, createHandler, integrationsView, llmChat, llmConfig, makeThinker, ruleChat, runChecks, seedKnownFacts } from "@brain/core";
 import { doDb } from "./do-db";
 
 export interface Env {
@@ -30,6 +30,8 @@ export class BrainDO extends DurableObject<Env> {
     // Trabalho novo ou mudança: garante um alarme para recuperar o que o reinício interromper.
     brain.on("queued", () => void this.arm(60_000));
     brain.on("prospeccao", () => void this.arm(20_000));
+    // Dados sempre frescos: a cada acordada o Brain confere o que venceu e agenda o alarme que atualiza.
+    void this.arm(estadoFrescor(brain, e).haAtraso ? 2_000 : 60_000);
 
     const integrations = () => integrationsView(brain.db, e, brain.clock());
     const rules = ruleChat(brain, integrations);
@@ -50,6 +52,8 @@ export class BrainDO extends DurableObject<Env> {
   }
 
   async fetch(req: Request): Promise<Response> {
+    // Alguém abriu a Central e há fonte vencida: atualiza já, em segundo plano, sem botão.
+    if (req.method === "GET" && estadoFrescor(this.brain, strings(this.env as Record<string, unknown>)).haAtraso) void this.arm(1_500);
     return (await this.handle(req)) ?? new Response(JSON.stringify({ error: "não encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
   }
 
@@ -96,14 +100,20 @@ export class BrainDO extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    await this.daily();
+    const env = strings(this.env as Record<string, unknown>);
     const busy = this.brain.db.prepare("select count(*) as n from agent_runs where status in ('queued','running')").get() as { n: number };
-    if (busy.n > 0) await this.arm(60_000);
-    // Rodadas do Apify em andamento: confere e processa o que terminou.
     const rod = this.brain.db.prepare("select count(*) as n from prospect_runs where status = 'rodando'").get() as { n: number };
-    if (rod.n > 0) {
-      const r = await prospAvancar(this.brain, strings(this.env as Record<string, unknown>)).catch(() => null);
-      if (!r || r.pendentes > 0) await this.arm(30_000);
+    if (busy.n > 0 || rod.n > 0) {
+      await this.daily();
+      if (busy.n > 0) await this.arm(60_000);
+      // Rodadas do Apify em andamento: confere e processa o que terminou.
+      if (rod.n > 0) {
+        const r = await prospAvancar(this.brain, env).catch(() => null);
+        if (!r || r.pendentes > 0) await this.arm(30_000);
+      }
     }
+    // Atualização das fontes (uma por alarme, para respeitar o limite de chamadas externas) e próximo alarme.
+    const d = await atualizarDados(this.brain, busy.n > 0 || rod.n > 0 ? {} : env).catch(() => ({ rodou: null, proxima: 60_000 }));
+    await this.arm(d.rodou ? 3_000 : Math.min(d.proxima, 15 * 60_000));
   }
 }

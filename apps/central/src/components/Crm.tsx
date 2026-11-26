@@ -169,10 +169,6 @@ export function CrmPainel() {
             {" min; leitura apenas."}
           </p>
         </div>
-        <button type="button" className="btn" onClick={() => u(true)} disabled={s}>
-          <RefreshCw size={15} aria-hidden className={s ? "spin" : ""} />{" "}
-          {s ? "Lendo o CRM\u2026" : "Atualizar"}
-        </button>
       </header>
       {r ? (
         <p className="banner" role="alert">

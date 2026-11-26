@@ -209,7 +209,7 @@ function VisaoSite({ s, funil, gaSite }) {
   const perfis = s.paginas.filter((p) => p.tipo === "perfil");
   const outras = s.paginas.filter((p) => p.tipo !== "perfil");
   const pos = s.atual.position, posAnt = s.anterior.position;
-  if (s.serie.length === 0) return <p className="empty">Sem dados ainda. Clique em "Sincronizar agora".</p>;
+  if (s.serie.length === 0) return <p className="empty">Sem dados ainda. Os dados chegam sozinhos.</p>;
   return (
     <div className="stack">
       <div className="kpis seo-kpis">
@@ -327,7 +327,6 @@ export function Seo() {
         <div className="seo-head">
           <h2>{vista === "ga" ? "Google Analytics" : vista === "mercado" ? "Mercado" : vista === "psicologos" ? "Psicólogos" : "Search Console"}</h2>
           <Chips valor={vista} onChange={setVista} opcoes={[{ id: "gsc", rotulo: "Search Console" }, { id: "ga", rotulo: "Google Analytics" }, { id: "mercado", rotulo: "Mercado" }, { id: "psicologos", rotulo: "Psicólogos" }]} />
-          <button type="button" className="btn" disabled={busy} onClick={sincronizar}>{busy ? "Sincronizando…" : "Sincronizar agora"}</button>
         </div>
         <p className="muted">
           Últimos 28 dias contra os 28 anteriores. Sincroniza sozinho todo dia{dados.ultimaSync ? `; última vez em ${dd(dados.ultimaSync)}` : ""}.

@@ -41,7 +41,6 @@ export function Mercado() {
       <section className="panel">
         <div className="seo-head">
           <h2>O que as pessoas buscam sobre terapia</h2>
-          <button type="button" className="btn" disabled={busy} onClick={() => acao(api.pacientesSincronizar, "Tendências")}>{busy ? "Consultando o Google…" : "Atualizar tendências"}</button>
         </div>
         <p className="muted">
           Sugestões do Google para quem procura terapia (online, preço, como escolher, e as principais cidades). Atualiza sozinho toda segunda; "nova" marca o que não existia na semana anterior.
@@ -63,7 +62,6 @@ export function Mercado() {
       <section className="panel">
         <div className="seo-head">
           <h2>O que o mercado procura</h2>
-          <button type="button" className="btn" disabled={busy} onClick={atualizar}>{busy ? "Consultando o Google…" : "Atualizar agora"}</button>
         </div>
         <p className="muted">
           Sugestões do Google (as buscas que as pessoas realmente digitam) para os termos do seu mercado. Atualiza sozinho toda semana; última vez: {data(d.ultima)}.
@@ -92,7 +90,7 @@ export function Mercado() {
           <h2>{g.semente}</h2>
           <p>{g.itens.map((x, i) => <span key={i} className={`chip${x.nova ? " on" : ""}`}>{x.texto}{x.nova ? " · nova" : ""}</span>)}</p>
         </section>
-      )) : <p className="empty">Ainda não há leitura do Google. Clique em "Atualizar agora".</p>}
+      )) : <p className="empty">Ainda não há leitura do Google. A leitura chega sozinha.</p>}
     </div>
   );
 }

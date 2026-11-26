@@ -92,6 +92,7 @@ export const api = {
   mercadoSincronizar: () => post("/api/mercado/sincronizar", {}),
   pacientesSincronizar: () => post("/api/mercado/pacientes", {}),
   relatorioEnviar: () => post("/api/relatorio/semanal/enviar", {}),
+  frescor: () => chamar("/api/frescor"),
   psicologos: () => chamar("/api/diretorio/psicologos"),
   psicologoLink: (slug, revogar = false) => post("/api/diretorio/psicologos/link", { slug, revogar }),
   leadsQuentesAvisar: () => post("/api/leads-quentes/avisar", {}),

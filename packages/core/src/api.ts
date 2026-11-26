@@ -14,6 +14,7 @@ import { aprovarEEnviar, gerarRascunhos, marcarContato } from "./prospeccao-emai
 import { autonomosAtivar, autonomosPainel, gerarAutonomos } from "./autonomos";
 import { marcarWhatsapp } from "./prospeccao-whatsapp";
 import { gscPainelCompleto, sincronizarGsc } from "./gsc";
+import { estadoFrescor } from "./frescor";
 import { configurar as instinctConfigurar, painel as instinctPainel, preparar as instinctPreparar, sincronizar as instinctSincronizar } from "./instinct";
 import { descobrirPropriedades, gaPainel, propriedadesGa, sincronizarGa } from "./ga";
 import { criarLink, planAcao, planPainel } from "./planejamento";
@@ -193,6 +194,8 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
       if (req.method === "GET" && url.pathname === "/api/instinct") return out(200, instinctPainel(brain, svc.env));
       if (req.method === "GET" && url.pathname === "/api/mercado") return out(200, { ...mercadoPainel(brain, svc.env), pacientes: tendenciasPacientes(brain), relatorioEmail: brain.policy<string>("relatorio_email", "felipeodriosolladalpra@gmail.com"), relatorioUltimo: brain.policy<string>("relatorio_semanal_ultimo", "") });
       if (req.method === "GET" && url.pathname === "/api/leitura") return out(200, { ...leituraPainel(brain), temChave: !!(svc.env.OPENAI_API_KEY || svc.env.ANTHROPIC_API_KEY) });
+      if (req.method === "GET" && url.pathname === "/api/frescor") return out(200, estadoFrescor(brain, svc.env));
+      if (req.method === "GET" && url.pathname === "/api/diretorio/psicologos") return out(200, { ...perfisDoDiretorio(brain, svc.env), links: linksDosPsicologos(brain) });
       if (req.method === "GET" && url.pathname === "/api/seo") return out(200, { ...(await gscPainelCompleto(brain, svc.env, (svc.fetch ?? fetch) as typeof fetch)), ga: gaPainel(brain, svc.env) });
       if (req.method === "GET" && url.pathname === "/api/planejamento/pdf") {
         const sm = url.searchParams.get("semana") ?? planPainel(brain).semana, rp = url.searchParams.get("responsavel") ?? "";
@@ -310,7 +313,6 @@ export function createHandler(svc: Services): (req: Request) => Promise<Response
         }
         return out(400, { message: "Informe o site e o número da propriedade (só dígitos), ou peça para descobrir." });
       }
-      if (req.method === "GET" && url.pathname === "/api/diretorio/psicologos") return out(200, { ...perfisDoDiretorio(brain, svc.env), links: linksDosPsicologos(brain) });
       if (req.method === "POST" && url.pathname === "/api/diretorio/psicologos/link") {
         const b = (await readJson(req, 2_000)) as { slug?: string; revogar?: boolean };
         try {

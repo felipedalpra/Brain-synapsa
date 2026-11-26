@@ -102,10 +102,6 @@ export function Dashboard({ midia = false }) {
             {midia ? " atrás." : " atrás na Meta; o MRR fecha todo dia às 7h."}
           </p>
         </div>
-        <button type="button" className="btn" onClick={x} disabled={s}>
-          <RefreshCw size={15} aria-hidden className={s ? "spin" : ""} />{" "}
-          {s ? "Lendo Meta e Instagram\u2026" : "Atualizar dados"}
-        </button>
       </header>
       {l.length ? (
         <p className="banner" role="alert">
@@ -434,7 +430,7 @@ export function Dashboard({ midia = false }) {
               />
             ) : (
               <p className="muted">
-                O gráfico aparece quando houver mais de um dia de dados. Use “Atualizar dados”.
+                O gráfico aparece quando houver mais de um dia de dados. Os dados chegam sozinhos.
               </p>
             )}
             <div className="table-wrap">
@@ -472,7 +468,7 @@ export function Dashboard({ midia = false }) {
                 </tbody>
               </table>
               {S.ultimos_posts?.length ? null : (
-                <p className="muted">Sem posts carregados ainda. Use “Atualizar dados”.</p>
+                <p className="muted">Sem posts carregados ainda. Os dados chegam sozinhos.</p>
               )}
             </div>
           </div>

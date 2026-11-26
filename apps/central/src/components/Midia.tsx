@@ -184,7 +184,7 @@ function Resumo({ d, ir }) {
       </section>
       <section className="panel">
         <h2>Coleta de dados</h2>
-        {!diag ? <p className="muted">Ainda não li a Meta. Toque em “Atualizar dados”.</p> : (
+        {!diag ? <p className="muted">Ainda não li a Meta. Os dados chegam sozinhos.</p> : (
           <>
             <p className="muted">Última leitura: {new Date(diag.at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}.{falhas.length ? ` ${falhas.length} parte(s) com problema:` : " Tudo foi lido."}</p>
             <ul className="mid-diag">
@@ -534,12 +534,9 @@ export function Midia() {
       <header className="page-head head-row">
         <div>
           <h1>Anúncios e Instagram</h1>
-          <p>Tudo que a Meta entrega, por período, com o que fazer em cada parte. Os dados são lidos todo dia de manhã.</p>
+          <p>Tudo que a Meta entrega, por período, com o que fazer em cada parte. Os dados são lidos sozinhos, de hora em hora.</p>
         </div>
         <div className="mid-ref">
-          <button type="button" className="btn" onClick={() => atualizar(90)} disabled={lendo}>
-            <RefreshCw size={15} aria-hidden className={lendo ? "spin" : ""} /> {lendo ? "Lendo a Meta…" : "Atualizar dados"}
-          </button>
           <button type="button" className="btn-link" onClick={() => atualizar(365)} disabled={lendo} title="Busca os anúncios, o pixel e os públicos dos últimos 12 meses">Buscar 12 meses</button>
         </div>
       </header>

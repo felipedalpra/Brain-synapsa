@@ -1,6 +1,7 @@
 // @ts-nocheck
 // Gerado a partir do build de produção de 12/11/2026 (conversor mecânico). Nomes locais ainda minificados; ajuste ao mexer na tela.
 import * as React from "react";
+import { Frescor } from "./components/Frescor";
 import { JarvisBot } from "./components/JarvisBot";
 import {
   Bot,
@@ -162,6 +163,7 @@ export function App() {
             <p>{e.mode === "live" ? "Ao vivo \xB7 Brain neste computador" : "Dados de demonstra\xE7\xE3o"}</p>
           </div>
         </div>
+        <Frescor />
         <nav className="nav" aria-label="Áreas">
           {GRUPOS.map((g) => {
             const S = g.icon;

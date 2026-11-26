@@ -54,3 +54,4 @@ export * from "./relatorio-semanal";
 export * from "./leitura";
 export * from "./leads-quentes";
 export * from "./diretorio-relatorio";
+export * from "./frescor";

@@ -282,7 +282,6 @@ export function InstinctPainel() {
         </div>
         <div className="ix-acoes">
           <span className="muted">{lido ? `Lida em ${lido}` : "Ainda não lida"}</span>
-          <button className="btn" disabled={busy} onClick={() => agir(() => api.instinctSincronizar(), "Lida")}>Atualizar</button>
           <a className="btn" href={p.planilha.url} target="_blank" rel="noreferrer">Planilha</a>
           <button className="btn" onClick={() => setCfg((v) => !v)} aria-expanded={cfg}>Configurar</button>
         </div>

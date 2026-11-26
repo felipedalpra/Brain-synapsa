@@ -111,7 +111,7 @@ function VisaoGa({ g, gsc }) {
   const [aba, setAba] = React.useState("canais");
   const gscMap = React.useMemo(() => new Map((gsc?.paginas ?? []).map((x) => [x.caminho, x])), [gsc]);
   if (!g.propriedade) return <p className="empty">Esse site ainda não tem propriedade do GA4 ligada.</p>;
-  if (!g.serie.length) return <p className="empty">Propriedade {g.propriedade} ligada, sem dados ainda. Clique em "Sincronizar agora".</p>;
+  if (!g.serie.length) return <p className="empty">Propriedade {g.propriedade} ligada, sem dados ainda. Os dados chegam sozinhos.</p>;
   const serie = g.serie.slice(-janela).map(derivada);
   const a = derivada(g.atual), p = derivada(g.anterior);
   const sub = [{ id: "canais", rotulo: "De onde vêm" }, { id: "entradas", rotulo: g.id === "diretorio" ? "Entradas e perfis" : "Páginas de entrada" }, { id: "paginas", rotulo: "Páginas vistas" }, { id: "eventos", rotulo: "Eventos" }, { id: "aparelho", rotulo: "Aparelho e país" }];
