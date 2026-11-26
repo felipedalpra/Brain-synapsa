@@ -27,7 +27,7 @@ Slide que serve: `foto` (frase forte sobre foto de pessoa), `dado` (número com 
 
 ## Como escolher
 
-Rode `node instagram/escolher.mjs` (com BRAIN_URL e IG_TOKEN). Ele diz o formato do dia e, se for estático, o tipo: o rodízio de 20 ajustado pelo que o Brain mediu (taxa de salvos, compartilhamentos e comentários por alcance). Tipo acima da mediana repete mais, abaixo repete menos, e os 6 últimos não voltam. Com poucos estáticos medidos, ele segue o rodízio fixo da data.
+Rode `node instagram/escolher.mjs` (com BRAIN_URL e IG_TOKEN). Ele diz o formato do dia e, se for estático, o tipo: o rodízio de 20 ajustado pelo que o Brain mediu (taxa de salvos, compartilhamentos e comentários por alcance). Tipo acima da mediana repete mais, abaixo repete menos, e os 6 últimos não voltam. Enquanto menos de 4 tipos tiverem sido medidos, ele segue o rodízio fixo da data.
 
 Se o tipo escolhido repetir tema ou ângulo recente do contexto, ou exigir fato que você não pode confirmar (tipos 3, 5, 13), pule para o próximo da lista. Registre no resumo final qual tipo usou.
 
