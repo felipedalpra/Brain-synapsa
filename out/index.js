@@ -3187,15 +3187,13 @@ async function sendApproved(brain2, env, proposalId, f = fetch) {
 }
 
 // packages/core/src/integrations.ts
-var LOCAL_ONLY = {
-  supabase: "O Brain usa SQLite (no computador ou no Durable Object da Cloudflare). N\xE3o usa Supabase.",
-  cloudflare: "O Brain roda num Worker com Durable Object. O deploy \xE9 feito com o wrangler."
-};
+var FORA_DA_LISTA = /* @__PURE__ */ new Set(["supabase"]);
 function integrationsView(db, env, now = Date.now()) {
   const checks = new Map(rows(db, "select * from integration_checks").map((c2) => [c2.integration_id, c2]));
-  return mockIntegrations().map((i) => {
+  return mockIntegrations().filter((i) => !FORA_DA_LISTA.has(i.id)).map((i) => {
     if (i.state === "manual") return i;
-    if (LOCAL_ONLY[i.id]) return { ...i, state: "pendente", detail: LOCAL_ONLY[i.id], syncMinutes: null };
+    if (i.id === "cloudflare") return { ...i, state: "conectado", detail: "O Brain roda neste Worker, com Durable Object. Os agentes e as leituras rodam sozinhos.", next: void 0, syncMinutes: i.syncMinutes };
+    if (i.id === "google" && env.GSC_SERVICE_ACCOUNT) return { ...i, state: "conectado", detail: "Search Console e GA4 lidos por conta de servi\xE7o, s\xF3 leitura. O Google Agenda ainda n\xE3o est\xE1 ligado.", next: void 0, syncMinutes: i.syncMinutes };
     const missing = i.secrets.filter((s2) => !env[s2]);
     if (missing.length > 0) return { ...i, state: "pendente", detail: `Falta ${missing.join(" e ")} nos secrets do Brain (Cloudflare: Settings, Variables and Secrets; local: .env.local).`, next: `Preencher ${missing.join(" e ")} no .env.local e reiniciar o servidor.`, syncMinutes: null };
     const c2 = checks.get(i.id);
